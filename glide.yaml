@@ -1,0 +1,8 @@
+package: github.com/gyuho/distdb
+import:
+- package: github.com/gogo/protobuf
+  subpackages:
+  - gogoproto
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
