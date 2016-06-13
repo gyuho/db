@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package walpb;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+message Record {
+	int64  Type = 1;
+	uint32 CRC  = 2;
+	bytes  Data = 3;
+}
+
+message Snapshot {
+	uint64 Term  = 1;
+	uint64 Index = 2;
+}
