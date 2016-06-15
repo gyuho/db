@@ -41,12 +41,15 @@ func PurgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan
 				}
 
 				if err = l.Close(); err != nil {
-					logger.Errorf("unlocking error when purging file %q (%v)", l.Name(), err)
+					logger.Errorf("unlocking error %v when closing %q", err, l.Name())
 					errc <- err
 					return
 				}
+
 				logger.Infof("purged %q", f)
-				ns = ns[1:] // pop-front
+
+				// pop-front
+				ns = ns[1:]
 			}
 
 			select {

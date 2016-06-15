@@ -80,7 +80,7 @@ func preallocExtendTrunc(f *os.File, sizeInBytes int64) error {
 		return err
 	}
 
-	// move(set) beginning of the file(os.SEEK_SET) to curOff
+	// move(set) beginning of the file(os.SEEK_SET) to curOff(beginning)
 	if _, err = f.Seek(curOff, os.SEEK_SET); err != nil { // 0, os.SEEK_SET: seek relative to the origin(beginning) of the file
 		return err
 	}
