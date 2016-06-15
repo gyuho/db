@@ -85,10 +85,10 @@ func Fdatasync(f *os.File) error {
 	return syscall.Fdatasync(int(f.Fd()))
 }
 
-// WriteAndSyncFile behaves just like ioutil.WriteFile,
+// WriteSync behaves just like ioutil.WriteFile,
 // but calls Sync before closing the file to guarantee that
 // the data is synced if there's no error returned.
-func WriteAndSyncFile(fpath string, data []byte, perm os.FileMode) error {
+func WriteSync(fpath string, data []byte, perm os.FileMode) error {
 	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
 	if err != nil {
 		return err
