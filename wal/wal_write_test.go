@@ -14,6 +14,17 @@ import (
 	"github.com/gyuho/distdb/walpb"
 )
 
+// createEmptyEntries creates empty slice of entries for testing.
+func createEmptyEntries(num int) [][]raftpb.Entry {
+	entries := make([][]raftpb.Entry, num)
+	for i := 0; i < num; i++ {
+		entries[i] = []raftpb.Entry{
+			{Index: uint64(i + 1)},
+		}
+	}
+	return entries
+}
+
 func TestUnsafeEncodeHardState(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	w := &WAL{
@@ -148,7 +159,7 @@ func TestCreateInterrupted(t *testing.T) {
 	}
 	w.Close()
 
-	if fileutil.DirWithFiles(tmpDir) {
+	if fileutil.DirHasFiles(tmpDir) {
 		t.Fatalf("%q should have been renamed (should not exist)", tmpDir)
 	}
 

@@ -6,108 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/gyuho/distdb/crc"
-	"github.com/gyuho/distdb/fileutil"
 	"github.com/gyuho/distdb/raftpb"
 	"github.com/gyuho/distdb/walpb"
 )
-
-// openLastWALFile opens the last WAL file for read and write.
-func openLastWALFile(dir string) (*fileutil.LockedFile, error) {
-	wnames, err := readWALNames(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	fpath := filepath.Join(dir, wnames[len(wnames)-1])
-	return fileutil.LockFile(fpath, os.O_RDWR, privateFileMode)
-}
-
-// openWAL opens a WAL file with given snapshot.
-func openWAL(dir string, snap walpb.Snapshot, write bool) (*WAL, error) {
-	names, err := readWALNames(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	lastWALIdx := searchLastWALIndex(names, snap.Index)
-	if lastWALIdx < 0 || !areWALNamesSorted(names[lastWALIdx:]) {
-		return nil, ErrFileNotFound
-	}
-	names = names[lastWALIdx:]
-
-	// open WAL files
-	var (
-		readClosers []io.ReadCloser
-		readers     []io.Reader
-		lockedFiles []*fileutil.LockedFile
-	)
-	for _, name := range names {
-		fpath := filepath.Join(dir, name)
-		switch write {
-		case true:
-			f, err := fileutil.LockFileNonBlocking(fpath, os.O_RDWR, fileutil.PrivateFileMode)
-			if err != nil {
-				closeAll(readClosers...)
-				return nil, err
-			}
-			readClosers = append(readClosers, f)
-			lockedFiles = append(lockedFiles, f)
-
-		case false:
-			f, err := os.OpenFile(fpath, os.O_RDONLY, fileutil.PrivateFileMode)
-			if err != nil {
-				closeAll(readClosers...)
-				return nil, err
-			}
-			readClosers = append(readClosers, f)
-			lockedFiles = append(lockedFiles, nil)
-		}
-		readers = append(readers, readClosers[len(readClosers)-1])
-	}
-	closeFunc := func() error {
-		return closeAll(readClosers...)
-	}
-
-	w := &WAL{
-		dir: dir,
-
-		lockedFiles: lockedFiles,
-
-		dec:                 newDecoder(readers...),
-		decoderReaderCloser: closeFunc,
-		readStartSnapshot:   snap,
-	}
-
-	if write {
-		// write reuses the file descriptors from read
-		// so don't close, then WAL can append without releasing the flocks
-		w.decoderReaderCloser = nil
-		if _, _, err := parseWALName(filepath.Base(w.UnsafeLastFile().Name())); err != nil {
-			closeFunc()
-			return nil, err
-		}
-		w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
-	}
-
-	return w, nil
-}
-
-// OpenWALWrite opens the WAL file at the given snapshot for writes.
-// The snap must have had been stored in the WAL, or the following ReadAll fails.
-// The returned WAL is ready for reads, and appends only after reading out
-// all of its previous records.
-// The first record will be the one after the given snapshot.
-func OpenWALWrite(dir string, snap walpb.Snapshot) (*WAL, error) {
-	return openWAL(dir, snap, true)
-}
-
-// OpenWALRead opens the WAL file for reads.
-func OpenWALRead(dir string, snap walpb.Snapshot) (*WAL, error) {
-	return openWAL(dir, snap, false)
-}
 
 var (
 	ErrMetadataConflict = errors.New("wal: conflicting metadata found")
@@ -187,7 +90,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 
 		default:
 			hardstate.Reset()
-			return nil, hardstate, nil, fmt.Errorf("unexpected record type %q", rec.Type)
+			return nil, hardstate, nil, fmt.Errorf("unexpected record type %d", rec.Type)
 		}
 	}
 
@@ -201,8 +104,8 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 			return nil, hardstate, nil, err
 		}
 
-	default: // write mode
-		// must read all entries in write mode
+	default:
+		// write mode, must read all entries in write mode
 		if err != io.EOF {
 			hardstate.Reset()
 			return nil, hardstate, nil, err

@@ -28,7 +28,7 @@ const (
 // be written at the head of each WAL file. It can be retrieved
 // with ReadAll.
 func Create(dir string, metadata []byte) (*WAL, error) {
-	if fileutil.DirWithFiles(dir) {
+	if fileutil.DirHasFiles(dir) {
 		return nil, os.ErrExist
 	}
 
@@ -78,10 +78,6 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 
 	// 3. encode snapshot
 	if err := w.UnsafeEncodeSnapshotAndFdatasync(&walpb.Snapshot{Term: 0, Index: 0}); err != nil {
-		return nil, err
-	}
-
-	if err := w.UnsafeFdatasync(); err != nil {
 		return nil, err
 	}
 
@@ -171,12 +167,12 @@ func (w *WAL) UnsafeEncodeEntry(ent *raftpb.Entry) error {
 }
 
 // UnsafeEncodeHardState encodes raftpb.HardState to the record.
-func (w *WAL) UnsafeEncodeHardState(st *raftpb.HardState) error {
-	if raftpb.IsEmptyHardState(*st) {
+func (w *WAL) UnsafeEncodeHardState(state *raftpb.HardState) error {
+	if raftpb.IsEmptyHardState(*state) {
 		return nil
 	}
 
-	data, err := st.Marshal()
+	data, err := state.Marshal()
 	if err != nil {
 		return err
 	}
@@ -188,7 +184,7 @@ func (w *WAL) UnsafeEncodeHardState(st *raftpb.HardState) error {
 		return err
 	}
 
-	w.hardState = *st
+	w.hardState = *state
 	return nil
 }
 

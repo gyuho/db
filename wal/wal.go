@@ -1,6 +1,8 @@
 package wal
 
 import (
+	"io"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -63,7 +65,7 @@ func (w *WAL) UnsafeLastFileSeq() uint64 {
 
 	seq, _, err := parseWALName(filepath.Base(f.Name()))
 	if err != nil {
-		logger.Fatalf("failed to parse WAL file %q (%v)", f.Name(), err)
+		logger.Fatalf("failed to parse %q (%v)", f.Name(), err)
 	}
 	return seq
 }
@@ -95,6 +97,101 @@ func (w *WAL) Close() error {
 	}
 
 	return nil
+}
+
+// openLastWALFile opens the last WAL file for read and write.
+func openLastWALFile(dir string) (*fileutil.LockedFile, error) {
+	wnames, err := readWALNames(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	fpath := filepath.Join(dir, wnames[len(wnames)-1])
+	return fileutil.LockFile(fpath, os.O_RDWR, fileutil.PrivateFileMode)
+}
+
+// openWAL opens a WAL file with given snapshot.
+func openWAL(dir string, snap walpb.Snapshot, write bool) (*WAL, error) {
+	names, err := readWALNames(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	lastWALIdx := searchLastWALIndex(names, snap.Index)
+	if lastWALIdx < 0 || !areWALNamesSorted(names[lastWALIdx:]) {
+		return nil, ErrFileNotFound
+	}
+	names = names[lastWALIdx:]
+
+	// open WAL files
+	var (
+		readClosers []io.ReadCloser
+		readers     []io.Reader
+		lockedFiles []*fileutil.LockedFile
+	)
+	for _, name := range names {
+		fpath := filepath.Join(dir, name)
+		switch write {
+		case true:
+			f, err := fileutil.LockFileNonBlocking(fpath, os.O_RDWR, fileutil.PrivateFileMode)
+			if err != nil {
+				closeAll(readClosers...)
+				return nil, err
+			}
+			readClosers = append(readClosers, f)
+			lockedFiles = append(lockedFiles, f)
+
+		case false:
+			f, err := os.OpenFile(fpath, os.O_RDONLY, fileutil.PrivateFileMode)
+			if err != nil {
+				closeAll(readClosers...)
+				return nil, err
+			}
+			readClosers = append(readClosers, f)
+			lockedFiles = append(lockedFiles, nil)
+		}
+		readers = append(readers, readClosers[len(readClosers)-1])
+	}
+	closeFunc := func() error {
+		return closeAll(readClosers...)
+	}
+
+	w := &WAL{
+		dir: dir,
+
+		lockedFiles: lockedFiles,
+
+		dec:                 newDecoder(readers...),
+		decoderReaderCloser: closeFunc,
+		readStartSnapshot:   snap,
+	}
+
+	if write {
+		// Write reuses the file descriptors from read.
+		// Don't close, so that WAL can append without releasing flocks.
+		w.decoderReaderCloser = nil
+		if _, _, err := parseWALName(filepath.Base(w.UnsafeLastFile().Name())); err != nil {
+			closeFunc()
+			return nil, err
+		}
+		w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
+	}
+
+	return w, nil
+}
+
+// OpenWALWrite opens the WAL file at the given snapshot for writes.
+// The snap must have had been stored in the WAL, or the following ReadAll fails.
+// The returned WAL is ready for reads, and appends only after reading out
+// all of its previous records.
+// The first record will be the one after the given snapshot.
+func OpenWALWrite(dir string, snap walpb.Snapshot) (*WAL, error) {
+	return openWAL(dir, snap, true)
+}
+
+// OpenWALRead opens the WAL file for reads.
+func OpenWALRead(dir string, snap walpb.Snapshot) (*WAL, error) {
+	return openWAL(dir, snap, false)
 }
 
 // ReleaseLocks releases locks whose index is smaller than the given,
