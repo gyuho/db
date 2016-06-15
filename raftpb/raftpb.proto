@@ -20,7 +20,7 @@ message Entry {
 	uint64 Term  = 2;
 	uint64 Index = 3;
 
-	bytes  Data = 4;
+	bytes Data = 4;
 }
 
 message ConfigState {
