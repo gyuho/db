@@ -14,7 +14,7 @@ import (
 func Repair(dir string) bool {
 	f, err := openLastWALFile(dir)
 	if err != nil {
-		logger.Errorf("failed to open last WAL at %q (%v)", dir, err)
+		logger.Errorf("failed to open last WAL in %q (%v)", dir, err)
 		return false
 	}
 	defer f.Close()
@@ -45,10 +45,10 @@ func Repair(dir string) bool {
 			return true
 
 		case io.ErrUnexpectedEOF:
-			logger.Infof("repairing WAL %q", f.Name())
+			logger.Infof("repairing %q", f.Name())
 			bf, berr := os.Create(f.Name() + ".broken")
 			if berr != nil {
-				logger.Errorf("failed to create backup file %q for WAL (%v)", f.Name(), err)
+				logger.Errorf("failed to create backup %q (%v)", f.Name(), err)
 				return false
 			}
 			defer bf.Close()
@@ -72,13 +72,13 @@ func Repair(dir string) bool {
 			}
 
 			if err = fileutil.Fsync(f.File); err != nil {
-				logger.Errorf("failed to fsync WAL %q (%v)", f.Name(), err)
+				logger.Errorf("failed to fsync %q (%v)", f.Name(), err)
 				return false
 			}
 			return true
 
 		default:
-			logger.Errorf("failed to repair WAL %q (%v)", f.Name(), err)
+			logger.Errorf("failed to repair %q (%v)", f.Name(), err)
 			return false
 		}
 	}

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/gyuho/distdb/fileutil"
-	"github.com/gyuho/distdb/raftpb"
 )
 
 func getWALName(seq, index uint64) string {
@@ -15,7 +14,7 @@ func getWALName(seq, index uint64) string {
 
 func parseWALName(name string) (seq, index uint64, err error) {
 	if filepath.Ext(name) != ".wal" {
-		return 0, 0, fmt.Errorf("bad WAL name %q", name)
+		return 0, 0, fmt.Errorf("bad WAL name")
 	}
 	_, err = fmt.Sscanf(name, "%016x-%016x.wal", &seq, &index)
 	return
@@ -27,7 +26,7 @@ func selectWALNames(names []string) []string {
 		if _, _, err := parseWALName(name); err != nil {
 			if filepath.Ext(name) != ".tmp" {
 				// only complain about non-WAL temp files
-				logger.Warnf("ignored WAL file %q (%v)", name, err)
+				logger.Warnf("ignored %q (%v)", name, err)
 			}
 			continue
 		}
@@ -95,15 +94,4 @@ func searchLastWALIndex(ns []string, idx uint64) int {
 		}
 	}
 	return -1
-}
-
-// createEmptyEntries creates empty slice of entries for testing.
-func createEmptyEntries(num int) [][]raftpb.Entry {
-	entries := make([][]raftpb.Entry, num)
-	for i := 0; i < num; i++ {
-		entries[i] = []raftpb.Entry{
-			{Index: uint64(i + 1)},
-		}
-	}
-	return entries
 }

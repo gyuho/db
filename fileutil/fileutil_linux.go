@@ -58,9 +58,9 @@ func ExistFile(name string) bool {
 	return err == nil
 }
 
-// DirWithFiles returns true only when the directory exists
+// DirHasFiles returns true only when the directory exists
 // and it is non-empty.
-func DirWithFiles(dir string) bool {
+func DirHasFiles(dir string) bool {
 	ns, err := ReadDir(dir)
 	if err != nil {
 		return false

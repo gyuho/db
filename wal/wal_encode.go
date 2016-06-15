@@ -56,6 +56,7 @@ func (e *encoder) encode(rec *walpb.Record) error {
 
 		recordBufN = len(e.recordBuf)
 	)
+
 	if rec.Size() > recordBufN { // not enough buffer was allocated
 		// github.com/golang/protobuf/proto
 		//
@@ -68,6 +69,7 @@ func (e *encoder) encode(rec *walpb.Record) error {
 		dataN = len(data)
 
 	} else { // use buffer
+
 		// github.com/golang/protobuf/proto
 		//
 		// dataN = proto.Size(rec)
@@ -76,7 +78,7 @@ func (e *encoder) encode(rec *walpb.Record) error {
 		// 	return err
 		// }
 		// data = buf.Bytes()[:dataN]
-		//
+
 		dataN, err = rec.MarshalTo(e.recordBuf)
 		if err != nil {
 			return err

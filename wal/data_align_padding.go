@@ -92,7 +92,7 @@ func putLengthFieldN(w io.Writer, buf []byte, lengthFieldN uint64) error {
 func readLengthFieldN(r io.Reader) (lengthFieldN int64, err error) {
 	// error is EOF only if no bytes were read.
 	// If an EOF happens after reading some but not all the bytes,
-	// Read returns ErrUnexpectedEOF.
+	// binary.Read returns io.ErrUnexpectedEOF.
 	err = binary.Read(r, binary.LittleEndian, &lengthFieldN)
 	return
 }

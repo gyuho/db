@@ -37,22 +37,15 @@ func newFilePipeline(dir string, size int64) *filePipeline {
 	return fp
 }
 
-const (
-	privateFileMode = 0600
-
-	// owners can make/remove files in this directory
-	privateDirMode = 0700
-)
-
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	fpath := filepath.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2)) // to make it different than previous one
-	if f, err = fileutil.LockFile(fpath, os.O_CREATE|os.O_WRONLY, privateFileMode); err != nil {
+	if f, err = fileutil.LockFile(fpath, os.O_CREATE|os.O_WRONLY, fileutil.PrivateFileMode); err != nil {
 		return nil, err
 	}
 
 	extendFile := true
 	if err = fileutil.Preallocate(f.File, fp.size, extendFile); err != nil {
-		logger.Errorf("failed to allocate space when creating new WAL %q (%v)", fpath, err)
+		logger.Errorf("failed to allocate space when creating %q (%v)", fpath, err)
 		f.Close()
 		return nil, err
 	}
@@ -70,11 +63,6 @@ func (fp *filePipeline) Open() (f *fileutil.LockedFile, err error) {
 	case err = <-fp.errc:
 	}
 	return
-}
-
-func (fp *filePipeline) Close() error {
-	close(fp.donec)
-	return <-fp.errc
 }
 
 func (fp *filePipeline) run() {
@@ -95,4 +83,9 @@ func (fp *filePipeline) run() {
 			return
 		}
 	}
+}
+
+func (fp *filePipeline) Close() error {
+	close(fp.donec)
+	return <-fp.errc
 }

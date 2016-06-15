@@ -143,14 +143,14 @@ func (d *decoder) isTornEntry(data []byte) bool {
 	// if any data in the sector chunk is ALL 0,
 	// it's a torn write
 	for _, sector := range chunks {
-		zero := true
+		allZero := true
 		for _, b := range sector {
 			if b != 0 {
-				zero = false
+				allZero = false
 				break
 			}
 		}
-		if zero { // torn-write!
+		if allZero { // torn-write!
 			return true
 		}
 	}
