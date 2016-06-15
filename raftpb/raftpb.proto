@@ -37,15 +37,15 @@ message SnapshotMetadata {
 // Snapshot contains snapshot data and meta-data.
 // It is stored in stable storage before messages are sent.
 message Snapshot {
-	bytes            Data  = 1;
-	SnapshotMetadata Metadata = 2;
+	SnapshotMetadata Metadata = 1;
+	bytes Data = 2;
 }
 
 // HardState is the current state of the Raft node.
 // It is stored in stable storage before messages are sent.
 message HardState {
-	uint64 Term        = 1;
-	uint64 VotedFor    = 2;
+	uint64 VotedFor    = 1;
+	uint64 Term        = 2;
 	uint64 CommitIndex = 3;
 }
 
