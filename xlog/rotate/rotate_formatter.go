@@ -10,7 +10,8 @@ import (
 
 // Config contains configuration for log rotation.
 type Config struct {
-	Dir string
+	Dir         string
+	MaxFileSize int64
 
 	Debug bool
 }

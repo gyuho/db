@@ -200,7 +200,7 @@ func (w *WAL) UnsafeCutCurrent() error {
 	}
 
 	// truncate to avoid wasting space with early cut
-	if err := w.UnsafeLastFile().Truncate(offset); err != nil {
+	if err = w.UnsafeLastFile().Truncate(offset); err != nil {
 		return err
 	}
 

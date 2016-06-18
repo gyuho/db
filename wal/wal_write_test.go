@@ -416,10 +416,10 @@ func TestTailWritesUnused(t *testing.T) {
 
 	// write more data
 	for i := 6; i <= 10; i++ {
-		entries := []raftpb.Entry{
+		ets := []raftpb.Entry{
 			{Term: 1, Index: uint64(i), Data: []byte{byte(i)}},
 		}
-		if err = w.Save(raftpb.HardState{Term: 1}, entries); err != nil {
+		if err = w.Save(raftpb.HardState{Term: 1}, ets); err != nil {
 			t.Fatal(err)
 		}
 	}
