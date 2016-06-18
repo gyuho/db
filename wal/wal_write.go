@@ -32,15 +32,14 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 		return nil, os.ErrExist
 	}
 
+	// create temporary directory, and rename later to make it appear atomic
 	tmpDir := filepath.Clean(dir) + ".tmp"
 	if fileutil.ExistFile(tmpDir) {
 		if err := os.RemoveAll(tmpDir); err != nil {
 			return nil, err
 		}
 	}
-
-	// create temporary directory, and rename later to make it appear atomic
-	if err := os.MkdirAll(tmpDir, fileutil.PrivateDirMode); err != nil {
+	if err := fileutil.MkdirAll(tmpDir); err != nil {
 		return nil, err
 	}
 

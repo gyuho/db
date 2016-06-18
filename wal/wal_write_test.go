@@ -142,7 +142,7 @@ func TestCreateInterrupted(t *testing.T) {
 
 	// create temporary directory to make it look like initialization got interrupted
 	tmpDir := filepath.Clean(dir) + ".tmp"
-	if err = os.Mkdir(tmpDir, fileutil.PrivateDirMode); err != nil {
+	if err = fileutil.MkdirAll(tmpDir); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = os.OpenFile(filepath.Join(tmpDir, "test"), os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode); err != nil {
