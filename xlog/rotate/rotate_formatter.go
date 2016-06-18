@@ -1,55 +1,112 @@
 package rotate
 
 import (
-	"bufio"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/gyuho/distdb/fileutil"
 	"github.com/gyuho/distdb/xlog"
 )
 
 // Config contains configuration for log rotation.
 type Config struct {
-	Dir         string
-	MaxFileSize int64
-
+	// Dir is the directory to put log files.
+	Dir   string
 	Debug bool
+
+	RotateFileSize int64
+	RotateDuration time.Duration
 }
 
 type formatter struct {
-	w     *bufio.Writer
+	dir   string
 	debug bool
+
+	rotateFileSize int64
+	rotateDuration time.Duration
+
+	lockedFile *fileutil.LockedFile
 }
 
 // NewFormatter returns a new formatter.
-func NewFormatter(cfg Config) xlog.Formatter {
-	return &formatter{}
+func NewFormatter(cfg Config) (xlog.Formatter, error) {
+	if !fileutil.DirHasFiles(cfg.Dir) {
+		if err := fileutil.MkdirAll(cfg.Dir); err != nil {
+			return nil, err
+		}
+	}
+
+	// create temporary directory, and rename later to make it appear atomic
+	tmpDir := filepath.Clean(cfg.Dir) + ".tmp"
+	if fileutil.ExistFile(tmpDir) {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			return nil, err
+		}
+	}
+	if err := fileutil.MkdirAll(tmpDir); err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	var (
+		logName    = getLogName()
+		tmpLogPath = filepath.Join(tmpDir, logName)
+		logPath    = filepath.Join(cfg.Dir, logName)
+	)
+	f, err := fileutil.LockFile(tmpLogPath, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+	if err != nil {
+		return nil, err
+	}
+
+	// set the end of file with 0 for pre-allocation
+	if _, err := f.Seek(0, os.SEEK_END); err != nil {
+		return nil, err
+	}
+	if err := fileutil.Preallocate(f.File, cfg.RotateFileSize, true); err != nil {
+		return nil, err
+	}
+
+	if err := os.Rename(tmpLogPath, logPath); err != nil {
+		return nil, err
+	}
+
+	// w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
+
+	return &formatter{
+		dir:            cfg.Dir,
+		debug:          cfg.Debug,
+		rotateFileSize: cfg.RotateFileSize,
+		rotateDuration: cfg.RotateDuration,
+		lockedFile:     f,
+	}, nil
 }
 
-func (rf *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
-	if !rf.debug && lvl == xlog.DEBUG {
+func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
+	if !ft.debug && lvl == xlog.DEBUG {
 		return
 	}
 
-	rf.w.WriteString(time.Now().String()[:26])
-	rf.w.WriteString(" " + lvl.String() + " | ")
+	ft.lockedFile.WriteString(time.Now().String()[:26])
+	ft.lockedFile.WriteString(" " + lvl.String() + " | ")
 	if pkg != "" {
-		rf.w.WriteString(pkg + ": ")
+		ft.lockedFile.WriteString(pkg + ": ")
 	}
 
-	rf.w.WriteString(txt)
+	ft.lockedFile.WriteString(txt)
 
 	if !strings.HasSuffix(txt, "\n") {
-		rf.w.WriteString("\n")
+		ft.lockedFile.WriteString("\n")
 	}
 
-	rf.w.Flush()
+	fileutil.Fdatasync(ft.lockedFile.File)
 }
 
-func (rf *formatter) SetDebug(debug bool) {
-	rf.debug = debug
+func (ft *formatter) SetDebug(debug bool) {
+	ft.debug = debug
 }
 
-func (rf *formatter) Flush() {
-	rf.w.Flush()
+func (ft *formatter) Flush() {
+	fileutil.Fdatasync(ft.lockedFile.File)
 }
