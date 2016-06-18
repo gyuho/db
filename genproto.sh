@@ -17,10 +17,14 @@ printf "generating proto in walpb\n"
 protoc --go_out=. walpb/*.proto
 COMMENT
 
-go get -v github.com/gogo/protobuf/proto;
-go get -v github.com/gogo/protobuf/protoc-gen-gogo;
-go get -v github.com/gogo/protobuf/gogoproto;
-go get -v github.com/gogo/protobuf/protoc-gen-gofast;
+GOGOPROTO_ROOT="$GOPATH/src/github.com/gogo/protobuf"
+GOGO_PROTO_SHA="2752d97bbd91927dd1c43296dbf8700e50e2708c"
+go get -u github.com/gogo/protobuf/{proto,protoc-gen-gogo,gogoproto,protoc-gen-gofast}
+go get -u golang.org/x/tools/cmd/goimports
+pushd "${GOGOPROTO_ROOT}"
+	git reset --hard "${GOGO_PROTO_SHA}"
+	make install
+popd
 
 printf "generating proto in raftpb\n"
 protoc --gofast_out=plugins=grpc:. \
