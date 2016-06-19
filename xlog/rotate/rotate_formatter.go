@@ -41,8 +41,8 @@ type formatter struct {
 	rotateDuration time.Duration
 	started        time.Time
 
-	w          *bufio.Writer
-	lockedFile *fileutil.LockedFile
+	w    *bufio.Writer
+	file *fileutil.LockedFile
 }
 
 // NewFormatter returns a new formatter.
@@ -83,7 +83,7 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		rotateDuration: cfg.RotateDuration,
 		started:        time.Now(),
 		w:              bufio.NewWriter(f),
-		lockedFile:     f,
+		file:           f,
 	}
 	return ft, nil
 }
@@ -110,7 +110,7 @@ func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 	ft.w.Flush()
 
 	// seek the current location, and get the offset
-	curOffset, err := ft.lockedFile.File.Seek(0, os.SEEK_CUR)
+	curOffset, err := ft.file.Seek(0, os.SEEK_CUR)
 	if err != nil {
 		panic(err)
 	}
@@ -126,7 +126,7 @@ func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 
 func (ft *formatter) unsafeRotate() {
 	// unlock the locked file
-	if err := ft.lockedFile.Close(); err != nil {
+	if err := ft.file.Close(); err != nil {
 		panic(err)
 	}
 
@@ -134,7 +134,7 @@ func (ft *formatter) unsafeRotate() {
 		logPath    = filepath.Join(ft.dir, getLogName())
 		logPathTmp = logPath + ".tmp"
 	)
-	newLockedFile, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+	newTmpFile, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
 	if err != nil {
 		panic(err)
 	}
@@ -145,18 +145,18 @@ func (ft *formatter) unsafeRotate() {
 	}
 
 	// release the lock, flush buffer
-	if err = newLockedFile.Close(); err != nil {
+	if err = newTmpFile.Close(); err != nil {
 		panic(err)
 	}
 
 	// create a new locked file for appends
-	newLockedFile, err = fileutil.LockFile(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
+	newTmpFile, err = fileutil.LockFile(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
 	if err != nil {
 		panic(err)
 	}
 
-	ft.w = bufio.NewWriter(newLockedFile)
-	ft.lockedFile = newLockedFile
+	ft.w = bufio.NewWriter(newTmpFile)
+	ft.file = newTmpFile
 
 	ft.started = time.Now()
 }
