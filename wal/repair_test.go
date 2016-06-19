@@ -113,11 +113,7 @@ func TestRepair_TruncatedWAL(t *testing.T) {
 		defer f.Close()
 
 		// truncate the last Record by 5 bytes
-		if err = f.Truncate(offset - 5); err != nil {
-			return err
-		}
-
-		return nil
+		return f.Truncate(offset - 5)
 	}
 
 	testRepair(t, expectedEntriesN, entries, corruptByTruncate)
