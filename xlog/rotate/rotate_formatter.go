@@ -1,6 +1,7 @@
 package rotate
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -38,6 +39,7 @@ type formatter struct {
 	rotateDuration time.Duration
 	started        time.Time
 
+	w          *bufio.Writer
 	lockedFile *fileutil.LockedFile
 }
 
@@ -78,6 +80,7 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		rotateFileSize: cfg.RotateFileSize,
 		rotateDuration: cfg.RotateDuration,
 		started:        time.Now(),
+		w:              bufio.NewWriter(f),
 		lockedFile:     f,
 	}
 	return ft, nil
@@ -89,22 +92,20 @@ func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 		return
 	}
 
-	ft.lockedFile.WriteString(time.Now().String()[:26])
-	ft.lockedFile.WriteString(" " + lvl.String() + " | ")
+	ft.w.WriteString(time.Now().String()[:26])
+	ft.w.WriteString(" " + lvl.String() + " | ")
 	if pkg != "" {
-		ft.lockedFile.WriteString(pkg + ": ")
+		ft.w.WriteString(pkg + ": ")
 	}
 
-	ft.lockedFile.WriteString(txt)
+	ft.w.WriteString(txt)
 
 	if !strings.HasSuffix(txt, "\n") {
-		ft.lockedFile.WriteString("\n")
+		ft.w.WriteString("\n")
 	}
 
 	// fsync to the disk
-	if err := fileutil.Fdatasync(ft.lockedFile.File); err != nil {
-		panic(err)
-	}
+	ft.w.Flush()
 
 	// seek the current location, and get the offset
 	curOffset, err := ft.lockedFile.File.Seek(0, os.SEEK_CUR)
@@ -122,6 +123,7 @@ func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 }
 
 func (ft *formatter) unsafeRotate() {
+	// unlock the locked file
 	if err := ft.lockedFile.Close(); err != nil {
 		panic(err)
 	}
@@ -151,7 +153,9 @@ func (ft *formatter) unsafeRotate() {
 		panic(err)
 	}
 
+	ft.w = bufio.NewWriter(newLockedFile)
 	ft.lockedFile = newLockedFile
+
 	ft.started = time.Now()
 }
 
@@ -160,5 +164,5 @@ func (ft *formatter) SetDebug(debug bool) {
 }
 
 func (ft *formatter) Flush() {
-	fileutil.Fdatasync(ft.lockedFile.File)
+	ft.w.Flush()
 }
