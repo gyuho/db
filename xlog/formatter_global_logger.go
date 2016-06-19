@@ -8,6 +8,8 @@ import (
 
 // Formatter defines log-format (printer) interface.
 type Formatter interface {
+	// WriteFlush writes the log and flush it to disk.
+	// This must be protected by mutex, outside.
 	WriteFlush(pkg string, lvl LogLevel, txt string)
 	SetDebug(debug bool)
 	Flush()

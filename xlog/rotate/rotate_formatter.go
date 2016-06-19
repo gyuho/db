@@ -32,10 +32,8 @@ type formatter struct {
 
 // NewFormatter returns a new formatter.
 func NewFormatter(cfg Config) (xlog.Formatter, error) {
-	if !fileutil.DirHasFiles(cfg.Dir) {
-		if err := fileutil.MkdirAll(cfg.Dir); err != nil {
-			return nil, err
-		}
+	if err := fileutil.MkdirAll(cfg.Dir); err != nil {
+		return nil, err
 	}
 
 	// create temporary directory, and rename later to make it appear atomic
@@ -60,7 +58,7 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		return nil, err
 	}
 
-	// set the end of file with 0 for pre-allocation
+	// set offset to the end of file with 0 for pre-allocation
 	if _, err := f.Seek(0, os.SEEK_END); err != nil {
 		return nil, err
 	}
@@ -72,15 +70,16 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		return nil, err
 	}
 
-	// w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
-
-	return &formatter{
+	ft := &formatter{
 		dir:            cfg.Dir,
 		debug:          cfg.Debug,
 		rotateFileSize: cfg.RotateFileSize,
 		rotateDuration: cfg.RotateDuration,
 		lockedFile:     f,
-	}, nil
+	}
+	// w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
+
+	return ft, nil
 }
 
 func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {

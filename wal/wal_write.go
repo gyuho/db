@@ -49,7 +49,7 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 		return nil, err
 	}
 
-	// set the end of file with 0 for pre-allocation
+	// set offset to the end of file with 0 for pre-allocation
 	if _, err := f.Seek(0, os.SEEK_END); err != nil {
 		return nil, err
 	}
