@@ -101,14 +101,14 @@ func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 		ft.lockedFile.WriteString("\n")
 	}
 
-	// seek the current location, and get the offset
-	curOffset, err := ft.lockedFile.File.Seek(0, os.SEEK_CUR)
-	if err != nil {
+	// fsync to the disk
+	if err := fileutil.Fdatasync(ft.lockedFile.File); err != nil {
 		panic(err)
 	}
 
-	// fsync to the disk
-	if err = fileutil.Fdatasync(ft.lockedFile.File); err != nil {
+	// seek the current location, and get the offset
+	curOffset, err := ft.lockedFile.File.Seek(0, os.SEEK_CUR)
+	if err != nil {
 		panic(err)
 	}
 
