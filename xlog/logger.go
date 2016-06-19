@@ -1,12 +1,8 @@
 package xlog
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"os"
-	"strings"
-	"time"
 )
 
 // LogLevel is the set of all log levels.
@@ -47,70 +43,6 @@ func (l LogLevel) String() string {
 	}
 }
 
-// Formatter defines log-format (printer) interface.
-type Formatter interface {
-	FormatAndFlush(pkg string, lvl LogLevel, txt string)
-	SetDebug(debug bool)
-	Flush()
-}
-
-type defaultFormatter struct {
-	w     *bufio.Writer
-	debug bool
-}
-
-func (df *defaultFormatter) FormatAndFlush(pkg string, lvl LogLevel, txt string) {
-	if !df.debug && lvl == DEBUG {
-		return
-	}
-
-	df.w.WriteString(time.Now().String()[:26])
-
-	df.w.WriteString(" " + lvl.String() + " | ")
-
-	if pkg != "" {
-		df.w.WriteString(pkg + ": ")
-	}
-
-	df.w.WriteString(txt)
-
-	if !strings.HasSuffix(txt, "\n") {
-		df.w.WriteString("\n")
-	}
-
-	df.w.Flush()
-}
-
-func (df *defaultFormatter) SetDebug(debug bool) {
-	df.debug = debug
-}
-
-func (df *defaultFormatter) Flush() {
-	df.w.Flush()
-}
-
-// NewFormatter returns a new defaultFormatter.
-func NewFormatter(w io.Writer, debug bool) Formatter {
-	return &defaultFormatter{
-		w:     bufio.NewWriter(w),
-		debug: debug,
-	}
-}
-
-// SetFormatter sets the formatting function for all logs.
-func SetFormatter(f Formatter) {
-	xlogger.mu.Lock()
-	xlogger.formatter = f
-	xlogger.mu.Unlock()
-}
-
-// SetDebug sets debug for Formatter.
-func SetDebug(debug bool) {
-	xlogger.mu.Lock()
-	xlogger.formatter.SetDebug(debug)
-	xlogger.mu.Unlock()
-}
-
 // Logger contains log prefix(pkg) and LogLevel.
 type Logger struct {
 	pkg string
@@ -138,7 +70,7 @@ func (l *Logger) log(lvl LogLevel, txt string) {
 		return
 	}
 
-	xlogger.formatter.FormatAndFlush(l.pkg, lvl, txt)
+	xlogger.formatter.WriteFlush(l.pkg, lvl, txt)
 }
 
 func (l *Logger) Panic(args ...interface{}) {

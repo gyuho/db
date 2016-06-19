@@ -45,7 +45,8 @@ func TestLockAndUnlock(t *testing.T) {
 	// double-lock should block
 	done := make(chan struct{}, 1)
 	go func() {
-		bl, err := LockFile(f.Name(), os.O_WRONLY, PrivateFileMode)
+		var bl *LockedFile
+		bl, err = LockFile(f.Name(), os.O_WRONLY, PrivateFileMode)
 		if err != nil {
 			t.Fatal(err)
 		}

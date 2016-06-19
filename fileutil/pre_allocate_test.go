@@ -19,7 +19,7 @@ func TestPreallocate(t *testing.T) {
 	}
 
 	size := int64(64 * 1000)
-	if err := Preallocate(f, size, false); err != nil {
+	if err = Preallocate(f, size, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,7 +46,7 @@ func TestPreallocateExtend(t *testing.T) {
 	}
 
 	size := int64(64 * 1000)
-	if err := Preallocate(f, size, true); err != nil {
+	if err = Preallocate(f, size, true); err != nil {
 		t.Fatal(err)
 	}
 

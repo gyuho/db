@@ -32,15 +32,14 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 		return nil, os.ErrExist
 	}
 
+	// create temporary directory, and rename later to make it appear atomic
 	tmpDir := filepath.Clean(dir) + ".tmp"
 	if fileutil.ExistFile(tmpDir) {
 		if err := os.RemoveAll(tmpDir); err != nil {
 			return nil, err
 		}
 	}
-
-	// create temporary directory, and rename later to make it appear atomic
-	if err := os.MkdirAll(tmpDir, fileutil.PrivateDirMode); err != nil {
+	if err := fileutil.MkdirAll(tmpDir); err != nil {
 		return nil, err
 	}
 
@@ -50,7 +49,7 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 		return nil, err
 	}
 
-	// set the end of file with 0 for pre-allocation
+	// set offset to the end of file with 0 for pre-allocation
 	if _, err := f.Seek(0, os.SEEK_END); err != nil {
 		return nil, err
 	}
@@ -192,15 +191,14 @@ func (w *WAL) UnsafeEncodeHardState(state *raftpb.HardState) error {
 // It first creates a temporary WAL file to write necessary headers onto.
 // And atomically rename the temporary WAL file to a WAL file.
 func (w *WAL) UnsafeCutCurrent() error {
-	// close the last WAL file
-	// move current offset to the beginning (0)
+	// set offset to current
 	offset, err := w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		return err
 	}
 
 	// truncate to avoid wasting space with early cut
-	if err := w.UnsafeLastFile().Truncate(offset); err != nil {
+	if err = w.UnsafeLastFile().Truncate(offset); err != nil {
 		return err
 	}
 
@@ -243,8 +241,7 @@ func (w *WAL) UnsafeCutCurrent() error {
 		return err
 	}
 
-	// move current offset to the beginning (0)
-	// new offset relative to the beginning of the file
+	// set offset to current, because there were writes
 	offset, err = w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		return err
@@ -266,7 +263,7 @@ func (w *WAL) UnsafeCutCurrent() error {
 		return err
 	}
 
-	// move(set) beginning of the file(os.SEEK_SET) to offset
+	// move(set) beginning of the file(os.SEEK_SET) to offset, because there were writes
 	if _, err = newLastTmpFile.Seek(offset, os.SEEK_SET); err != nil { // 0, os.SEEK_SET: seek relative to the origin(beginning) of the file
 		return err
 	}

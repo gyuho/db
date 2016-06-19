@@ -1,22 +1,38 @@
 #!/usr/bin/env bash
 
-TEST="./crc ./fileutil ./ioutil ./mvcc ./raft ./rsm ./wal ./xlog"
-FMT="$TEST"
+IGNORE_PKGS="(vendor)"
+TESTS=`find . -name \*_test.go | while read a; do dirname $a; done | sort | uniq | egrep -v "$IGNORE_PKGS"`
 
-echo "Running tests...";
-go test -v -cover -cpu 1,2,4 $TEST;
-go test -v -cover -cpu 1,2,4 -race $TEST;
+<<COMMENT
+IGNORE_PKGS="(vendor)"
+TESTS=`find . -name \*_test.go | while read a; do dirname $a; done | sort | uniq | egrep -v "$IGNORE_PKGS"`
+go vet $TESTS
+
+vetShadowRes=$( go tool vet -shadow $TESTS 2>&1 >/dev/null )
+echo $vetShadowRes
+COMMENT
 
 echo "Checking gofmt..."
-fmtRes=$(gofmt -l -s $FMT)
+fmtRes=$(gofmt -l -s $TESTS 2>&1 >/dev/null)
 if [ -n "${fmtRes}" ]; then
 	echo -e "gofmt checking failed:\n${fmtRes}"
 	exit 255
 fi
 
-echo "Checking govet..."
-vetRes=$(go vet $TEST)
+echo "Checking go vet..."
+vetRes=$(go vet $TESTS 2>&1 >/dev/null)
 if [ -n "${vetRes}" ]; then
-	echo -e "govet checking failed:\n${vetRes}"
+	echo -e "go vet checking failed:\n${vetRes}"
 	exit 255
 fi
+
+echo "Checking go tool vet -shadow..."
+vetShadowRes=$(go tool vet -shadow $TESTS 2>&1 >/dev/null)
+if [ -n "${vetShadowRes}" ]; then
+	echo -e "go vet shadow checking failed:\n${vetShadowRes}"
+	exit 255
+fi
+
+echo "Running tests...";
+go test -v -cover -cpu 1,2,4 $TESTS;
+go test -v -cover -cpu 1,2,4 -race $TESTS;
