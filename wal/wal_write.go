@@ -44,7 +44,7 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	}
 
 	walPath := filepath.Join(tmpDir, getWALName(0, 0))
-	f, err := fileutil.LockFile(walPath, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+	f, err := fileutil.OpenFileWithLock(walPath, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (w *WAL) UnsafeCutCurrent() error {
 	}
 
 	// create a new locked file for appends
-	newLastTmpFile, err = fileutil.LockFile(walPath, os.O_WRONLY, fileutil.PrivateFileMode)
+	newLastTmpFile, err = fileutil.OpenFileWithLock(walPath, os.O_WRONLY, fileutil.PrivateFileMode)
 	if err != nil {
 		return err
 	}

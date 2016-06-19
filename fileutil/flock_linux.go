@@ -34,27 +34,27 @@ var (
 		Len:    0,
 	}
 
-	funcLockFile            = flock
-	funcLockFileNonBlocking = flockNonBlocking
+	funcOpenFileWithLock            = flock
+	funcOpenFileWithLockNonBlocking = flockNonBlocking
 )
 
 func init() {
 	// use open file descriptor locks if the system suppoprts it
 	readLock := syscall.Flock_t{Type: syscall.F_RDLCK}
 	if err := syscall.FcntlFlock(0, F_OFD_GETLK, &readLock); err == nil {
-		funcLockFile = flock_OFD
-		funcLockFileNonBlocking = flock_OFD_NonBlocking
+		funcOpenFileWithLock = flock_OFD
+		funcOpenFileWithLockNonBlocking = flock_OFD_NonBlocking
 	}
 }
 
-// LockFile locks the file.
-func LockFile(fpath string, flag int, perm os.FileMode) (*LockedFile, error) {
-	return funcLockFile(fpath, flag, perm)
+// OpenFileWithLock opens, locks the file.
+func OpenFileWithLock(fpath string, flag int, perm os.FileMode) (*LockedFile, error) {
+	return funcOpenFileWithLock(fpath, flag, perm)
 }
 
-// LockFileNonBlocking locks the file in a non-blocking way.
-func LockFileNonBlocking(fpath string, flag int, perm os.FileMode) (*LockedFile, error) {
-	return funcLockFileNonBlocking(fpath, flag, perm)
+// OpenFileWithLockNonBlocking locks the file in a non-blocking way.
+func OpenFileWithLockNonBlocking(fpath string, flag int, perm os.FileMode) (*LockedFile, error) {
+	return funcOpenFileWithLockNonBlocking(fpath, flag, perm)
 }
 
 func flock(fpath string, flag int, perm os.FileMode) (*LockedFile, error) {

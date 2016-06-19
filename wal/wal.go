@@ -107,7 +107,7 @@ func openLastWALFile(dir string) (*fileutil.LockedFile, error) {
 	}
 
 	fpath := filepath.Join(dir, wnames[len(wnames)-1])
-	return fileutil.LockFile(fpath, os.O_RDWR, fileutil.PrivateFileMode)
+	return fileutil.OpenFileWithLock(fpath, os.O_RDWR, fileutil.PrivateFileMode)
 }
 
 // openWAL opens a WAL file with given snapshot.
@@ -133,7 +133,7 @@ func openWAL(dir string, snap walpb.Snapshot, write bool) (*WAL, error) {
 		fpath := filepath.Join(dir, name)
 		switch write {
 		case true:
-			f, err := fileutil.LockFileNonBlocking(fpath, os.O_RDWR, fileutil.PrivateFileMode)
+			f, err := fileutil.OpenFileWithLockNonBlocking(fpath, os.O_RDWR, fileutil.PrivateFileMode)
 			if err != nil {
 				closeAll(readClosers...)
 				return nil, err

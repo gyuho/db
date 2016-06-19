@@ -69,7 +69,7 @@ func TestPurgeFile(t *testing.T) {
 	close(stopc)
 }
 
-func TestPurgeFileHoldingLockFile(t *testing.T) {
+func TestPurgeFileHoldingOpenFileWithLock(t *testing.T) {
 	dir, err := ioutil.TempDir("", "purgefile")
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestPurgeFileHoldingLockFile(t *testing.T) {
 
 	// create a purge barrier at 5
 	p := filepath.Join(dir, fmt.Sprintf("%d.test", 5))
-	l, err := LockFile(p, os.O_WRONLY, 0600)
+	l, err := OpenFileWithLock(p, os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}

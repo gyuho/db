@@ -30,7 +30,7 @@ func PurgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan
 			for len(ns) > int(max) {
 				f := filepath.Join(dir, ns[0])
 
-				l, err := LockFileNonBlocking(f, os.O_WRONLY, PrivateFileMode)
+				l, err := OpenFileWithLockNonBlocking(f, os.O_WRONLY, PrivateFileMode)
 				if err != nil {
 					break
 				}
