@@ -25,8 +25,9 @@ func getLogName() string {
 // Config contains configuration for log rotation.
 type Config struct {
 	// Dir is the directory to put log files.
-	Dir   string
-	Debug bool
+	Dir      string
+	Debug    bool
+	FileLock bool
 
 	RotateFileSize int64
 	RotateDuration time.Duration
@@ -41,8 +42,10 @@ type formatter struct {
 	rotateDuration time.Duration
 	started        time.Time
 
-	w    *bufio.Writer
-	file *fileutil.LockedFile
+	w *bufio.Writer
+
+	fileLock bool
+	file     *fileutil.LockedFile
 }
 
 // NewFormatter returns a new formatter.
@@ -67,11 +70,25 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		logName    = getLogName()
 		logPath    = filepath.Join(cfg.Dir, logName)
 		logPathTmp = filepath.Join(tmpDir, logName)
+
+		f   *fileutil.LockedFile
+		err error
 	)
-	f, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
-	if err != nil {
-		return nil, err
+	switch cfg.FileLock {
+	case true:
+		f, err = fileutil.OpenFileWithLock(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+		if err != nil {
+			return nil, err
+		}
+	case false:
+		var tFile *os.File
+		tFile, err = os.OpenFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+		if err != nil {
+			return nil, err
+		}
+		f = &fileutil.LockedFile{tFile}
 	}
+
 	if err = os.Rename(logPathTmp, logPath); err != nil {
 		return nil, err
 	}
@@ -83,6 +100,7 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		rotateDuration: cfg.RotateDuration,
 		started:        time.Now(),
 		w:              bufio.NewWriter(f),
+		fileLock:       cfg.FileLock,
 		file:           f,
 	}
 	return ft, nil
@@ -133,10 +151,23 @@ func (ft *formatter) unsafeRotate() {
 	var (
 		logPath    = filepath.Join(ft.dir, getLogName())
 		logPathTmp = logPath + ".tmp"
+
+		fileTmp *fileutil.LockedFile
+		err     error
 	)
-	fileTmp, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
-	if err != nil {
-		panic(err)
+	switch ft.fileLock {
+	case true:
+		fileTmp, err = fileutil.OpenFileWithLock(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+		if err != nil {
+			panic(err)
+		}
+	case false:
+		var tFile *os.File
+		tFile, err = os.OpenFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+		if err != nil {
+			panic(err)
+		}
+		fileTmp = &fileutil.LockedFile{tFile}
 	}
 
 	// rename the file to WAL name atomically
@@ -150,9 +181,19 @@ func (ft *formatter) unsafeRotate() {
 	}
 
 	// create a new locked file for appends
-	fileTmp, err = fileutil.LockFile(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
-	if err != nil {
-		panic(err)
+	switch ft.fileLock {
+	case true:
+		fileTmp, err = fileutil.OpenFileWithLock(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
+		if err != nil {
+			panic(err)
+		}
+	case false:
+		var tFile *os.File
+		tFile, err = os.OpenFile(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
+		if err != nil {
+			panic(err)
+		}
+		fileTmp = &fileutil.LockedFile{tFile}
 	}
 
 	ft.w = bufio.NewWriter(fileTmp)

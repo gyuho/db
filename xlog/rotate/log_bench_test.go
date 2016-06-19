@@ -10,6 +10,68 @@ import (
 	"github.com/gyuho/distdb/xlog"
 )
 
+func BenchmarkLogRotateNoFlock(b *testing.B) {
+	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	var (
+		rotateFileSize int64 = 3 * 1024 // 3KB
+		rotateDuration       = time.Duration(0)
+	)
+	ft, err := NewFormatter(Config{
+		Dir:            dir,
+		FileLock:       false,
+		RotateFileSize: rotateFileSize,
+		RotateDuration: rotateDuration,
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	xlog.SetFormatter(ft)
+
+	logger := xlog.NewLogger("test")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Println("TEST")
+	}
+}
+
+func BenchmarkLogRotateFlock(b *testing.B) {
+	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	var (
+		rotateFileSize int64 = 3 * 1024 // 3KB
+		rotateDuration       = time.Duration(0)
+	)
+	ft, err := NewFormatter(Config{
+		Dir:            dir,
+		FileLock:       true,
+		RotateFileSize: rotateFileSize,
+		RotateDuration: rotateDuration,
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	xlog.SetFormatter(ft)
+
+	logger := xlog.NewLogger("test")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Println("TEST")
+	}
+}
+
 func BenchmarkLogDefault(b *testing.B) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -35,36 +97,6 @@ func BenchmarkLogDefault(b *testing.B) {
 
 	if err = f.Close(); err != nil {
 		b.Fatal(err)
-	}
-}
-
-func BenchmarkLogRotate(b *testing.B) {
-	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
-	var (
-		rotateFileSize int64 = 3 * 1024 // 3KB
-		rotateDuration       = time.Duration(0)
-	)
-	ft, err := NewFormatter(Config{
-		Dir:            dir,
-		RotateFileSize: rotateFileSize,
-		RotateDuration: rotateDuration,
-	})
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	xlog.SetFormatter(ft)
-
-	logger := xlog.NewLogger("test")
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Println("TEST")
 	}
 }
 
