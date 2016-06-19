@@ -6,6 +6,7 @@ import (
 	"syscall"
 )
 
+// LockedFile wraps *os.File with flock syscalls.
 type LockedFile struct {
 	*os.File
 }
@@ -46,10 +47,12 @@ func init() {
 	}
 }
 
+// LockFile locks the file.
 func LockFile(fpath string, flag int, perm os.FileMode) (*LockedFile, error) {
 	return funcLockFile(fpath, flag, perm)
 }
 
+// LockFileNonBlocking locks the file in a non-blocking way.
 func LockFileNonBlocking(fpath string, flag int, perm os.FileMode) (*LockedFile, error) {
 	return funcLockFileNonBlocking(fpath, flag, perm)
 }
