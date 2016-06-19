@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/coreos/rkt/tests/testutils/logger"
 	"github.com/gyuho/distdb/fileutil"
 )
 
@@ -39,7 +40,7 @@ func newFilePipeline(dir string, size int64) *filePipeline {
 
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	fpath := filepath.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2)) // to make it different than previous one
-	if f, err = fileutil.LockFile(fpath, os.O_CREATE|os.O_WRONLY, fileutil.PrivateFileMode); err != nil {
+	if f, err = fileutil.LockFile(fpath, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode); err != nil {
 		return nil, err
 	}
 
