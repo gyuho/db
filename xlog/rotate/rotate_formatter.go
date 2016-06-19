@@ -65,14 +65,14 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 
 	var (
 		logName    = getLogName()
-		tmpLogPath = filepath.Join(tmpDir, logName)
 		logPath    = filepath.Join(cfg.Dir, logName)
+		logPathTmp = filepath.Join(tmpDir, logName)
 	)
-	f, err := fileutil.LockFile(tmpLogPath, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+	f, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
 	if err != nil {
 		return nil, err
 	}
-	if err = os.Rename(tmpLogPath, logPath); err != nil {
+	if err = os.Rename(logPathTmp, logPath); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func (ft *formatter) unsafeRotate() {
 		logPath    = filepath.Join(ft.dir, getLogName())
 		logPathTmp = logPath + ".tmp"
 	)
-	newTmpFile, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+	fileTmp, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
 	if err != nil {
 		panic(err)
 	}
@@ -145,18 +145,18 @@ func (ft *formatter) unsafeRotate() {
 	}
 
 	// release the lock, flush buffer
-	if err = newTmpFile.Close(); err != nil {
+	if err = fileTmp.Close(); err != nil {
 		panic(err)
 	}
 
 	// create a new locked file for appends
-	newTmpFile, err = fileutil.LockFile(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
+	fileTmp, err = fileutil.LockFile(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
 	if err != nil {
 		panic(err)
 	}
 
-	ft.w = bufio.NewWriter(newTmpFile)
-	ft.file = newTmpFile
+	ft.w = bufio.NewWriter(fileTmp)
+	ft.file = fileTmp
 
 	ft.started = time.Now()
 }
