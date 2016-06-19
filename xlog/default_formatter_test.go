@@ -39,7 +39,7 @@ func TestDefaultFormatterLoggerFile(t *testing.T) {
 
 	logger := NewLogger("test")
 	logger.Println("Hello World!")
-	logger.Debugln("DO NOT PRINT THIS")
+	logger.Debugln("TEST")
 
 	if err = f.Close(); err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestDefaultFormatterLoggerFile(t *testing.T) {
 	if !strings.Contains(txt, "Hello World!") {
 		t.Fatalf("unexpected log %q", txt)
 	}
-	if !strings.Contains(txt, "DO NOT PRINT THIS") {
+	if !strings.Contains(txt, "TEST") {
 		t.Fatalf("unexpected log %q", txt)
 	}
 	fmt.Println(txt)

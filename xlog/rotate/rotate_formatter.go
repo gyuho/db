@@ -3,12 +3,21 @@ package rotate
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gyuho/distdb/fileutil"
 	"github.com/gyuho/distdb/xlog"
 )
+
+var numRegex = regexp.MustCompile("[0-9]+")
+
+func getLogName() string {
+	txt := time.Now().String()[:26]
+	txt = strings.Join(numRegex.FindAllString(txt, -1), "")
+	return txt[:8] + "-" + txt[8:14] + "-" + txt[14:] + ".log"
+}
 
 // Config contains configuration for log rotation.
 type Config struct {
@@ -25,7 +34,9 @@ type formatter struct {
 	debug bool
 
 	rotateFileSize int64
+
 	rotateDuration time.Duration
+	started        time.Time
 
 	lockedFile *fileutil.LockedFile
 }
@@ -57,16 +68,7 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// set offset to the end of file with 0 for pre-allocation
-	if _, err := f.Seek(0, os.SEEK_END); err != nil {
-		return nil, err
-	}
-	if err := fileutil.Preallocate(f.File, cfg.RotateFileSize, true); err != nil {
-		return nil, err
-	}
-
-	if err := os.Rename(tmpLogPath, logPath); err != nil {
+	if err = os.Rename(tmpLogPath, logPath); err != nil {
 		return nil, err
 	}
 
@@ -75,13 +77,13 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		debug:          cfg.Debug,
 		rotateFileSize: cfg.RotateFileSize,
 		rotateDuration: cfg.RotateDuration,
+		started:        time.Now(),
 		lockedFile:     f,
 	}
-	// w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
-
 	return ft, nil
 }
 
+// WriteFlush writes log and flushes it. This is protected by mutex in xlog.
 func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 	if !ft.debug && lvl == xlog.DEBUG {
 		return
@@ -99,7 +101,58 @@ func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 		ft.lockedFile.WriteString("\n")
 	}
 
-	fileutil.Fdatasync(ft.lockedFile.File)
+	// seek the current location, and get the offset
+	curOffset, err := ft.lockedFile.File.Seek(0, os.SEEK_CUR)
+	if err != nil {
+		panic(err)
+	}
+
+	// fsync to the disk
+	if err = fileutil.Fdatasync(ft.lockedFile.File); err != nil {
+		panic(err)
+	}
+
+	var (
+		needRotateBySize     = ft.rotateFileSize > 0 && curOffset > ft.rotateFileSize
+		needRotateByDuration = ft.rotateDuration > time.Duration(0) && time.Since(ft.started) > ft.rotateDuration
+	)
+	if needRotateBySize || needRotateByDuration {
+		ft.unsafeRotate()
+	}
+}
+
+func (ft *formatter) unsafeRotate() {
+	if err := ft.lockedFile.Close(); err != nil {
+		panic(err)
+	}
+
+	var (
+		logPath    = filepath.Join(ft.dir, getLogName())
+		logPathTmp = logPath + ".tmp"
+	)
+	newLockedFile, err := fileutil.LockFile(logPathTmp, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+	if err != nil {
+		panic(err)
+	}
+
+	// rename the file to WAL name atomically
+	if err = os.Rename(logPathTmp, logPath); err != nil {
+		panic(err)
+	}
+
+	// release the lock, flush buffer
+	if err = newLockedFile.Close(); err != nil {
+		panic(err)
+	}
+
+	// create a new locked file for appends
+	newLockedFile, err = fileutil.LockFile(logPath, os.O_WRONLY, fileutil.PrivateFileMode)
+	if err != nil {
+		panic(err)
+	}
+
+	ft.lockedFile = newLockedFile
+	ft.started = time.Now()
 }
 
 func (ft *formatter) SetDebug(debug bool) {
