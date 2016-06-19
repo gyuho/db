@@ -14,6 +14,8 @@ import (
 
 var numRegex = regexp.MustCompile("[0-9]+")
 
+// getLogName generates a log file name based on current time
+// (e.g. 20160619-142321-397035.log).
 func getLogName() string {
 	txt := time.Now().String()[:26]
 	txt = strings.Join(numRegex.FindAllString(txt, -1), "")
