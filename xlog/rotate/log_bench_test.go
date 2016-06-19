@@ -2,6 +2,7 @@ package rotate
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,32 @@ import (
 
 	"github.com/gyuho/distdb/xlog"
 )
+
+func BenchmarkLogStd(b *testing.B) {
+	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	fpath := filepath.Join(dir, "test.log")
+
+	f, err := openToAppendOnly(fpath)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	logger := log.New(f, "", log.Ldate|log.Ltime|log.Lmicroseconds)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Println("TEST")
+	}
+
+	if err = f.Close(); err != nil {
+		b.Fatal(err)
+	}
+}
 
 func BenchmarkLogRotateNoFlock(b *testing.B) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
