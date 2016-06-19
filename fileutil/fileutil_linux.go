@@ -52,8 +52,8 @@ func MkdirAll(dir string) error {
 	return DirWritable(dir)
 }
 
-// ExistFile returns true if the file exists.
-func ExistFile(name string) bool {
+// ExistFileOrDir returns true if the file or directory exists.
+func ExistFileOrDir(name string) bool {
 	_, err := os.Stat(name)
 	return err == nil
 }

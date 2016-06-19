@@ -53,7 +53,7 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 
 	// create temporary directory, and rename later to make it appear atomic
 	tmpDir := filepath.Clean(cfg.Dir) + ".tmp"
-	if fileutil.ExistFile(tmpDir) {
+	if fileutil.ExistFileOrDir(tmpDir) {
 		if err := os.RemoveAll(tmpDir); err != nil {
 			return nil, err
 		}
