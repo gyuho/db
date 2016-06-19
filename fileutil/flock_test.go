@@ -37,22 +37,21 @@ func TestLockAndUnlock(t *testing.T) {
 	}
 
 	// try lock the unlocked file
-	l2, err := LockFileNonBlocking(f.Name(), os.O_WRONLY, PrivateFileMode)
-	if err != nil {
-		t.Fatal(err)
+	l2, lerr := LockFileNonBlocking(f.Name(), os.O_WRONLY, PrivateFileMode)
+	if lerr != nil {
+		t.Fatal(lerr)
 	}
 
 	// double-lock should block
 	done := make(chan struct{}, 1)
 	go func() {
-		var bl *LockedFile
-		bl, err = LockFile(f.Name(), os.O_WRONLY, PrivateFileMode)
-		if err != nil {
-			t.Fatal(err)
+		bl, berr := LockFile(f.Name(), os.O_WRONLY, PrivateFileMode)
+		if berr != nil {
+			t.Fatal(berr)
 		}
 		done <- struct{}{}
-		if err = bl.Close(); err != nil {
-			t.Fatal(err)
+		if berr = bl.Close(); berr != nil {
+			t.Fatal(berr)
 		}
 	}()
 	select {

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/coreos/rkt/tests/testutils/logger"
 	"github.com/gyuho/distdb/fileutil"
 )
 
