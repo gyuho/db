@@ -124,17 +124,17 @@ func (l *Logger) Errorf(format string, args ...interface{}) {
 	l.log(ERROR, txt)
 }
 
-func (l *Logger) Warn(args ...interface{}) {
+func (l *Logger) Warning(args ...interface{}) {
 	txt := fmt.Sprint(args...)
 	l.log(WARN, txt)
 }
 
-func (l *Logger) Warnln(args ...interface{}) {
+func (l *Logger) Warningln(args ...interface{}) {
 	txt := fmt.Sprintln(args...)
 	l.log(WARN, txt)
 }
 
-func (l *Logger) Warnf(format string, args ...interface{}) {
+func (l *Logger) Warningf(format string, args ...interface{}) {
 	txt := fmt.Sprintf(format, args...)
 	l.log(WARN, txt)
 }
