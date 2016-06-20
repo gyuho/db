@@ -11,34 +11,8 @@ import (
 	"github.com/gyuho/distdb/xlog"
 )
 
-func BenchmarkLogStd(b *testing.B) {
-	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
-	fpath := filepath.Join(dir, "test.log")
-
-	f, err := openToAppendOnly(fpath)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	logger := log.New(f, "", log.Ldate|log.Ltime|log.Lmicroseconds)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Println("TEST")
-	}
-
-	if err = f.Close(); err != nil {
-		b.Fatal(err)
-	}
-}
-
-func BenchmarkLogRotateNoFlock(b *testing.B) {
-	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
+func Benchmark_xlog_rotate_without_flock(b *testing.B) {
+	dir, err := ioutil.TempDir(os.TempDir(), "log_test")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -68,8 +42,8 @@ func BenchmarkLogRotateNoFlock(b *testing.B) {
 	}
 }
 
-func BenchmarkLogRotateFlock(b *testing.B) {
-	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
+func Benchmark_xlog_rotate_with_flock(b *testing.B) {
+	dir, err := ioutil.TempDir(os.TempDir(), "log_test")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -99,8 +73,8 @@ func BenchmarkLogRotateFlock(b *testing.B) {
 	}
 }
 
-func BenchmarkLogDefault(b *testing.B) {
-	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
+func Benchmark_xlog(b *testing.B) {
+	dir, err := ioutil.TempDir(os.TempDir(), "log_test")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -116,6 +90,32 @@ func BenchmarkLogDefault(b *testing.B) {
 	xlog.SetFormatter(xlog.NewDefaultFormatter(f, true))
 
 	logger := xlog.NewLogger("test")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		logger.Println("TEST")
+	}
+
+	if err = f.Close(); err != nil {
+		b.Fatal(err)
+	}
+}
+
+func Benchmark_log(b *testing.B) {
+	dir, err := ioutil.TempDir(os.TempDir(), "log_test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	fpath := filepath.Join(dir, "test.log")
+
+	f, err := openToAppendOnly(fpath)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	logger := log.New(f, "", log.Ldate|log.Ltime|log.Lmicroseconds)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
