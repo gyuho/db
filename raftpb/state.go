@@ -5,14 +5,14 @@ var (
 	EmptyHardState = HardState{}
 )
 
-// checkHardStateEqual returns true if two states are equal
-func checkHardStateEqual(a, b HardState) bool {
+// checkHardState returns true if two states are equal
+func checkHardState(a, b HardState) bool {
 	return a.Term == b.Term && a.VotedFor == b.VotedFor && a.CommitIndex == b.CommitIndex
 }
 
 // IsEmptyHardState returns true if the given HardState is empty.
 func IsEmptyHardState(st HardState) bool {
-	return checkHardStateEqual(st, EmptyHardState)
+	return checkHardState(st, EmptyHardState)
 }
 
 // MustStoreHardState returns true, if the given hard state must be
