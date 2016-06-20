@@ -20,7 +20,7 @@ func TestGetLogName(t *testing.T) {
 }
 
 func TestRotateByFileSize(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "logtest")
+	dir, err := ioutil.TempDir(os.TempDir(), "log_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestRotateByFileSize(t *testing.T) {
 }
 
 func TestRotateByDuration(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "logtest")
+	dir, err := ioutil.TempDir(os.TempDir(), "log_test")
 	if err != nil {
 		t.Fatal(err)
 	}
