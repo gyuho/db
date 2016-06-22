@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 var (

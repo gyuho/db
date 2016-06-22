@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gyuho/distdb/fileutil"
-	"github.com/gyuho/distdb/xlog"
+	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/xlog"
 )
 
 var numRegex = regexp.MustCompile("[0-9]+")

@@ -4,11 +4,11 @@ set -e
 <<COMMENT
 go get -v github.com/golang/protobuf/protoc-gen-go
 
-printf "generating proto in raftpb\n"
-protoc --go_out=. raftpb/*.proto
+printf "generating proto in raft/raftpb\n"
+protoc --go_out=. raft/raftpb/*.proto
 
-printf "generating proto in walpb\n"
-protoc --go_out=. walpb/*.proto
+printf "generating proto in wal/walpb\n"
+protoc --go_out=. wal/walpb/*.proto
 COMMENT
 
 # for now, be conservative about what version of protoc we expect

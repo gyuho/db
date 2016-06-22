@@ -7,8 +7,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/gyuho/distdb/crc"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/crc"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 var (

@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 func TestRecordEncode(t *testing.T) {

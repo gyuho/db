@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gyuho/distdb/fileutil"
-	"github.com/gyuho/distdb/raftpb"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 const (
@@ -104,7 +104,7 @@ func (w *WAL) UnsafeFdatasync() error {
 	took := time.Since(st)
 
 	if took > warnSyncDuration {
-		logger.Warnf("fsync took too long (took %v, expected %v)", took, warnSyncDuration)
+		logger.Warningf("fsync took too long (took %v, expected %v)", took, warnSyncDuration)
 	}
 	return err
 }

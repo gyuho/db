@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/rand"
 
-	"github.com/gyuho/distdb/raftpb"
+	"github.com/gyuho/db/raft/raftpb"
 )
 
 // NoLeaderNodeID is a placeholder node ID, only used when
@@ -101,6 +101,8 @@ func (c *Config) validate() error {
 	if c.MaxInflightMsgs <= 0 {
 		return errors.New("max number of inflight messages must be greater than 0")
 	}
+
+	return nil
 }
 
 // raftNode represents Raft-algorithm-specific node.
@@ -109,12 +111,15 @@ type raftNode struct {
 	id    uint64
 	state raftpb.NODE_STATE
 
-	leaderID     uint64
-	idToProgress map[uint64]*Progress
+	term      uint64          // (etcd raft.raft.Term)
+	votedFor  uint64          // (etcd raft.raft.Vote)
+	votedFrom map[uint64]bool // (etcd raft.raft.votes)
 
-	term      uint64
-	votedFor  uint64
-	votedFrom map[uint64]bool
+	leaderID     uint64               // (etcd raft.raft.lead)
+	idToProgress map[uint64]*Progress // (etcd raft.raft.prs)
+
+	heartbeatTick        int // for leader
+	heartbeatTickElapsed int // for leader
 
 	logger     Logger
 	logStorage *LogStorage
@@ -129,9 +134,6 @@ type raftNode struct {
 	electionTickRandomized int
 	rand                   *rand.Rand
 
-	heartbeatTick        int
-	heartbeatTickElapsed int
-
 	tickFunc func()
 	stepFunc func(r *raftNode, msg raftpb.Message)
 
@@ -140,7 +142,9 @@ type raftNode struct {
 	maxEntryPerMsg  uint64
 	maxInflightMsgs int
 
-	pendingConf bool
+	// pendingConfigExist is true, then new configuration will be ignored,
+	// in preference to the unapplied configuration.
+	pendingConfigExist bool
 
 	// leaderIDTransferee is the ID of the leader transfer target
 	// when it's not zero (Raft 3.10).

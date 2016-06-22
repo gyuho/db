@@ -7,9 +7,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/gyuho/distdb/crc"
-	"github.com/gyuho/distdb/raftpb"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/crc"
+	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 var (

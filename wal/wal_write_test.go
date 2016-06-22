@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gyuho/distdb/fileutil"
-	"github.com/gyuho/distdb/raftpb"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 // createEmptyEntries creates empty slice of entries for testing.

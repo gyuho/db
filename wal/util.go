@@ -5,7 +5,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/gyuho/distdb/fileutil"
+	"github.com/gyuho/db/fileutil"
 )
 
 func getWALName(seq, index uint64) string {
@@ -26,7 +26,7 @@ func selectWALNames(names []string) []string {
 		if _, _, err := parseWALName(name); err != nil {
 			if filepath.Ext(name) != ".tmp" {
 				// only complain about non-WAL temp files
-				logger.Warnf("ignored %q (%v)", name, err)
+				logger.Warningf("ignored %q (%v)", name, err)
 			}
 			continue
 		}

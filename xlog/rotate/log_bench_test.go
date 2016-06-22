@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gyuho/distdb/xlog"
+	"github.com/gyuho/db/xlog"
 )
 
 func Benchmark_xlog_rotate_without_flock(b *testing.B) {
