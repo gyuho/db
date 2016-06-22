@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -32,6 +33,27 @@ func TestExistFileOrDir(t *testing.T) {
 	os.Remove(f.Name())
 	if ok := ExistFileOrDir(f.Name()); ok {
 		t.Fatalf("%s should not exist", f.Name())
+	}
+}
+
+func TestMkdirAllEmpty(t *testing.T) {
+	tmpdir, err := ioutil.TempDir(os.TempDir(), "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	tmpdir2 := filepath.Join(tmpdir, "testdir")
+	if err = MkdirAllEmpty(tmpdir2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = ioutil.WriteFile(filepath.Join(tmpdir2, "text.txt"), []byte("test text"), PrivateFileMode); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = MkdirAllEmpty(tmpdir2); err == nil || !strings.Contains(err.Error(), "to be empty, got") {
+		t.Fatalf("unexpected error %v", err)
 	}
 }
 

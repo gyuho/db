@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -45,11 +46,32 @@ func ReadDir(dir string) ([]string, error) {
 
 // MkdirAll runs os.MkdirAll with writable check.
 func MkdirAll(dir string) error {
+	// If path is already a directory, MkdirAll does nothing
+	// and returns nil.
 	err := os.MkdirAll(dir, PrivateDirMode)
-	if err != nil && err != os.ErrExist {
+	if err != nil {
+		// if mkdirAll("a/text") and "text" is not
+		// a directory, this will return syscall.ENOTDIR
 		return err
 	}
 	return DirWritable(dir)
+}
+
+// MkdirAllEmpty is similar to MkdirAll but returns error
+// if the deepest directory was not empty.
+func MkdirAllEmpty(dir string) error {
+	err := MkdirAll(dir)
+	if err == nil {
+		var ns []string
+		ns, err = ReadDir(dir)
+		if err != nil {
+			return err
+		}
+		if len(ns) != 0 {
+			err = fmt.Errorf("expected %q to be empty, got %q", dir, ns)
+		}
+	}
+	return err
 }
 
 // ExistFileOrDir returns true if the file or directory exists.
