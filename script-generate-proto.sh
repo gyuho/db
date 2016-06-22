@@ -27,12 +27,12 @@ pushd "${GOGOPROTO_ROOT}"
 	make install
 popd
 
-printf "Generating raftpb\n"
+printf "Generating raft/raftpb\n"
 protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
-	raftpb/*.proto;
+	raft/raftpb/*.proto;
 
-printf "Generating walpb\n"
+printf "Generating wal/walpb\n"
 protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
-	walpb/*.proto;
+	wal/walpb/*.proto;

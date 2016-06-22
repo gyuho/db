@@ -9,13 +9,6 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
 
-// NODE_STATE represents the state of a node in a cluster.
-enum NODE_STATE {
-	FOLLOWER  = 0;
-	CANDIDATE = 1;
-	LEADER    = 2;
-}
-
 enum ENTRY_TYPE {
 	NORMAL        = 0;
 	CONFIG_CHANGE = 1;
