@@ -1,6 +1,10 @@
 package raft
 
-import "github.com/gyuho/db/raft/raftpb"
+import (
+	"fmt"
+
+	"github.com/gyuho/db/raft/raftpb"
+)
 
 // Progress is follower's state in leader's view.
 type Progress struct {
@@ -19,13 +23,6 @@ type Progress struct {
 	// (etcd raft.Progress.Next)
 	NextIndex uint64
 
-	// ProbePaused is used in PROBE state.
-	// When ProbePaused is true, leader stops sending replication messages
-	// to this follower.
-	//
-	// (etcd raft.Progress.Paused)
-	ProbePaused bool
-
 	// PendingSnapshotIndex is used in SNAPSHOT state.
 	// PendingSnapshotIndex is the index of the ongoing snapshot.
 	// When PendingSnapshotIndex is set, leader stops replication
@@ -34,36 +31,142 @@ type Progress struct {
 	// (etcd raft.Progress.PendingSnapshot)
 	PendingSnapshotIndex uint64
 
-	// RecentActive is true if this follower is recently active,
+	// Paused is used in PROBE state.
+	// When Paused is true, leader stops sending replication messages
+	// to this follower.
+	//
+	// (etcd raft.Progress.Paused)
+	Paused bool
+
+	// Active is true if this follower is recently active,
 	// such as receiving any message from this follower.
 	// It can be reset to false after election timeout.
 	//
 	// (etcd raft.Progress.RecentActive)
-	RecentActive bool
+	Active bool
 
-	// inflightState represents the status of buffered messages
+	// inflights represents the status of buffered messages
 	// to this follower. When it's full, no more messages should
 	// be sent to this follower.
-	inflightState *inflightState
+	inflights *inflights
 }
 
-// inflightState represents the sliding window of
-// inflight messages to this follower. When it's full,
-// no more messages should be sent to this follower.
-// Whenever leader sends out a message to this follower,
-// the index of the last entry in the message should be
-// added to inflightState. And when the leader receives
-// the response from this follower, it should free the
-// previous inflight messages.
+func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
+	pr.State = state
+	pr.PendingSnapshotIndex = 0
+	pr.Paused = false
+	pr.Active = false
+}
+
+func (pr *Progress) becomeProbe() {
+	if pr.State == raftpb.PROGRESS_STATE_SNAPSHOT { // snapshot was sent
+		pIdx := pr.PendingSnapshotIndex
+		pr.resetState(raftpb.PROGRESS_STATE_PROBE)
+		pr.NextIndex = maxUint64(pr.MatchIndex+1, pIdx+1)
+		return
+	}
+	pr.resetState(raftpb.PROGRESS_STATE_PROBE)
+	pr.NextIndex = pr.MatchIndex + 1 // probe next index
+}
+
+func (pr *Progress) becomeReplicate() {
+	pr.resetState(raftpb.PROGRESS_STATE_REPLICATE)
+	pr.NextIndex = pr.MatchIndex + 1 // probe next index
+}
+
+func (pr *Progress) pause() {
+	pr.Paused = true
+}
+
+func (pr *Progress) resume() {
+	pr.Paused = false
+}
+
+func (pr *Progress) isPaused() bool {
+	switch pr.State {
+	case raftpb.PROGRESS_STATE_PROBE:
+		return pr.Paused
+	case raftpb.PROGRESS_STATE_REPLICATE:
+		return pr.inflights.full()
+	case raftpb.PROGRESS_STATE_SNAPSHOT:
+		return true
+	default:
+		panic("unexpected pr.State")
+	}
+}
+
+func (pr *Progress) becomeSnapshot(snapshotIndex uint64) {
+	pr.resetState(raftpb.PROGRESS_STATE_SNAPSHOT)
+	pr.PendingSnapshotIndex = snapshotIndex
+}
+
+func (pr *Progress) optimisticUpdate(msgLogIndex uint64) {
+	pr.NextIndex = msgLogIndex + 1
+}
+
+// maybeUpdate returns false if the given index comes from an
+// outdated message.
 //
-// (etcd raft.inflights)
-type inflightState struct {
-	bufferSize    int
-	bufferIndexes []uint64
+// (etcd raft.Progress.maybeUpdate)
+func (pr *Progress) maybeUpdate(msgLogIndex uint64) bool {
+	upToDate := false
+	if pr.MatchIndex < msgLogIndex { // update MatchIndex
+		pr.MatchIndex = msgLogIndex
+		upToDate = true
+		pr.resume()
+	}
 
-	// starting index in the buffer
-	bufferedStartIndex int
+	if pr.NextIndex <= msgLogIndex { // update NextIndex
+		pr.NextIndex = msgLogIndex + 1
+	}
 
-	// number of inflights in the buffer
-	bufferedCount int
+	return upToDate
+}
+
+// maybeDecrease returns true if the rejecting message's log index
+// comes from an outdated message. Otherwise, it decreases the next
+// index in the follower's progress, and returns true.
+//
+// (etcd raft.Progress.maybeDecrTo)
+func (pr *Progress) maybeDecrease(rejectLogIndex, rejectHint uint64) bool {
+	if pr.State == raftpb.PROGRESS_STATE_REPLICATE {
+		if rejectLogIndex <= pr.MatchIndex {
+			return false
+		}
+
+		pr.NextIndex = pr.MatchIndex + 1
+		return true
+	}
+
+	if pr.NextIndex-1 != rejectLogIndex {
+		return false
+	}
+
+	pr.NextIndex = minUint64(rejectLogIndex, rejectHint+1)
+	if pr.NextIndex < 1 {
+		pr.NextIndex = 1
+	}
+
+	pr.resume()
+	return true
+}
+
+// needSnapshotAbort returns true if it needs to stop sending snapshot to the
+// follower.
+func (pr *Progress) needSnapshotAbort() bool {
+	return pr.State == raftpb.PROGRESS_STATE_SNAPSHOT && pr.MatchIndex >= pr.PendingSnapshotIndex
+}
+
+func (pr *Progress) snapshotFailed() {
+	pr.PendingSnapshotIndex = 0 // reset because it failed
+}
+
+func (pr *Progress) String() string {
+	return fmt.Sprintf("[state %q | match index %d | next index %d | paused(waiting) %v | pending Snapshot index %d]",
+		pr.State,
+		pr.MatchIndex,
+		pr.NextIndex,
+		pr.isPaused(),
+		pr.PendingSnapshotIndex,
+	)
 }

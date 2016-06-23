@@ -86,7 +86,7 @@ func (c *Config) validate() error {
 		return errors.New("logger cannot be nil")
 	}
 
-	if c.raftStorage == nil {
+	if c.StableStorage == nil {
 		return errors.New("raft log storage cannot be nil")
 	}
 
