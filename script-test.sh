@@ -21,28 +21,28 @@ if [ -n "${fmtRes}" ]; then
 	exit 255
 fi
 
-# echo "Checking go vet..."
-# result=$(go vet $TESTS 2>&1 >/dev/null)
-# if [ -n "${result}" ]; then
-# 	echo -e "go vet checking failed:\n${result}"
-# 	exit 255
-# fi
+echo "Checking go vet..."
+result=$(go vet $TESTS 2>&1 >/dev/null)
+if [ -n "${result}" ]; then
+	echo -e "go vet checking failed:\n${result}"
+	exit 255
+fi
 
-# echo "Checking go tool vet -shadow..."
-# result=$(go tool vet -shadow $TESTS 2>&1 >/dev/null)
-# if [ -n "${result}" ]; then
-# 	echo -e "go vet shadow checking failed:\n${result}"
-# 	exit 255
-# fi
+echo "Checking go tool vet -shadow..."
+result=$(go tool vet -shadow $TESTS 2>&1 >/dev/null)
+if [ -n "${result}" ]; then
+	echo -e "go vet shadow checking failed:\n${result}"
+	exit 255
+fi
 
-# echo "Checking gosimple..."
-# for path in $TESTS; do
-# 	result=`gosimple ${path} || true`
-# 	if [ -n "${result}" ]; then
-# 		echo -e "gosimple checking ${path} failed:\n${result}"
-# 		exit 255
-# 	fi
-# done
+echo "Checking gosimple..."
+for path in $TESTS; do
+	result=`gosimple ${path} || true`
+	if [ -n "${result}" ]; then
+		echo -e "gosimple checking ${path} failed:\n${result}"
+		exit 255
+	fi
+done
 
 echo "Checking unused..."
 for path in $TESTS; do
@@ -56,3 +56,4 @@ done
 echo "Running tests...";
 go test -v -cover -cpu 1,2,4 $TESTS;
 go test -v -cover -cpu 1,2,4 -race $TESTS;
+
