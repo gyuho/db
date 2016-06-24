@@ -19,6 +19,6 @@ func IsEmptyHardState(st HardState) bool {
 // stored in the disk. Raft stores the state on all servers before
 // responding to RPCs.
 func MustStoreHardState(prev, cur HardState, entN int) bool {
-	// different, so we need to store the HardState to disk
+	// different, then we need to store the HardState to disk
 	return entN != 0 || prev.Term != cur.Term || prev.VotedFor != cur.VotedFor
 }

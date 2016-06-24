@@ -45,3 +45,9 @@ enum PROGRESS_STATE {
 	// it back to PROBE.
 	SNAPSHOT = 2;
 }
+
+// SNAPSHOT_STATE represents the state of snapshot.
+enum SNAPSHOT_STATE {
+	FINISHED = 0;
+	FAILED   = 1;
+}
