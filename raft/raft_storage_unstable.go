@@ -1,5 +1,5 @@
 package raft
 
-type unstableStorage struct {
+type storageUnstable struct {
 	logger Logger
 }
