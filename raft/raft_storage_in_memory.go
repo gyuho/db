@@ -97,7 +97,11 @@ func (ms *StorageInMemory) Snapshot() (raftpb.Snapshot, error) {
 	return ms.snapshot, nil
 }
 
-// Apppend appends entries to storage. Make sure not to manipulate
+// More methods ↓
+//              ↓
+//              ↓
+
+// Append appends entries to storage. Make sure not to manipulate
 // the original entries so to be optimized for returning.
 func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	if len(entries) == 0 {
@@ -116,7 +120,7 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	// last entry index = 10
 	//
 	// first log index > last entry index
-	// ==> No new entry!
+	// ➝ No new entry!
 	//
 	firstLogIndex := ms.firstIndex()
 	lastEntryIndex := entries[len(entries)-1].Index
@@ -134,12 +138,12 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	// last  entry index = 14
 	//
 	// first log index =< last entry index
-	// ==> New entry!
+	// ➝ New entry!
 	//
 	// first log index > first entry index
-	// ==> Need to truncate compacted entries!
-	// ==> entries = entries[first log index - first entry index:]
-	//             == entries[11 - 9:] == entries[2:] == [11, 12, 13, 14]
+	// ➝ Need to truncate compacted entries!
+	// ➝ entries = entries[first log index - first entry index:]
+	//           == entries[11 - 9:] == entries[2:] == [11, 12, 13, 14]
 	//
 	firstEntryIndex := entries[0].Index
 	if firstLogIndex > firstEntryIndex { // truncate compacted entries
@@ -149,7 +153,7 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	// Now
 	//
 	// entries in snapshot = [0,  11, 12]
-	// entries in append   = [11, 12, 13, 14]
+	// entries to append   = [11, 12, 13, 14]
 	//
 	// first log   index = 11
 	// first entry index = 11
@@ -167,7 +171,7 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	)
 	switch {
 	case snapshotEntryN > offset:
-		// Now entries in snapshot = [0, 11, 12]
+		// ↳ Now entries in snapshot = [0, 11, 12]
 		//
 		// make a copy to not manipulate the original entries
 		// (X) ms.snapshotEntries = ms.snapshotEntries[:offset]
@@ -175,9 +179,11 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 		copy(tmps, ms.snapshotEntries[:offset])
 		ms.snapshotEntries = tmps
 		//
-		// Now entries in snapshot = [0]
+		// ➝ Now entries in snapshot = [0]
 
-		// Then append [11, 12, 13, 14] to [0]
+		// Then [0] ← append [11, 12, 13, 14]
+		// ➝ Now entries in snapshot = [0, 11, 12, 13, 14]
+		//
 		ms.snapshotEntries = append(ms.snapshotEntries, entries...)
 
 	case snapshotEntryN == offset:
@@ -192,10 +198,10 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 		// last  entry index = 17
 		//
 		// first log index =< last entry index
-		// ==> New entry!
+		// ➝ New entry!
 		//
 		// first log index < first entry index
-		// ==> No need to truncate compacted entries!
+		// ➝ No need to truncate compacted entries!
 		//
 		// offset = first entry index - first log index + 1
 		//        = 13 - 11 + 1 = 3
@@ -203,12 +209,12 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 		// size of snapshot entries = 3
 		//
 		// offset == size of snapshot entries
-		// ==> Just append all entries!
+		// ➝ Just append all entries!
 		//
 		ms.snapshotEntries = append(ms.snapshotEntries, entries...)
 
 	default:
-		raftLogger.Panicf("missing log entry [last log index: %d | entries[0].Index %d]", ms.lastIndex(), entries[0].Index)
+		raftLogger.Panicf("missing log entry [last log index: %d | entries[0].Index: %d]", ms.lastIndex(), entries[0].Index)
 	}
 
 	return nil
@@ -258,9 +264,9 @@ func (ms *StorageInMemory) SetHardState(state raftpb.HardState) error {
 	return nil
 }
 
-// Compact discards all log entries up to compactIndex.
-// It keeps entries[compactIndex:], retaining first entry
-// only for matching purposes.
+// Compact discards all log entries "up to" compactIndex.
+// It keeps entries[compactIndex:], and retains entries[compactIndex]
+// in its first entry only for matching purposes.
 //
 // The application must ensure that it does not compacts on an index
 // greater than applied index.
@@ -303,7 +309,7 @@ func (ms *StorageInMemory) Compact(compactIndex uint64) error {
 	tmps := make([]raftpb.Entry, 1, uint64(len(ms.snapshotEntries))-newEntryStartIndex)
 	tmps[0].Term = ms.snapshotEntries[newEntryStartIndex].Term
 	tmps[0].Index = ms.snapshotEntries[newEntryStartIndex].Index
-	// skip data
+	// skip tmps[0].Data
 
 	tmps = append(tmps, ms.snapshotEntries[newEntryStartIndex+1:]...)
 
@@ -324,7 +330,7 @@ func limitEntries(entries []raftpb.Entry, limitSize uint64) []raftpb.Entry {
 	for i = 0; i < len(entries); i++ {
 		total += entries[i].Size()
 
-		// at least one entry
+		// to return at least one entry
 		if i != 0 && uint64(total) > limitSize {
 			break
 		}

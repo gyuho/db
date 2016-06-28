@@ -68,54 +68,54 @@ func Test_StorageInMemory_Entries(t *testing.T) {
 		{
 			4, 5, math.MaxUint64,
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}},
+			[]raftpb.Entry{{Term: 4, Index: 4}},
 		},
 
 		{
 			4, 6, math.MaxUint64,
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			[]raftpb.Entry{{Term: 4, Index: 4}, {Term: 5, Index: 5}},
 		},
 
 		{
 			4, 7, math.MaxUint64,
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}, {Index: 6, Term: 6}},
+			[]raftpb.Entry{{Term: 4, Index: 4}, {Term: 5, Index: 5}, {Term: 6, Index: 6}},
 		},
 
 		// even limitSize 0 should return at least one entry
 		{
 			4, 7, 0,
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}},
+			[]raftpb.Entry{{Term: 4, Index: 4}},
 		},
 
 		// limit to 2 entries
 		{
 			4, 7, uint64(ents[1].Size() + ents[2].Size()),
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			[]raftpb.Entry{{Term: 4, Index: 4}, {Term: 5, Index: 5}},
 		},
 
 		// limit to 2 entries
 		{
 			4, 7, uint64(ents[1].Size() + ents[2].Size() + ents[3].Size()/2),
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			[]raftpb.Entry{{Term: 4, Index: 4}, {Term: 5, Index: 5}},
 		},
 
 		// limit to 2 entries
 		{
 			4, 7, uint64(ents[1].Size() + ents[2].Size() + ents[3].Size() - 1),
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			[]raftpb.Entry{{Term: 4, Index: 4}, {Term: 5, Index: 5}},
 		},
 
 		// limit to 3 entries
 		{
 			4, 7, uint64(ents[1].Size() + ents[2].Size() + ents[3].Size()),
 			nil,
-			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}, {Index: 6, Term: 6}},
+			[]raftpb.Entry{{Term: 4, Index: 4}, {Term: 5, Index: 5}, {Term: 6, Index: 6}},
 		},
 	}
 
