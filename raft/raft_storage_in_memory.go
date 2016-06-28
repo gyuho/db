@@ -97,6 +97,8 @@ func (ms *StorageInMemory) Snapshot() (raftpb.Snapshot, error) {
 	return ms.snapshot, nil
 }
 
+// Apppend appends entries to storage. Make sure not to manipulate
+// the original entries so to be optimized for returning.
 func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	if len(entries) == 0 {
 		return nil
@@ -167,9 +169,15 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	case snapshotEntryN > offset:
 		//
 		// Now entries in snapshot = [0, 11, 12]
-		ms.snapshotEntries = ms.snapshotEntries[:offset]
-		// Now entries in snapshot = [0]
 		//
+		// make a copy to not manipulate the original entries
+		// (X) ms.snapshotEntries = ms.snapshotEntries[:offset]
+		tmps := make([]raftpb.Entry, offset)
+		copy(tmps, ms.snapshotEntries[:offset])
+		ms.snapshotEntries = tmps
+		//
+		// Now entries in snapshot = [0]
+
 		// Then append [11, 12, 13, 14] to [0]
 		ms.snapshotEntries = append(ms.snapshotEntries, entries...)
 
@@ -277,12 +285,20 @@ func (ms *StorageInMemory) Compact(compactIndex uint64) error {
 	// entries = entries[1:] == [11, 12, 13]
 	//
 	newEntryStartIndex := compactIndex - firstEntryIndexInStorage
-	ms.snapshotEntries = ms.snapshotEntries[newEntryStartIndex:]
-	//
-	// ???
-	// new capacity = size of entries in snapshot - new entry start index + 1
+
+	// DO NOT MODIFY THE ORIGINAL ENTRIES
+	// (X) ms.snapshotEntries = ms.snapshotEntries[newEntryStartIndex:]
+
+	// new capacity = size of entries in snapshot - new entry start index
 	//              = 4 - 1 = 3
-	// newCapacity  = uint64(len(ms.snapshotEntries) - i)
+	//              = uint64(len(ms.snapshotEntries) - i)
+	//
+	// (etcd adds 1 more to the capacity)
+	//
+	// ??? Why etcd skips copying data?
+	tmps := make([]raftpb.Entry, uint64(len(ms.snapshotEntries))-newEntryStartIndex)
+	copy(tmps, ms.snapshotEntries[newEntryStartIndex:])
+	ms.snapshotEntries = tmps
 
 	return nil
 }
