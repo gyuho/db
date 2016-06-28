@@ -9,7 +9,7 @@ type Storage interface {
 	// GetState returns the saved HardState and ConfigState.
 	//
 	// (etcd raft.Storage.InitialState)
-	GetState() (raftpb.HardState, *raftpb.ConfigState, error)
+	GetState() (raftpb.HardState, raftpb.ConfigState, error)
 
 	// Term returns the term of the entry index, which must be in the range
 	// [FirstIndex - 1, LastIndex].

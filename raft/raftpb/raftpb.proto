@@ -28,7 +28,7 @@ message ConfigState {
 }
 
 message SnapshotMetadata {
-	ConfigState ConfigState = 1;
+	ConfigState ConfigState = 1 [(gogoproto.nullable) = false]; // generate without pointer
 
 	uint64 Term  = 2;
 	uint64 Index = 3;
@@ -37,7 +37,7 @@ message SnapshotMetadata {
 // Snapshot contains snapshot data and meta-data.
 // It is stored in stable storage before messages are sent.
 message Snapshot {
-	SnapshotMetadata Metadata = 1;
+	SnapshotMetadata Metadata = 1 [(gogoproto.nullable) = false]; // generate without pointer
 	bytes Data = 2;
 }
 
@@ -559,7 +559,7 @@ message Message {
 	// before messages are sent.
 	//
 	// (etcd: raft.raftpb.Message.Entries)
-	repeated Entry Entries = 8;
+	repeated Entry Entries = 8 [(gogoproto.nullable) = false]; // generate without pointer
 
 	// Snapshot represents current in-memory state of the server.
 	// It is stored in stable storage before messages are sent.
@@ -580,7 +580,7 @@ message Message {
 	// the start entry.
 	//
 	// (etcd: raft.raftpb.Message.Snapshot)
-	Snapshot Snapshot = 9;
+	Snapshot Snapshot = 9 [(gogoproto.nullable) = false]; // generate without pointer
 
 	// Reject is true when rejecting Message.
 	// (etcd: raft.raftpb.Message.Reject, raftpb.MsgVoteResp)

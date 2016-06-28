@@ -27,7 +27,7 @@ func NewStorageInMemory() *StorageInMemory {
 	}
 }
 
-func (ms *StorageInMemory) GetState() (raftpb.HardState, *raftpb.ConfigState, error) {
+func (ms *StorageInMemory) GetState() (raftpb.HardState, raftpb.ConfigState, error) {
 	return ms.hardState, ms.snapshot.Metadata.ConfigState, nil
 }
 
@@ -167,7 +167,6 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 	)
 	switch {
 	case snapshotEntryN > offset:
-		//
 		// Now entries in snapshot = [0, 11, 12]
 		//
 		// make a copy to not manipulate the original entries
@@ -207,6 +206,9 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 		// ==> Just append all entries!
 		//
 		ms.snapshotEntries = append(ms.snapshotEntries, entries...)
+
+	default:
+		raftLogger.Panicf("missing log entry [last log index: %d | entries[0].Index %d]", ms.lastIndex(), entries[0].Index)
 	}
 
 	return nil
@@ -231,7 +233,7 @@ func (ms *StorageInMemory) CreateSnapshot(idx uint64, configState *raftpb.Config
 	ms.snapshot.Metadata.Index = idx
 
 	if configState != nil {
-		ms.snapshot.Metadata.ConfigState = configState
+		ms.snapshot.Metadata.ConfigState = *configState
 	}
 
 	ms.snapshot.Data = data
@@ -256,7 +258,10 @@ func (ms *StorageInMemory) SetHardState(state raftpb.HardState) error {
 	return nil
 }
 
-// Compact discards all log entries prior to compactIndex.
+// Compact discards all log entries up to compactIndex.
+// It keeps entries[compactIndex:], retaining first entry
+// only for matching purposes.
+//
 // The application must ensure that it does not compacts on an index
 // greater than applied index.
 func (ms *StorageInMemory) Compact(compactIndex uint64) error {
@@ -264,7 +269,7 @@ func (ms *StorageInMemory) Compact(compactIndex uint64) error {
 	defer ms.mu.Unlock()
 
 	firstEntryIndexInStorage := ms.firstIndex() - 1
-	if firstEntryIndexInStorage >= compactIndex {
+	if firstEntryIndexInStorage >= compactIndex { // == means first dummy entry (already compacted)
 		return ErrCompacted
 	}
 
@@ -295,9 +300,13 @@ func (ms *StorageInMemory) Compact(compactIndex uint64) error {
 	//
 	// (etcd adds 1 more to the capacity)
 	//
-	// ??? Why etcd skips copying data?
-	tmps := make([]raftpb.Entry, uint64(len(ms.snapshotEntries))-newEntryStartIndex)
-	copy(tmps, ms.snapshotEntries[newEntryStartIndex:])
+	tmps := make([]raftpb.Entry, 1, uint64(len(ms.snapshotEntries))-newEntryStartIndex)
+	tmps[0].Term = ms.snapshotEntries[newEntryStartIndex].Term
+	tmps[0].Index = ms.snapshotEntries[newEntryStartIndex].Index
+	// skip data
+
+	tmps = append(tmps, ms.snapshotEntries[newEntryStartIndex+1:]...)
+
 	ms.snapshotEntries = tmps
 
 	return nil
