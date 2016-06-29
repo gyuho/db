@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/gyuho/db/raft/raftpb"
@@ -401,7 +402,26 @@ func Test_storageUnstable_persistedEntriesAt(t *testing.T) {
 }
 
 func Test_storageUnstable_restoreIncomingSnapshot(t *testing.T) {
+	su := storageUnstable{
+		incomingSnapshot: &raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 1}},
+		indexOffset:      5,
+		entries:          []raftpb.Entry{{Index: 5, Term: 1}},
+	}
+	incomingSnapshot := raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 10, Term: 3}}
 
+	su.restoreIncomingSnapshot(incomingSnapshot)
+
+	if su.indexOffset != incomingSnapshot.Metadata.Index+1 {
+		t.Fatalf("index offset expected %d, got %d", incomingSnapshot.Metadata.Index+1, su.indexOffset)
+	}
+
+	if len(su.entries) != 0 { // must be nil
+		t.Fatalf("len(su.entries) expected 0, got %d", len(su.entries))
+	}
+
+	if !reflect.DeepEqual(su.incomingSnapshot, &incomingSnapshot) {
+		t.Fatalf("incomingSnapshot expected %+v, got %+v", incomingSnapshot, su.incomingSnapshot)
+	}
 }
 
 func Test_storageUnstable_truncateAndAppend(t *testing.T) {
