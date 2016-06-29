@@ -32,12 +32,11 @@ func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {
 func (su *storageUnstable) maybeLastIndex() (uint64, bool) {
 	switch {
 	case len(su.entries) > 0:
-		return su.entries[len(su.entries)-1].Index, true
+		// (X) return su.entries[len(su.entries)-1].Index, true
 		// OR
-		// return su.indexOffset + uint64(len(su.entries)) - 1
+		return su.indexOffset + uint64(len(su.entries)) - 1, true
 
 	case su.incomingSnapshot != nil: // no unstable entries
-		// ??? no "+1" because
 		return su.incomingSnapshot.Metadata.Index, true
 
 	default:
@@ -51,7 +50,7 @@ func (su *storageUnstable) maybeTerm(idx uint64) (uint64, bool) {
 		if su.incomingSnapshot == nil {
 			return 0, false
 		}
-		if su.incomingSnapshot.Metadata.Index == idx {
+		if su.incomingSnapshot.Metadata.Index == idx { // no matching unstable entries
 			return su.incomingSnapshot.Metadata.Term, true
 		}
 		return 0, false

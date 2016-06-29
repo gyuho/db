@@ -250,7 +250,88 @@ func Test_storageUnstable_maybeTerm(t *testing.T) {
 }
 
 func Test_storageUnstable_persistedEntriesAt(t *testing.T) {
+	tests := []struct {
+		incomingSnapshot *raftpb.Snapshot
+		indexOffset      uint64
+		entries          []raftpb.Entry
 
+		index, term uint64
+
+		windexOffset uint64
+		wlen         int
+	}{
+		{
+			nil, 0, []raftpb.Entry{},
+
+			5, 1,
+
+			0,
+			0,
+		},
+
+		{
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}},
+
+			5, 1, // persisting to the first entry of index 5
+
+			6,
+			0,
+		},
+
+		{
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}, {Index: 6, Term: 1}},
+
+			5, 1, // persisting to the first entry of index 5
+
+			6,
+			1, // {Index: 6, Term: 1}
+		},
+
+		{
+			nil, 6, []raftpb.Entry{{Index: 6, Term: 2}},
+
+			6, 1, // persisting to the first entry of index 5, term mismatch
+
+			6, // term mismatch, so the indexOffset did not increase
+			1,
+		},
+
+		{
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}},
+
+			4, 1, // persisting the old index
+
+			5, // index mismatch, so nothing happens
+			1,
+		},
+
+		{
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}},
+
+			4, 2, // persisting the old index, but with different term
+
+			5, // index mismatch, so nothing happens
+			1,
+		},
+	}
+
+	for i, tt := range tests {
+		su := storageUnstable{
+			incomingSnapshot: tt.incomingSnapshot,
+			indexOffset:      tt.indexOffset,
+			entries:          tt.entries,
+		}
+
+		su.persistedEntriesAt(tt.index, tt.term)
+
+		if su.indexOffset != tt.windexOffset {
+			t.Fatalf("#%d: index offset = %d, want %d", i, su.indexOffset, tt.windexOffset)
+		}
+
+		if len(su.entries) != tt.wlen {
+			t.Fatalf("#%d: len(su.entries) = %d, want %d", i, len(su.entries), tt.wlen)
+		}
+	}
 }
 
 func Test_storageUnstable_restoreIncomingSnapshot(t *testing.T) {
