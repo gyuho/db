@@ -122,7 +122,6 @@ type raftNode struct {
 	heartbeatTick        int // for leader
 	heartbeatTickElapsed int // for leader
 
-	logger         Logger
 	raftLogStorage *raftLogStorage
 	msgs           []raftpb.Message
 
@@ -150,4 +149,9 @@ type raftNode struct {
 	// leaderIDTransferee is the ID of the leader transfer target
 	// when it's not zero (Raft 3.10).
 	leaderIDTransferee uint64
+}
+
+func newRaftNode(c *Config) *raftNode {
+	raftLogger.SetLogger(c.Logger)
+	return nil
 }
