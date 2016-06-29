@@ -425,5 +425,80 @@ func Test_storageUnstable_restoreIncomingSnapshot(t *testing.T) {
 }
 
 func Test_storageUnstable_truncateAndAppend(t *testing.T) {
+	tests := []struct {
+		incomingSnapshot *raftpb.Snapshot
+		indexOffset      uint64
+		entries          []raftpb.Entry
 
+		entriesToAppend []raftpb.Entry
+
+		windexOffset uint64
+		wentries     []raftpb.Entry
+	}{
+		{ // direct append
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}},
+
+			[]raftpb.Entry{{Index: 6, Term: 1}, {Index: 7, Term: 1}},
+
+			5, []raftpb.Entry{{Index: 5, Term: 1}, {Index: 6, Term: 1}, {Index: 7, Term: 1}},
+		},
+
+		{ // replacing unstable entries
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}},
+
+			[]raftpb.Entry{{Index: 5, Term: 2}, {Index: 6, Term: 2}},
+
+			5, []raftpb.Entry{{Index: 5, Term: 2}, {Index: 6, Term: 2}},
+		},
+
+		{ // replacing unstable entries
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}},
+
+			[]raftpb.Entry{{Index: 4, Term: 1}, {Index: 5, Term: 1}, {Index: 6, Term: 1}},
+
+			4, []raftpb.Entry{{Index: 4, Term: 1}, {Index: 5, Term: 1}, {Index: 6, Term: 1}},
+		},
+
+		{ // replacing unstable entries
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}},
+
+			[]raftpb.Entry{{Index: 4, Term: 2}, {Index: 5, Term: 2}, {Index: 6, Term: 2}},
+
+			4, []raftpb.Entry{{Index: 4, Term: 2}, {Index: 5, Term: 2}, {Index: 6, Term: 2}},
+		},
+
+		{ // truncating existing entries
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}, {Index: 6, Term: 1}, {Index: 7, Term: 1}},
+
+			[]raftpb.Entry{{Index: 6, Term: 2}},
+
+			5, []raftpb.Entry{{Index: 5, Term: 1}, {Index: 6, Term: 2}},
+		},
+
+		{ // truncating existing entries
+			nil, 5, []raftpb.Entry{{Index: 5, Term: 1}, {Index: 6, Term: 1}, {Index: 7, Term: 1}},
+
+			[]raftpb.Entry{{Index: 7, Term: 2}, {Index: 8, Term: 2}},
+
+			5, []raftpb.Entry{{Index: 5, Term: 1}, {Index: 6, Term: 1}, {Index: 7, Term: 2}, {Index: 8, Term: 2}},
+		},
+	}
+
+	for i, tt := range tests {
+		su := storageUnstable{
+			incomingSnapshot: tt.incomingSnapshot,
+			indexOffset:      tt.indexOffset,
+			entries:          tt.entries,
+		}
+
+		su.truncateAndAppend(tt.entriesToAppend)
+
+		if su.indexOffset != tt.windexOffset {
+			t.Fatalf("#%d: index offset = %d, want %d", i, su.indexOffset, tt.windexOffset)
+		}
+
+		if !reflect.DeepEqual(su.entries, tt.wentries) {
+			t.Fatalf("#%d: su.entries expected %+v, got %+v", i, su.entries, tt.wentries)
+		}
+	}
 }
