@@ -59,6 +59,14 @@ func (s *settableLogger) GetLogger() Logger {
 	return l
 }
 
+func SetLogger(l Logger) {
+	raftLogger.SetLogger(l)
+}
+
+func GetLogger() Logger {
+	return raftLogger.GetLogger()
+}
+
 func init() {
 	raftLogger.SetLogger(xlog.NewLogger("raft"))
 }
