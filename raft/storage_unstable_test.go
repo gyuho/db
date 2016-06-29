@@ -313,6 +313,72 @@ func Test_storageUnstable_persistedEntriesAt(t *testing.T) {
 			5, // index mismatch, so nothing happens
 			1,
 		},
+
+		{ // with snapshot
+			&raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 1}},
+			5,
+			[]raftpb.Entry{{Index: 5, Term: 1}},
+
+			5, 1, // persisting to first entry
+
+			6, // index match, so increases the index offset
+			0,
+		},
+
+		{
+			&raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 1}},
+			5,
+			[]raftpb.Entry{{Index: 5, Term: 1}, {Index: 6, Term: 1}},
+
+			5, 1, // persisting to first entry
+
+			6, // index match, so increases the index offset
+			1, // {Index: 6, Term: 1}
+		},
+
+		{
+			&raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 1}},
+			6,
+			[]raftpb.Entry{{Index: 6, Term: 2}},
+
+			6, 1, // persisting to first entry, but mismatching term
+
+			6, // mismatching term, so nothing happens
+			1,
+		},
+
+		{
+			&raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 1}},
+			5,
+			[]raftpb.Entry{{Index: 5, Term: 1}},
+
+			4, 1, // persisting to snapshot
+
+			5,
+			1,
+		},
+
+		{
+			&raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 2}},
+			5,
+			[]raftpb.Entry{{Index: 5, Term: 2}},
+
+			4, 1, // persisting to old entry
+
+			5, // old entry, so nothing happens
+			1,
+		},
+
+		{
+			&raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 2}},
+			5,
+			[]raftpb.Entry{{Index: 5, Term: 2}},
+
+			4, 2, // persisting to old entry
+
+			5, // old entry, so nothing happens
+			1,
+		},
 	}
 
 	for i, tt := range tests {
