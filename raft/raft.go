@@ -25,12 +25,12 @@ type Config struct {
 	// Logger implements system logging for Raft.
 	Logger Logger
 
-	// Storage implements storage for Raft logs, where a node stores its
+	// StorageStable implements storage for Raft logs, where a node stores its
 	// entries and states, reads the persisted data when needed.
 	// Raft node needs to read the previous state and configuration
 	// when restarting.
 	// (etcd raft.Storage)
-	Storage Storage
+	StorageStable StorageStable
 
 	// ElectionTick is the number of ticks between elections.
 	// If a follower does not receive any message from a valid leader
@@ -86,8 +86,8 @@ func (c *Config) validate() error {
 		return errors.New("logger cannot be nil")
 	}
 
-	if c.Storage == nil {
-		return errors.New("raft log storage cannot be nil")
+	if c.StorageStable == nil {
+		return errors.New("raft storage cannot be nil")
 	}
 
 	if c.HeartbeatTick <= 0 {

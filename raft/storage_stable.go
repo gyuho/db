@@ -2,23 +2,14 @@ package raft
 
 import "github.com/gyuho/db/raft/raftpb"
 
-// Storage defines storage interface that retrieves log entries from storage.
+// StorageStable defines storage interface that retrieves log entries from storage.
 //
 // (etcd raft.Storage)
-type Storage interface {
+type StorageStable interface {
 	// GetState returns the saved HardState and ConfigState.
 	//
 	// (etcd raft.Storage.InitialState)
 	GetState() (raftpb.HardState, raftpb.ConfigState, error)
-
-	// Term returns the term of the entry index, which must be in the range
-	// [FirstIndex - 1, LastIndex].
-	//
-	// The term of the entry before FirstIndex is retained for matching purposes,
-	// even if the rest of the entries in the term may not be available.
-	//
-	// (etcd raft.Storage.Term)
-	Term(idx uint64) (uint64, error)
 
 	// FirstIndex returns the index of the first-available log entry.
 	// Older entries have been incorporated into the latest snapshot.
@@ -30,6 +21,15 @@ type Storage interface {
 	//
 	// (etcd raft.Storage.LastIndex)
 	LastIndex() (uint64, error)
+
+	// Term returns the term of the entry index, which must be in the range
+	// [FirstIndex - 1, LastIndex].
+	//
+	// The term of the entry before FirstIndex is retained for matching purposes,
+	// even if the rest of the entries in the term may not be available.
+	//
+	// (etcd raft.Storage.Term)
+	Term(idx uint64) (uint64, error)
 
 	// Entries returns the slice of log entries in [startIdx, endIdx).
 	// limitSize limits the total size of log entries to return.

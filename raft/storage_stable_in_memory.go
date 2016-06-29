@@ -6,8 +6,8 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// StorageInMemory implements Storage interface backed by in-memory storage.
-type StorageInMemory struct {
+// StorageStableInMemory implements StorageStable interface backed by in-memory storage.
+type StorageStableInMemory struct {
 	mu sync.Mutex
 
 	hardState raftpb.HardState
@@ -19,19 +19,43 @@ type StorageInMemory struct {
 	snapshotEntries []raftpb.Entry
 }
 
-// NewStorageInMemory creates an empty Storage in memory.
-func NewStorageInMemory() *StorageInMemory {
-	return &StorageInMemory{
+// NewStorageStableInMemory creates an empty StorageStable in memory.
+func NewStorageStableInMemory() *StorageStableInMemory {
+	return &StorageStableInMemory{
 		// populate with one dummy entry at term 0
 		snapshotEntries: make([]raftpb.Entry, 1),
 	}
 }
 
-func (ms *StorageInMemory) GetState() (raftpb.HardState, raftpb.ConfigState, error) {
+func (ms *StorageStableInMemory) GetState() (raftpb.HardState, raftpb.ConfigState, error) {
 	return ms.hardState, ms.snapshot.Metadata.ConfigState, nil
 }
 
-func (ms *StorageInMemory) Term(idx uint64) (uint64, error) {
+func (ms *StorageStableInMemory) firstIndex() uint64 {
+	return ms.snapshotEntries[0].Index + 1 // because first index is dummy at term 0
+}
+
+func (ms *StorageStableInMemory) FirstIndex() (uint64, error) {
+	ms.mu.Lock()
+	idx := ms.firstIndex()
+	ms.mu.Unlock()
+
+	return idx, nil
+}
+
+func (ms *StorageStableInMemory) lastIndex() uint64 {
+	return ms.snapshotEntries[len(ms.snapshotEntries)-1].Index
+}
+
+func (ms *StorageStableInMemory) LastIndex() (uint64, error) {
+	ms.mu.Lock()
+	idx := ms.lastIndex()
+	ms.mu.Unlock()
+
+	return idx, nil
+}
+
+func (ms *StorageStableInMemory) Term(idx uint64) (uint64, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
@@ -43,31 +67,7 @@ func (ms *StorageInMemory) Term(idx uint64) (uint64, error) {
 	return ms.snapshotEntries[idx-firstEntryIndexInStorage].Term, nil
 }
 
-func (ms *StorageInMemory) firstIndex() uint64 {
-	return ms.snapshotEntries[0].Index + 1 // because first index is dummy at term 0
-}
-
-func (ms *StorageInMemory) FirstIndex() (uint64, error) {
-	ms.mu.Lock()
-	idx := ms.firstIndex()
-	ms.mu.Unlock()
-
-	return idx, nil
-}
-
-func (ms *StorageInMemory) lastIndex() uint64 {
-	return ms.snapshotEntries[len(ms.snapshotEntries)-1].Index
-}
-
-func (ms *StorageInMemory) LastIndex() (uint64, error) {
-	ms.mu.Lock()
-	idx := ms.lastIndex()
-	ms.mu.Unlock()
-
-	return idx, nil
-}
-
-func (ms *StorageInMemory) Entries(startIdx, endIdx, limitSize uint64) ([]raftpb.Entry, error) {
+func (ms *StorageStableInMemory) Entries(startIdx, endIdx, limitSize uint64) ([]raftpb.Entry, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
@@ -90,7 +90,7 @@ func (ms *StorageInMemory) Entries(startIdx, endIdx, limitSize uint64) ([]raftpb
 	return limitEntries(entries, limitSize), nil
 }
 
-func (ms *StorageInMemory) Snapshot() (raftpb.Snapshot, error) {
+func (ms *StorageStableInMemory) Snapshot() (raftpb.Snapshot, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
@@ -105,7 +105,7 @@ func (ms *StorageInMemory) Snapshot() (raftpb.Snapshot, error) {
 
 // Append appends entries to storage. Make sure not to manipulate
 // the original entries so to be optimized for returning.
-func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
+func (ms *StorageStableInMemory) Append(entries []raftpb.Entry) error {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -224,7 +224,7 @@ func (ms *StorageInMemory) Append(entries []raftpb.Entry) error {
 
 // CreateSnapshot makes, update snapshot in storage, later to be retrieved by the Snapshot() method.
 // This is used to recontruct the point-in-time state of storage.
-func (ms *StorageInMemory) CreateSnapshot(idx uint64, configState *raftpb.ConfigState, data []byte) (raftpb.Snapshot, error) {
+func (ms *StorageStableInMemory) CreateSnapshot(idx uint64, configState *raftpb.ConfigState, data []byte) (raftpb.Snapshot, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
@@ -237,8 +237,8 @@ func (ms *StorageInMemory) CreateSnapshot(idx uint64, configState *raftpb.Config
 		raftLogger.Panicf("snapshot is out of bound (first log entry index in storage = %d, last log index in storage = %d)", firstEntryIndexInStorage, ms.lastIndex())
 	}
 
-	ms.snapshot.Metadata.Term = ms.snapshotEntries[idx-firstEntryIndexInStorage].Term
 	ms.snapshot.Metadata.Index = idx
+	ms.snapshot.Metadata.Term = ms.snapshotEntries[idx-firstEntryIndexInStorage].Term
 
 	if configState != nil {
 		ms.snapshot.Metadata.ConfigState = *configState
@@ -249,19 +249,19 @@ func (ms *StorageInMemory) CreateSnapshot(idx uint64, configState *raftpb.Config
 	return ms.snapshot, nil
 }
 
-func (ms *StorageInMemory) SetSnapshot(snapshot raftpb.Snapshot) error {
+func (ms *StorageStableInMemory) SetSnapshot(snapshot raftpb.Snapshot) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
 	ms.snapshot = snapshot
 	ms.snapshotEntries = []raftpb.Entry{
-		{Term: snapshot.Metadata.Term, Index: snapshot.Metadata.Index},
+		{Index: snapshot.Metadata.Index, Term: snapshot.Metadata.Term},
 	}
 
 	return nil
 }
 
-func (ms *StorageInMemory) SetHardState(state raftpb.HardState) error {
+func (ms *StorageStableInMemory) SetHardState(state raftpb.HardState) error {
 	ms.hardState = state
 	return nil
 }
@@ -272,7 +272,7 @@ func (ms *StorageInMemory) SetHardState(state raftpb.HardState) error {
 //
 // The application must ensure that it does not compacts on an index
 // greater than applied index.
-func (ms *StorageInMemory) Compact(compactIndex uint64) error {
+func (ms *StorageStableInMemory) Compact(compactIndex uint64) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
@@ -309,8 +309,8 @@ func (ms *StorageInMemory) Compact(compactIndex uint64) error {
 	// (etcd adds 1 more to the capacity)
 	//
 	tmps := make([]raftpb.Entry, 1, uint64(len(ms.snapshotEntries))-newEntryStartIndex)
-	tmps[0].Term = ms.snapshotEntries[newEntryStartIndex].Term
 	tmps[0].Index = ms.snapshotEntries[newEntryStartIndex].Index
+	tmps[0].Term = ms.snapshotEntries[newEntryStartIndex].Term
 	// skip tmps[0].Data
 
 	tmps = append(tmps, ms.snapshotEntries[newEntryStartIndex+1:]...)

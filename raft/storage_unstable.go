@@ -44,3 +44,49 @@ func (su *storageUnstable) maybeLastIndex() (uint64, bool) {
 		return 0, false
 	}
 }
+
+// maybeTerm returns the term of the entry with log index idx, if any.
+func (su *storageUnstable) maybeTerm(idx uint64) (uint64, bool) {
+	if idx < su.indexOffset {
+		if su.incomingSnapshot == nil {
+			return 0, false
+		}
+		if su.incomingSnapshot.Metadata.Index == idx {
+			return su.incomingSnapshot.Metadata.Term, true
+		}
+		return 0, false
+	}
+
+	lasti, ok := su.maybeLastIndex()
+	if !ok {
+		return 0, false
+	}
+
+	if idx > lasti {
+		return 0, false
+	}
+
+	return su.entries[idx-su.indexOffset].Term, true
+}
+
+func (su *storageUnstable) stableTo(index, term uint64) {
+	tm, ok := su.maybeTerm(index)
+	if !ok {
+		return
+	}
+
+	// only update unstable entries if term
+	// is matched with an unstable entry
+	if tm == term && index >= su.indexOffset {
+		// entries      = [10, 11, 12]
+		// index offset = 0 + 10 = 10
+		//
+		// stableTo(index=10) = entries[10-10+1:] = entries[1:]
+		//                    = [11, 12]
+		//
+		// [10] is now considered persisted to stable storage
+		//
+		su.entries = su.entries[index-su.indexOffset+1:]
+		su.indexOffset = index + 1
+	}
+}
