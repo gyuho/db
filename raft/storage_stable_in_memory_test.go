@@ -8,6 +8,64 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
+func Test_StorageStableInMemory_FirstIndex(t *testing.T) {
+	ents := []raftpb.Entry{
+		{Index: 3, Term: 3},
+		{Index: 4, Term: 4},
+		{Index: 5, Term: 5},
+	}
+	st := &StorageStableInMemory{snapshotEntries: ents}
+
+	firstIdx, err := st.FirstIndex()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstIdx != 4 {
+		t.Fatalf("last index expected 4, got %d", firstIdx)
+	}
+
+	// compact up to index 4
+	if err = st.Compact(4); err != nil {
+		t.Fatal(err)
+	}
+
+	firstIdx, err = st.FirstIndex()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstIdx != 5 {
+		t.Fatalf("last index expected 5, got %d", firstIdx)
+	}
+}
+
+func Test_StorageStableInMemory_LastIndex(t *testing.T) {
+	ents := []raftpb.Entry{
+		{Index: 3, Term: 3},
+		{Index: 4, Term: 4},
+		{Index: 5, Term: 5},
+	}
+	st := &StorageStableInMemory{snapshotEntries: ents}
+
+	lastIdx, err := st.LastIndex()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastIdx != 5 {
+		t.Fatalf("last index expected 5, got %d", lastIdx)
+	}
+
+	if err = st.Append([]raftpb.Entry{{Index: 6, Term: 5}}); err != nil {
+		t.Fatal(err)
+	}
+	lastIdx, err = st.LastIndex()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastIdx != 6 {
+		t.Fatalf("last index expected 6, got %d", lastIdx)
+	}
+}
+
 func Test_StorageStableInMemory_Term(t *testing.T) {
 	ents := []raftpb.Entry{
 		{Index: 3, Term: 3},
@@ -128,64 +186,6 @@ func Test_StorageStableInMemory_Entries(t *testing.T) {
 		if !reflect.DeepEqual(entries, tt.wentries) {
 			t.Fatalf("#%d: entries expected %+v, got %+v", i, tt.wentries, entries)
 		}
-	}
-}
-
-func Test_StorageStableInMemory_LastIndex(t *testing.T) {
-	ents := []raftpb.Entry{
-		{Index: 3, Term: 3},
-		{Index: 4, Term: 4},
-		{Index: 5, Term: 5},
-	}
-	st := &StorageStableInMemory{snapshotEntries: ents}
-
-	lastIdx, err := st.LastIndex()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lastIdx != 5 {
-		t.Fatalf("last index expected 5, got %d", lastIdx)
-	}
-
-	if err = st.Append([]raftpb.Entry{{Index: 6, Term: 5}}); err != nil {
-		t.Fatal(err)
-	}
-	lastIdx, err = st.LastIndex()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lastIdx != 6 {
-		t.Fatalf("last index expected 6, got %d", lastIdx)
-	}
-}
-
-func Test_StorageStableInMemory_FirstIndex(t *testing.T) {
-	ents := []raftpb.Entry{
-		{Index: 3, Term: 3},
-		{Index: 4, Term: 4},
-		{Index: 5, Term: 5},
-	}
-	st := &StorageStableInMemory{snapshotEntries: ents}
-
-	firstIdx, err := st.FirstIndex()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if firstIdx != 4 {
-		t.Fatalf("last index expected 4, got %d", firstIdx)
-	}
-
-	// compact up to index 4
-	if err = st.Compact(4); err != nil {
-		t.Fatal(err)
-	}
-
-	firstIdx, err = st.FirstIndex()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if firstIdx != 5 {
-		t.Fatalf("last index expected 5, got %d", firstIdx)
 	}
 }
 

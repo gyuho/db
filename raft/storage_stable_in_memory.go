@@ -234,7 +234,7 @@ func (ms *StorageStableInMemory) CreateSnapshot(idx uint64, configState *raftpb.
 
 	firstEntryIndexInStorage := ms.firstIndex() - 1
 	if firstEntryIndexInStorage > ms.lastIndex() {
-		raftLogger.Panicf("snapshot is out of bound (first log entry index in storage = %d, last log index in storage = %d)", firstEntryIndexInStorage, ms.lastIndex())
+		raftLogger.Panicf("snapshot is out of bound [first log entry index in storage = %d | last log index in storage = %d]", firstEntryIndexInStorage, ms.lastIndex())
 	}
 
 	ms.snapshot.Metadata.Index = idx
