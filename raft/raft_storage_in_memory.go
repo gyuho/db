@@ -234,7 +234,7 @@ func (ms *StorageInMemory) CreateSnapshot(idx uint64, configState *raftpb.Config
 
 	firstEntryIndexInStorage := ms.firstIndex() - 1
 	if firstEntryIndexInStorage > ms.lastIndex() {
-		raftLogger.Panicf("snapshot on '%d' is out of bound (last log index in storage = %d)", idx, ms.lastIndex())
+		raftLogger.Panicf("snapshot is out of bound (first log entry index in storage = %d, last log index in storage = %d)", firstEntryIndexInStorage, ms.lastIndex())
 	}
 
 	ms.snapshot.Metadata.Term = ms.snapshotEntries[idx-firstEntryIndexInStorage].Term
@@ -282,7 +282,7 @@ func (ms *StorageInMemory) Compact(compactIndex uint64) error {
 	}
 
 	if compactIndex > ms.lastIndex() {
-		raftLogger.Panicf("compact on '%d' is out of bound (last log index in storage %d)", compactIndex, ms.lastIndex())
+		raftLogger.Panicf("compact on '%d' is out of bound (last log index in storage = %d)", compactIndex, ms.lastIndex())
 	}
 
 	// For example
