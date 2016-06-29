@@ -97,9 +97,11 @@ func (ms *StorageInMemory) Snapshot() (raftpb.Snapshot, error) {
 	return ms.snapshot, nil
 }
 
-// More methods ↓
-//              ↓
-//              ↓
+/////////////////////////////////////////////////////////////////
+//                     More methods ↓                          //
+//                                  ↓                          //
+//                                  ↓                          //
+/////////////////////////////////////////////////////////////////
 
 // Append appends entries to storage. Make sure not to manipulate
 // the original entries so to be optimized for returning.
