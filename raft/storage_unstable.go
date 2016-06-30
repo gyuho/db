@@ -170,7 +170,7 @@ func (su *storageUnstable) truncateAndAppend(entries []raftpb.Entry) {
 		// ➝ now appends to the truncated unstable entries
 		// ➝ [10] + [11, 12, 13] = [10, 11, 12, 13]
 		//
-		raftLogger.Infof("truncating unstable entries in [start index='%d', end index='%d')", su.indexOffset, firstIndexInEntriesToAppend)
+		raftLogger.Infof("truncating unstable entries in [start index='%d', end='%d')", su.indexOffset, firstIndexInEntriesToAppend)
 		oldN := len(su.entries)
 		sl := su.slice(su.indexOffset, firstIndexInEntriesToAppend)
 		tmps := make([]raftpb.Entry, len(sl))
