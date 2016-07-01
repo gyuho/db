@@ -2,12 +2,10 @@ package fileutil
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
-	"syscall"
 )
 
 const (
@@ -17,6 +15,53 @@ const (
 	// PrivateDirMode grants owner to make/remove files inside the directory.
 	PrivateDirMode = 0700
 )
+
+// OpenToRead opens a file for reads. Make sure to close the file.
+func OpenToRead(fpath string) (*os.File, error) {
+	f, err := os.OpenFile(fpath, os.O_RDONLY, PrivateFileMode)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// OpenToOverwrite creates or opens a file for overwriting.
+// Make sure to close the file.
+func OpenToOverwrite(fpath string) (*os.File, error) {
+	f, err := os.OpenFile(fpath, os.O_RDWR|os.O_TRUNC|os.O_CREATE, PrivateFileMode)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// OpenToOverwriteOnly opens a file only for overwriting.
+func OpenToOverwriteOnly(fpath string) (*os.File, error) {
+	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, PrivateFileMode)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// OpenToAppend opens a file for appends. If the file does not eixst, it creates one.
+// Make sure to close the file.
+func OpenToAppend(fpath string) (*os.File, error) {
+	f, err := os.OpenFile(fpath, os.O_RDWR|os.O_APPEND|os.O_CREATE, PrivateFileMode)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// OpenToAppendOnly opens a file only for appends.
+func OpenToAppendOnly(fpath string) (*os.File, error) {
+	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, PrivateFileMode)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
 
 // DirWritable returns nil if dir is writable.
 func DirWritable(dir string) error {
@@ -88,45 +133,4 @@ func DirHasFiles(dir string) bool {
 		return false
 	}
 	return len(ns) != 0
-}
-
-// Fsync commits the current contents of the file to the disk.
-// Typically it means flushing the file system's in-memory copy
-// of recently written data to the disk.
-func Fsync(f *os.File) error {
-	return f.Sync()
-}
-
-// Fdatasync flushes all data buffers of a file onto the disk.
-// Fsync is required to update the metadata, such as access time.
-// Fsync always does two write operations: one for writing new data
-// to disk. Another for updating the modification time stored in its
-// inode. If the modification time is not a part of the transaction,
-// syscall.Fdatasync can be used to avoid unnecessary inode disk writes.
-func Fdatasync(f *os.File) error {
-	return syscall.Fdatasync(int(f.Fd()))
-}
-
-// WriteSync behaves just like ioutil.WriteFile,
-// but calls Sync before closing the file to guarantee that
-// the data is synced if there's no error returned.
-func WriteSync(fpath string, data []byte, perm os.FileMode) error {
-	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
-	if err != nil {
-		return err
-	}
-
-	n, err := f.Write(data)
-	if err == nil && n < len(data) {
-		err = io.ErrShortWrite
-	}
-
-	if err == nil {
-		err = f.Sync()
-	}
-
-	if e := f.Close(); err == nil {
-		err = e
-	}
-	return err
 }
