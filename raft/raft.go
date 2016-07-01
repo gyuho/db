@@ -122,8 +122,8 @@ type raftNode struct {
 	heartbeatTick        int // for leader
 	heartbeatTickElapsed int // for leader
 
-	raftLogStorage *raftLogStorage
-	msgs           []raftpb.Message
+	raftLog *raftLog
+	msgs    []raftpb.Message
 
 	electionTick        int
 	electionTickElapsed int

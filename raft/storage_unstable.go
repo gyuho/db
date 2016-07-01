@@ -15,14 +15,18 @@ type storageUnstable struct {
 	// log entries.
 	indexOffset uint64
 
-	// entries[idx]'s raft log index == idx + indexOffset
+	// entries[idx]'s raft log index == idx + su.indexOffset
 	entries []raftpb.Entry
 }
 
 // maybeFirstIndex returns the index of first available entry in snapshot.
 func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {
 	if su.incomingSnapshot != nil {
-		// ??? "+ 1" to
+		// "+ 1" because first entry is for compacted entry
+		// kept for matching purposes.
+		//
+		// StorageStable.snapshotEntries[idx]'s raft log index == idx + snapshot.Metadata.Index
+		// And StorageStable.snapshotEntries[0] is a dummy entry.
 		return su.incomingSnapshot.Metadata.Index + 1, true
 	}
 	return 0, false
@@ -32,7 +36,7 @@ func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {
 func (su *storageUnstable) maybeLastIndex() (uint64, bool) {
 	switch {
 	case len(su.entries) > 0:
-		// (X) return su.entries[len(su.entries)-1].Index, true
+		// return su.entries[len(su.entries)-1].Index, true
 		// OR
 		return su.indexOffset + uint64(len(su.entries)) - 1, true
 
@@ -82,13 +86,13 @@ func (su *storageUnstable) persistedEntriesAt(index, term uint64) {
 	// is matched with an unstable entry
 	if tm == term && index >= su.indexOffset {
 		// entries      = [10, 11, 12]
-		// index offset = 0 + 10 = 10
+		// indexOffset = 0 + 10 = 10
 		//
 		// persistedEntriesAt(index=10) = entries[10-10+1:] = entries[1:]
 		//                    = [11, 12]
 		//
 		// [10] is now considered persisted to stable storage
-		// Now index offset = 10 + 1 = 11
+		// Now indexOffset = 10 + 1 = 11
 		//
 		su.entries = su.entries[index-su.indexOffset+1:]
 		su.indexOffset = index + 1
@@ -115,60 +119,59 @@ func (su *storageUnstable) truncateAndAppend(entries []raftpb.Entry) {
 	firstIndexInEntriesToAppend := entries[0].Index
 	switch {
 	case firstIndexInEntriesToAppend == su.indexOffset+uint64(len(su.entries)):
-		// entries in unstable = [10, 11, 12]
-		// index offset        = 10
+		// su.entries   = [10, 11, 12]
+		// indexOffset  = 10
 		//
-		// entries to append   = [13, 14]
+		// entries to append = [13, 14]
 		//
-		// first index in entries to append = 13
-		// index offset + len(unstable entries) = 10 + 3 = 13
+		// firstIndexInEntriesToAppend = 13
+		// indexOffset + len(unstable entries) = 10 + 3 = 13
 		//
-		// first index in entries to append == index offset + len(unstable entries)
-		//                               13 == 13
+		// firstIndexInEntriesToAppend == indexOffset + len(unstable entries)
+		//                          13 == 13
 		// ➝ just append
 		//
 		su.entries = append(su.entries, entries...)
 
 	case firstIndexInEntriesToAppend <= su.indexOffset:
-		// entries in unstable = [10, 11, 12]
-		// index offset        = 10
+		// su.entries   = [10, 11, 12]
+		// indexOffset  = 10
 		//
-		// entries to append   = [9, 10, 11, 12, 13]
+		// entries to append = [9, 10, 11, 12, 13]
 		//
-		// first index in entries to append = 9
-		// index offset + len(unstable entries) = 10 + 3 = 13
+		// firstIndexInEntriesToAppend = 9
+		// indexOffset + len(unstable entries) = 10 + 3 = 13
 		//
-		// first index in entries to append != index offset + len(unstable entries)
-		// first index in entries to append <= index offset
-		//                                9 <= 10
-		// ➝ need to replace unstable entries from "first index in entries to append"
+		// firstIndexInEntriesToAppend != indexOffset + len(unstable entries)
+		// firstIndexInEntriesToAppend <= indexOffset
+		//                           9 <= 10
+		// ➝ need to replace unstable entries from "firstIndexInEntriesToAppend"
 		//
-		// ➝ index offset        = first index in entries to append = 9
-		// ➝ entries in unstable = entries to append                = [9, 10, 11, 12, 13]
+		// ➝ indexOffset = firstIndexInEntriesToAppend = 9
+		// ➝ su.entries  = entries to append           = [9, 10, 11, 12, 13]
 		//
 		raftLogger.Infof("replacing unstable entries from index %d", firstIndexInEntriesToAppend)
 		su.indexOffset = firstIndexInEntriesToAppend
 		su.entries = entries
 
 	default:
-		// entries in unstable = [10, 11, 12]
-		// index offset        = 10
+		// su.entries     = [10, 11, 12]
+		// su.indexOffset = 10
 		//
-		// entries to append   = [11, 12, 13]
+		// entries to append = [11, 12, 13]
 		//
-		// first index in entries to append = 11
-		// index offset + len(unstable entries) = 10 + 3 = 13
+		// firstIndexInEntriesToAppend = 11
+		// su.indexOffset + len(unstable entries) = 10 + 3 = 13
 		//
-		// first index in entries to append != index offset + len(unstable entries)
-		// first index in entries to append > index offset
-		//                               11 > 10
+		// firstIndexInEntriesToAppend != su.indexOffset + len(unstable entries)
+		// firstIndexInEntriesToAppend  > su.indexOffset
+		//                          11 > 10
 		// ➝ need to truncate unstable entries before appending
 		//
-		// ➝ entries in unstable = entries to append [index offset - index offset : first index in entries to append - index offset]
-		//                       = entries[10-10:11-10] = entries[:1] = [10]
-		//
-		// ➝ now appends to the truncated unstable entries
-		// ➝ [10] + [11, 12, 13] = [10, 11, 12, 13]
+		// ➝ su.entries = entries to append [su.indexOffset - su.indexOffset : firstIndexInEntriesToAppend - su.indexOffset]
+		//              = su.entries[10 - 10 : 11 - 10]
+		//              = su.entries[:1]
+		//              = [10]
 		//
 		raftLogger.Infof("truncating unstable entries in [start index='%d', end='%d')", su.indexOffset, firstIndexInEntriesToAppend)
 		oldN := len(su.entries)
@@ -177,23 +180,31 @@ func (su *storageUnstable) truncateAndAppend(entries []raftpb.Entry) {
 		copy(tmps, sl)
 		su.entries = tmps
 
+		// ➝ now append new entries to the truncated unstable entries
+		// ➝ [10] + [11, 12, 13] = [10, 11, 12, 13]
+		//
 		raftLogger.Infof("truncated %d entries, now appending %d entries", oldN-len(su.entries), len(entries))
 		su.entries = append(su.entries, entries...)
 	}
 }
 
-func (su *storageUnstable) checkSliceBoundary(startIdx, endIdx uint64) {
-	if startIdx > endIdx {
-		raftLogger.Panicf("invalid unstable indexes [start index = %d | end index = %d]", startIdx, endIdx)
+// mustCheckSliceBoundary ensures that:
+//
+//   su.indexOffset <= startIndex <= endIndex <= su.lastIndex
+//
+func (su *storageUnstable) mustCheckSliceBoundary(startIndex, endIndex uint64) {
+	if startIndex > endIndex {
+		raftLogger.Panicf("invalid unstable indexes [start index = %d | end index = %d]", startIndex, endIndex)
 	}
 
 	lastIndex := su.indexOffset + uint64(len(su.entries))
-	if startIdx < su.indexOffset || endIdx > lastIndex {
-		raftLogger.Panicf("unstable.entries[%d,%d) is out of bound [index offset = %d | last index = %d]", startIdx, endIdx, su.indexOffset, lastIndex)
+	if startIndex < su.indexOffset || endIndex > lastIndex {
+		raftLogger.Panicf("unstable.entries[%d,%d) is out of bound [indexOffset = %d | last index = %d]", startIndex, endIndex, su.indexOffset, lastIndex)
 	}
 }
 
-func (su *storageUnstable) slice(startIdx, endIdx uint64) []raftpb.Entry {
-	su.checkSliceBoundary(startIdx, endIdx)
-	return su.entries[startIdx-su.indexOffset : endIdx-su.indexOffset]
+// slice returns entries[startIndex, endIndex).
+func (su *storageUnstable) slice(startIndex, endIndex uint64) []raftpb.Entry {
+	su.mustCheckSliceBoundary(startIndex, endIndex)
+	return su.entries[startIndex-su.indexOffset : endIndex-su.indexOffset]
 }

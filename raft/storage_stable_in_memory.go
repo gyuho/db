@@ -55,30 +55,30 @@ func (ms *StorageStableInMemory) LastIndex() (uint64, error) {
 	return idx, nil
 }
 
-func (ms *StorageStableInMemory) Term(idx uint64) (uint64, error) {
+func (ms *StorageStableInMemory) Term(index uint64) (uint64, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
 	firstEntryIndexInStorage := ms.firstIndex() - 1
-	if firstEntryIndexInStorage > idx {
+	if firstEntryIndexInStorage > index {
 		return 0, ErrCompacted
 	}
 
-	return ms.snapshotEntries[idx-firstEntryIndexInStorage].Term, nil
+	return ms.snapshotEntries[index-firstEntryIndexInStorage].Term, nil
 }
 
-func (ms *StorageStableInMemory) Entries(startIdx, endIdx, limitSize uint64) ([]raftpb.Entry, error) {
+func (ms *StorageStableInMemory) Entries(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
 	firstEntryIndexInStorage := ms.firstIndex() - 1
-	if firstEntryIndexInStorage >= startIdx { // == means match with the dummy entry
+	if firstEntryIndexInStorage >= startIndex { // == means match with the dummy entry
 		return nil, ErrCompacted
 	}
 
-	// since [startIdx, endIdx)
-	if endIdx > ms.lastIndex()+1 {
-		raftLogger.Panicf("end index on '%d' out of bound (entries last index = %d)", endIdx, ms.lastIndex())
+	// since [startIndex, endIndex)
+	if endIndex > ms.lastIndex()+1 {
+		raftLogger.Panicf("end index on '%d' out of bound (entries last index = %d)", endIndex, ms.lastIndex())
 	}
 
 	// only contain the dummy entry
@@ -86,7 +86,7 @@ func (ms *StorageStableInMemory) Entries(startIdx, endIdx, limitSize uint64) ([]
 		return nil, ErrUnavailable
 	}
 
-	entries := ms.snapshotEntries[startIdx-firstEntryIndexInStorage : endIdx-firstEntryIndexInStorage]
+	entries := ms.snapshotEntries[startIndex-firstEntryIndexInStorage : endIndex-firstEntryIndexInStorage]
 	return limitEntries(entries, limitSize), nil
 }
 

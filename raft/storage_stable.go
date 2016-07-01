@@ -29,14 +29,14 @@ type StorageStable interface {
 	// even if the rest of the entries in the term may not be available.
 	//
 	// (etcd raft.Storage.Term)
-	Term(idx uint64) (uint64, error)
+	Term(index uint64) (uint64, error)
 
-	// Entries returns the slice of log entries in [startIdx, endIdx).
+	// Entries returns the slice of log entries in [startIndex, endIndex).
 	// limitSize limits the total size of log entries to return.
 	// It returns at least one entry if any.
 	//
 	// (etcd raft.Storage.Entries)
-	Entries(startIdx, endIdx, limitSize uint64) ([]raftpb.Entry, error)
+	Entries(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry, error)
 
 	// Snapshot returns the most recent snapshot.
 	// If the snapshot is temporarily unavailable, the state machine

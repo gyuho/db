@@ -45,7 +45,7 @@ message Snapshot {
 // It is stored in stable storage before messages are sent.
 message HardState {
 	uint64 VotedFor    = 1;
-	uint64 CommitIndex = 2;
+	uint64 CommittedIndex = 2;
 	uint64 Term        = 3;
 }
 
@@ -107,10 +107,10 @@ enum MESSAGE_TYPE {
 	// followers.
 	//
 	//   idx1 = Leader.Follower.Progress.Match
-	//   idx2 = Leader.raftLog.CommitIndex
-	//   Leader.LEADER_HEARTBEAT_REQUEST.CommitIndex = min(idx1, idx2)
+	//   idx2 = Leader.raftLog.CommittedIndex
+	//   Leader.LEADER_HEARTBEAT_REQUEST.CommittedIndex = min(idx1, idx2)
 	//
-	// So that the followers can update their CommitIndex.
+	// So that the followers can update their CommittedIndex.
 	//
 	// (etcd: raft.raftpb.MsgHeartbeat)
 	LEADER_HEARTBEAT_REQUEST  = 3;
@@ -214,12 +214,12 @@ enum MESSAGE_TYPE {
 	//   prevLogIndex  = newLogsIndex - 1
 	//   prevLogTerm   = Leader.raftLog.term(prevLogIndex)
 	//   entries       = Leader.raftLog.entries(newLogIndex, Leader.maxMsgSize)
-	//   leaderCommit  = Leader.raftLog.CommitIndex
+	//   leaderCommit  = Leader.raftLog.CommittedIndex
 	//
-	//   Leader.LEADER_APPEND_REQUEST.LogTerm     = prevLogTerm
-	//   Leader.LEADER_APPEND_REQUEST.LogIndex    = prevLogIndex
-	//   Leader.LEADER_APPEND_REQUEST.Entries     = entries
-	//   Leader.LEADER_APPEND_REQUEST.CommitIndex = leaderCommit
+	//   Leader.LEADER_APPEND_REQUEST.LogTerm        = prevLogTerm
+	//   Leader.LEADER_APPEND_REQUEST.LogIndex       = prevLogIndex
+	//   Leader.LEADER_APPEND_REQUEST.Entries        = entries
+	//   Leader.LEADER_APPEND_REQUEST.CommittedIndex = leaderCommit
 	//
 	// (etcd: raft.raftpb.MsgApp)
 	LEADER_APPEND_REQUEST = 8;
@@ -229,18 +229,18 @@ enum MESSAGE_TYPE {
 	//   i) response to LEADER_APPEND_REQUEST:
 	//
 	//      IF
-	//         Follower.raftLog.CommitIndex > Leader.LEADER_APPEND_REQUEST.LogIndex
+	//         Follower.raftLog.CommittedIndex > Leader.LEADER_APPEND_REQUEST.LogIndex
 	//
 	//      THEN
 	//         Follower.APPEND_RESPONSE.To       = Leader
-	//         Follower.APPEND_RESPONSE.LogIndex = Follower.raftLog.CommitIndex
+	//         Follower.APPEND_RESPONSE.LogIndex = Follower.raftLog.CommittedIndex
 	//         Follower.APPEND_RESPONSE.Reject   = false
 	//
 	//      AND THEN
 	//         Leader updates Leader.Follower.Progress
 	//
 	//      ELSE IF
-	//         Leader.LEADER_APPEND_REQUEST.LogIndex >= Follower.raftLog.CommitIndex
+	//         Leader.LEADER_APPEND_REQUEST.LogIndex >= Follower.raftLog.CommittedIndex
 	//
 	//      AND IF
 	//         term1 = Leader.LEADER_APPEND_REQUEST.LogTerm
@@ -248,7 +248,7 @@ enum MESSAGE_TYPE {
 	//         term1 == term2
 	//
 	//         THEN
-	//            idx1 = Leader.LEADER_APPEND_REQUEST.CommitIndex
+	//            idx1 = Leader.LEADER_APPEND_REQUEST.CommittedIndex
 	//            idx2 = Leader.LEADER_APPEND_REQUEST.LogIndex + len(new entries)
 	//            Follower.raftLog.commitTo(min(idx1, idx2))
 	//
@@ -256,7 +256,8 @@ enum MESSAGE_TYPE {
 	//            Follower.APPEND_RESPONSE.LogIndex = idx2
 	//            Follower.APPEND_RESPONSE.Reject   = false
 	//
-	//      ELSE //         Follower.APPEND_RESPONSE.To         = Leader
+	//      ELSE
+	//         Follower.APPEND_RESPONSE.To         = Leader
 	//         Follower.APPEND_RESPONSE.LogIndex   = Leader.LEADER_APPEND_REQUEST.LogIndex
 	//         Follower.APPEND_RESPONSE.Reject     = true
 	//         Follower.APPEND_RESPONSE.RejectHint = Follower.raftLog.lastIndex()
@@ -273,7 +274,7 @@ enum MESSAGE_TYPE {
 	//   ii) response to LEADER_SNAPSHOT_REQUEST
 	//
 	//      IF
-	//         idx1 = Follower.raftLog.CommitIndex
+	//         idx1 = Follower.raftLog.CommittedIndex
 	//         idx2 = Leader.LEADER_SNAPSHOT_REQUEST.Index
 	//         idx1 >= idx2
 	//            THEN false
@@ -295,7 +296,7 @@ enum MESSAGE_TYPE {
 	//
 	//      ELSE ignores snapshot
 	//         Follower.APPEND_RESPONSE.To       = Leader
-	//         Follower.APPEND_RESPONSE.LogIndex = Follower.raftLog.CommitIndex
+	//         Follower.APPEND_RESPONSE.LogIndex = Follower.raftLog.CommittedIndex
 	//         Follower.APPEND_RESPONSE.Reject   = false
 	//
 	//   (etcd: raft.*raft.handleSnapshot)
@@ -409,23 +410,23 @@ message Message {
 	// (etcd: raft.raftpb.Message.Index)
 	uint64 LogIndex = 4;
 
-	// CommitIndex is the index of highest log entry that is known to be
+	// CommittedIndex is the index of highest log entry that is known to be
 	// committed (initialized to 0, increasing monotonically). It is the
 	// highest log position that is known to be in stable storage on a
 	// quorum of nodes in the cluster.
 	//
 	//
-	// Leader updates CommitIndex when sending out AppendEntries:
+	// Leader updates CommittedIndex when sending out AppendEntries:
 	//
-	//   Leader.Message.CommitIndex = Leader.raftLog.committed
+	//   Leader.Message.CommittedIndex = Leader.raftLog.committed
 	//
 	// (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
 	//
 	//
-	// Follower receives/reads Leader.CommitIndex in AppendEntries
+	// Follower receives/reads Leader.CommittedIndex in AppendEntries
 	// and AppendEntries is only successful when:
 	//
-	//   i) Follower.raftLog.CommitIndex > Leader.Message.LogIndex
+	//   i) Follower.raftLog.CommittedIndex > Leader.Message.LogIndex
 	//   (etcd: raft.*raft.handleAppendEntries, raft.*Progress.maybeUpdate)
 	//
 	//   OR
@@ -439,7 +440,7 @@ message Message {
 	//
 	//   Then overwrite with Leader's log.
 	//
-	//   idx1 = Leader.Message.CommitIndex
+	//   idx1 = Leader.Message.CommittedIndex
 	//   idx2 = Leader.Message.LogIndex + len(Leader.Message.Entries)
 	//   Follower.raftLog.commitTo(min(idx1, idx2))
 	//
@@ -447,7 +448,7 @@ message Message {
 	//
 	//
 	// (etcd: raft.raftpb.Message.Commit)
-	uint64 CommitIndex = 5;
+	uint64 CommittedIndex = 5;
 
 	// CurrentTerm is the latest term that server has seen,
 	// initialized to 0 on first boot, increasing monotonically.
@@ -515,7 +516,7 @@ message Message {
 	//   2. When Follower receives AppendEntries from Leader:
 	//   AppendEntries is only successful when:
 	//
-	//      i)  Follower.raftLog.CommitIndex > Leader.Message.LogIndex
+	//      i)  Follower.raftLog.CommittedIndex > Leader.Message.LogIndex
 	//
 	//      to tell Follower is ahead of that message, so Follower ignores
 	//      this Message, and Leader can update Leader.Follower.Progress.Next.
@@ -523,7 +524,7 @@ message Message {
 	//      It will respond with:
 	//         - To: Leader
 	//         - Type: raftpb.MsgAppResp
-	//         - LogIndex: Follower.raftLog.CommitIndex
+	//         - LogIndex: Follower.raftLog.CommittedIndex
 	//
 	//      (etcd: raft.*raft.handleAppendEntries, raft.*Progress.maybeUpdate)
 	//
@@ -545,7 +546,7 @@ message Message {
 	//
 	//      Then overwrite with Leader's log.
 	//
-	//      idx1 = Leader.Message.CommitIndex
+	//      idx1 = Leader.Message.CommittedIndex
 	//      idx2 = Leader.Message.LogIndex + len(Leader.Message.Entries)
 	//      Follower.raftLog.commitTo(min(idx1, idx2))
 	//

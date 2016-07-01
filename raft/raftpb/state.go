@@ -7,7 +7,7 @@ var (
 
 // checkHardState returns true if two states are equal
 func checkHardState(a, b HardState) bool {
-	return a.Term == b.Term && a.VotedFor == b.VotedFor && a.CommitIndex == b.CommitIndex
+	return a.CommittedIndex == b.CommittedIndex && a.Term == b.Term && a.VotedFor == b.VotedFor
 }
 
 // IsEmptyHardState returns true if the given HardState is empty.
