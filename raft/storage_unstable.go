@@ -20,6 +20,8 @@ type storageUnstable struct {
 }
 
 // maybeFirstIndex returns the index of first available entry in snapshot.
+//
+// (etcd raft.unstable.maybeFirstIndex)
 func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {
 	if su.incomingSnapshot != nil {
 		// "+ 1" because first entry is for compacted entry
@@ -33,6 +35,8 @@ func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {
 }
 
 // maybeLastIndex returns the last index of unstable entries or snapshot.
+//
+// (etcd raft.unstable.maybeLastIndex)
 func (su *storageUnstable) maybeLastIndex() (uint64, bool) {
 	switch {
 	case len(su.entries) > 0:
@@ -49,6 +53,8 @@ func (su *storageUnstable) maybeLastIndex() (uint64, bool) {
 }
 
 // maybeTerm returns the term of the entry with log index idx, if any.
+//
+// (etcd raft.unstable.maybeTerm)
 func (su *storageUnstable) maybeTerm(idx uint64) (uint64, bool) {
 	if idx < su.indexOffset {
 		if su.incomingSnapshot == nil {
@@ -109,13 +115,22 @@ func (su *storageUnstable) persistedSnapshotAt(index uint64) {
 }
 
 // restoreIncomingSnapshot sets unstable storage with incoming snapshot.
+//
+// (etcd raft.unstable.restore)
 func (su *storageUnstable) restoreIncomingSnapshot(snap raftpb.Snapshot) {
 	su.indexOffset = snap.Metadata.Index + 1
 	su.entries = nil
 	su.incomingSnapshot = &snap
 }
 
-func (su *storageUnstable) truncateAndAppend(entries []raftpb.Entry) {
+// truncateAndAppend appends new entries with truncation if needed.
+//
+// (etcd raft.unstable.truncateAndAppend)
+func (su *storageUnstable) truncateAndAppend(entries ...raftpb.Entry) {
+	if len(entries) == 0 {
+		return
+	}
+
 	firstIndexInEntriesToAppend := entries[0].Index
 	switch {
 	case firstIndexInEntriesToAppend == su.indexOffset+uint64(len(su.entries)):
@@ -188,11 +203,12 @@ func (su *storageUnstable) truncateAndAppend(entries []raftpb.Entry) {
 	}
 }
 
-// mustCheckSliceBoundary ensures that:
+// mustCheckOutOfBounds ensures that:
 //
 //   su.indexOffset <= startIndex <= endIndex <= su.lastIndex
 //
-func (su *storageUnstable) mustCheckSliceBoundary(startIndex, endIndex uint64) {
+// (etcd raft.unstable.mustCheckOutOfBounds)
+func (su *storageUnstable) mustCheckOutOfBounds(startIndex, endIndex uint64) {
 	if startIndex > endIndex {
 		raftLogger.Panicf("invalid unstable indexes [start index = %d | end index = %d]", startIndex, endIndex)
 	}
@@ -205,6 +221,6 @@ func (su *storageUnstable) mustCheckSliceBoundary(startIndex, endIndex uint64) {
 
 // slice returns entries[startIndex, endIndex).
 func (su *storageUnstable) slice(startIndex, endIndex uint64) []raftpb.Entry {
-	su.mustCheckSliceBoundary(startIndex, endIndex)
+	su.mustCheckOutOfBounds(startIndex, endIndex)
 	return su.entries[startIndex-su.indexOffset : endIndex-su.indexOffset]
 }

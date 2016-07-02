@@ -491,7 +491,7 @@ func Test_storageUnstable_truncateAndAppend(t *testing.T) {
 			entries:          tt.entries,
 		}
 
-		su.truncateAndAppend(tt.entriesToAppend)
+		su.truncateAndAppend(tt.entriesToAppend...)
 
 		if su.indexOffset != tt.windexOffset {
 			t.Fatalf("#%d: index offset = %d, want %d", i, su.indexOffset, tt.windexOffset)
