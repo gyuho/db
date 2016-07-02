@@ -27,6 +27,8 @@ const (
 // Create creates a WAL ready for appends, with the metadata to
 // be written at the head of each WAL file. It can be retrieved
 // with ReadAll.
+//
+// (etcd wal.Create)
 func Create(dir string, metadata []byte) (*WAL, error) {
 	if fileutil.DirHasFiles(dir) {
 		return nil, os.ErrExist
@@ -80,15 +82,37 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 		return nil, err
 	}
 
-	if err := os.RemoveAll(dir); err != nil {
+	// Linux can:
+	//
+	// if err := os.RemoveAll(dir); err != nil {
+	// 	return nil, err
+	// }
+	// if err := os.Rename(tmpDir, dir); err != nil {
+	// 	return nil, err
+	// }
+	// w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
+	//
+	// But some OS (windows) doesn't support renaming directory with locked files
+	// (https://github.com/coreos/etcd/issues/5852)
+
+	// close WAL to release locks, so the directory can be renamed
+	if err := w.Close(); err != nil {
 		return nil, err
 	}
-	if err := os.Rename(tmpDir, dir); err != nil {
+	if err := os.Rename(tmpDir, dir); err != nil { // os.Rename won't error even if 'dir' exists
 		return nil, err
 	}
 
-	w.filePipeline = newFilePipeline(dir, segmentSizeBytes)
-	return w, nil
+	// reopen and relock
+	newWAL, oerr := OpenWALWrite(dir, walpb.Snapshot{})
+	if oerr != nil {
+		return nil, oerr
+	}
+	if _, _, _, err := newWAL.ReadAll(); err != nil {
+		newWAL.Close()
+		return nil, err
+	}
+	return newWAL, nil
 }
 
 // UnsafeFdatasync fsyncs the last file in the lockedFiles to the disk.
