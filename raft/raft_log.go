@@ -406,3 +406,58 @@ func (rg *raftLog) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
 	rg.storageUnstable.truncateAndAppend(entries...)
 	return rg.lastIndex()
 }
+
+// hasNextEntriesToApply returns true if there are entries
+// availablefor execution.
+//
+// (etcd raft.raftLog.hasNextEnts)
+func (rg *raftLog) hasNextEntriesToApply() (uint64, bool) {
+	maxStart := maxUint64(rg.appliedIndex+1, rg.firstIndex())
+	return maxStart, rg.committedIndex >= maxStart
+}
+
+// nextEntriesToApply returns all the available entries ready for applying(execution).
+//
+// (etcd raft.raftLog.nextEnts)
+func (rg *raftLog) nextEntriesToApply() []raftpb.Entry {
+	maxStart, ok := rg.hasNextEntriesToApply()
+	if !ok {
+		return nil
+	}
+
+	entries, err := rg.slice(maxStart, rg.committedIndex+1, math.MaxUint64)
+	if err != nil {
+		raftLogger.Panicf("nextEntriesToApply error (%v)", err)
+	}
+	return entries
+}
+
+// zeroTermOnErrCompacted returns 0 if specified error is ErrCompacted.
+//
+// (etcd raft.raftLog.zeroTermOnErrCompacted)
+func (rg *raftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 {
+	switch err {
+	case nil:
+		return term
+
+	case ErrCompacted:
+		return 0
+
+	default:
+		raftLogger.Panicf("unexpected error (%v)", err)
+		return 0
+	}
+}
+
+/*
+findConflict
+maybeAppend
+maybeCommit
+
+isUpToDate
+
+commitTo
+appliedTo
+stableTo
+stableSnapTo
+*/
