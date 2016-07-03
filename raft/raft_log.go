@@ -390,23 +390,6 @@ func (rg *raftLog) restoreIncomingSnapshot(snap raftpb.Snapshot) {
 	rg.storageUnstable.restoreIncomingSnapshot(snap)
 }
 
-// appendToStorageUnstable appends new entries to unstable storage,
-// and returns the last index of raftLog.
-//
-// (etcd raft.raftLog.append)
-func (rg *raftLog) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
-	if len(entries) == 0 {
-		return rg.lastIndex()
-	}
-
-	if expectedLastIdx := entries[0].Index - 1; expectedLastIdx < rg.committedIndex {
-		raftLogger.Panicf("expected last index '%d' is out of range on raft log committed index '%d'", expectedLastIdx, rg.committedIndex)
-	}
-
-	rg.storageUnstable.truncateAndAppend(entries...)
-	return rg.lastIndex()
-}
-
 // hasNextEntriesToApply returns true if there are entries
 // availablefor execution.
 //
@@ -449,15 +432,158 @@ func (rg *raftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 {
 	}
 }
 
-/*
-findConflict
-maybeAppend
-maybeCommit
+// isUpToDate returns true if the given (lastIndex, term) log is more
+// up-to-date than the last entry in the existing logs.
+//
+// (etcd raft.raftLog.isUpToDate)
+func (rg *raftLog) isUpToDate(lastIndex, term uint64) bool {
+	return term > rg.lastTerm() || (term == rg.lastTerm() && lastIndex >= rg.lastIndex())
+}
 
-isUpToDate
+// persistedEntriesAt updates unstable entries and indexes after persisting
+// those unstable entries to stable storage.
+//
+// (etcd raft.raftLog.stableTo)
+func (rg *raftLog) persistedEntriesAt(index, term uint64) {
+	rg.storageUnstable.persistedEntriesAt(index, term)
+}
 
-commitTo
-appliedTo
-stableTo
-stableSnapTo
-*/
+// persistedSnapshotAt updates snapshot metadata after processing the incoming snapshot.
+//
+// (etcd raft.raftLog.stableSnapTo)
+func (rg *raftLog) persistedSnapshotAt(index uint64) {
+	rg.storageUnstable.persistedSnapshotAt(index)
+}
+
+// commitTo updates raftLog's committedIndex.
+//
+// (etcd raft.raftLog.commitTo)
+func (rg *raftLog) commitTo(committedIndex uint64) {
+	// to never decrease commit index
+	if rg.committedIndex < committedIndex {
+		if rg.lastIndex() < committedIndex {
+			raftLogger.Panicf("got wrong commit index '%d', smaller than last index '%d' (possible log corruption, truncation, lost)",
+				committedIndex, rg.lastIndex())
+		}
+		rg.committedIndex = committedIndex
+	}
+}
+
+// appliedTo updates raftLog's appliedIndex.
+//
+// (etcd raft.raftLog.appliedTo)
+func (rg *raftLog) appliedTo(appliedIndex uint64) {
+	if appliedIndex == 0 {
+		return
+	}
+
+	// MUST "rg.committedIndex >= appliedIndex"
+	if rg.committedIndex < appliedIndex || appliedIndex < rg.appliedIndex {
+		raftLogger.Panicf("got wrong applied index %d [commit index=%d | previous applied index=%d]",
+			appliedIndex, rg.committedIndex, rg.appliedIndex)
+	}
+
+	rg.appliedIndex = appliedIndex
+}
+
+// maybeCommit returns true if commitTo operation was successful
+// with given index and term.
+//
+// (etcd raft.raftLog.maybeCommit)
+func (rg *raftLog) maybeCommit(index, term uint64) bool {
+	if index > rg.committedIndex && rg.zeroTermOnErrCompacted(rg.term(index)) == term {
+		rg.commitTo(index)
+		return true
+	}
+	return false
+}
+
+// appendToStorageUnstable appends new entries to unstable storage,
+// and returns the last index of raftLog.
+//
+// (etcd raft.raftLog.append)
+func (rg *raftLog) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
+	if len(entries) == 0 {
+		return rg.lastIndex()
+	}
+
+	if expectedLastIdx := entries[0].Index - 1; expectedLastIdx < rg.committedIndex {
+		raftLogger.Panicf("expected last index '%d' is out of range on raft log committed index '%d'", expectedLastIdx, rg.committedIndex)
+	}
+
+	rg.storageUnstable.truncateAndAppend(entries...)
+	return rg.lastIndex()
+}
+
+// findConflictingTerm finds the first entry index with conflicting term.
+// An entry is conflicting if it has the same index but different term.
+// If the given entries contain new entries, which still does not match in
+// the terms with those extra entries, it returns the index of first new entry.
+// The index of given entries must be continuously increasing.
+//
+// (etcd raft.raftLog.findConflict)
+func (rg *raftLog) findConflictingTerm(entries ...raftpb.Entry) uint64 {
+	for _, ent := range entries {
+		if !rg.matchTerm(ent.Index, ent.Term) {
+			if ent.Index <= rg.lastIndex() {
+				raftLogger.Infof("conflicting entry at index %d [existing term %d != conflicting term %d]",
+					ent.Index, rg.zeroTermOnErrCompacted(rg.term(ent.Index)), ent.Term)
+			}
+			return ent.Index
+		}
+	}
+	return 0
+}
+
+// maybeAppend returns the last index of new entries and true, if appends were successful.
+// Otherwise, it returns 0 and false.
+//
+// (etcd raft.raftLog.maybeAppend)
+func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...raftpb.Entry) (uint64, bool) {
+	if rg.matchTerm(index, term) {
+		conflictingIndex := rg.findConflictingTerm(entries...)
+		switch {
+		case conflictingIndex == 0:
+
+		case conflictingIndex <= rg.committedIndex:
+			raftLogger.Panicf("conflicting entry index %d must be greater than committed index %d", conflictingIndex, rg.committedIndex)
+
+		default:
+			// For example
+			//
+			// entries in unstable = [10(term 7), 11(term 7), 12(term 8)]
+			// index               = 10
+			// term                =  7
+			// committedIndex      = 12
+			//
+			// entries to append         = [11(term 8), 12(term 8)]
+			// ➝ conflicting entry index = 11
+			//
+			// ➝ new start index
+			//    = conflicting entry index - (index + 1)
+			//    = 11 - (10 + 1)
+			//    = 0
+			//
+			// ➝ entries to append = [11(term 8), 12(term 8)]
+			//
+			newStartIndex := conflictingIndex - (index + 1)
+			rg.appendToStorageUnstable(entries[newStartIndex:]...)
+			//
+			// truncates...
+			// ➝ entries in unstable = [10(term 7), 11(term 8), 12(term 8)]
+		}
+
+		// committedIndex = 12
+		// lastNewIndex   = index + len(entries)
+		//                = 10 + 2
+		//                = 12
+		// commitTo( min( committedIndex , lastNewIndex ) )
+		// = commitTo( min(12,12) ) = commitTo(12)
+		//
+		lastNewIndex := index + uint64(len(entries))
+		rg.commitTo(minUint64(committedIndex, lastNewIndex))
+		return lastNewIndex, true
+	}
+
+	return 0, false
+}
