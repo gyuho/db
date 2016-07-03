@@ -27,6 +27,9 @@ func NewStorageStableInMemory() *StorageStableInMemory {
 	}
 }
 
+// GetState returns the saved HardState and ConfigState.
+//
+// (etcd raft.MemoryStorage.InitialState)
 func (ms *StorageStableInMemory) GetState() (raftpb.HardState, raftpb.ConfigState, error) {
 	return ms.hardState, ms.snapshot.Metadata.ConfigState, nil
 }
@@ -35,6 +38,9 @@ func (ms *StorageStableInMemory) firstIndex() uint64 {
 	return ms.snapshotEntries[0].Index + 1 // because first index is dummy at term 0
 }
 
+// FirstIndex returns the first index.
+//
+// (etcd raft.MemoryStorage.FirstIndex)
 func (ms *StorageStableInMemory) FirstIndex() (uint64, error) {
 	ms.mu.Lock()
 	idx := ms.firstIndex()
@@ -47,6 +53,9 @@ func (ms *StorageStableInMemory) lastIndex() uint64 {
 	return ms.snapshotEntries[len(ms.snapshotEntries)-1].Index
 }
 
+// LastIndex returns the last index.
+//
+// (etcd raft.MemoryStorage.LastIndex)
 func (ms *StorageStableInMemory) LastIndex() (uint64, error) {
 	ms.mu.Lock()
 	idx := ms.lastIndex()
@@ -55,6 +64,9 @@ func (ms *StorageStableInMemory) LastIndex() (uint64, error) {
 	return idx, nil
 }
 
+// Term returns the term of the given index.
+//
+// (etcd raft.MemoryStorage.Term)
 func (ms *StorageStableInMemory) Term(index uint64) (uint64, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -67,6 +79,9 @@ func (ms *StorageStableInMemory) Term(index uint64) (uint64, error) {
 	return ms.snapshotEntries[index-firstEntryIndexInStorage].Term, nil
 }
 
+// Entries returns the slice of stable storage log entries of [startIndex, endIndex).
+//
+// (etcd raft.MemoryStorage.Entries)
 func (ms *StorageStableInMemory) Entries(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -90,6 +105,9 @@ func (ms *StorageStableInMemory) Entries(startIndex, endIndex, limitSize uint64)
 	return limitEntries(entries, limitSize), nil
 }
 
+// Snapshot returns the snapshot of stable storage.
+//
+// (etcd raft.MemoryStorage.Snapshot)
 func (ms *StorageStableInMemory) Snapshot() (raftpb.Snapshot, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -105,7 +123,9 @@ func (ms *StorageStableInMemory) Snapshot() (raftpb.Snapshot, error) {
 
 // Append appends entries to storage. Make sure not to manipulate
 // the original entries so to be optimized for returning.
-func (ms *StorageStableInMemory) Append(entries []raftpb.Entry) error {
+//
+// (etcd raft.MemoryStorage.Append)
+func (ms *StorageStableInMemory) Append(entries ...raftpb.Entry) error {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -224,6 +244,8 @@ func (ms *StorageStableInMemory) Append(entries []raftpb.Entry) error {
 
 // CreateSnapshot makes, update snapshot in storage, later to be retrieved by the Snapshot() method.
 // This is used to recontruct the point-in-time state of storage.
+//
+// (etcd raft.MemoryStorage.CreateSnapshot)
 func (ms *StorageStableInMemory) CreateSnapshot(idx uint64, configState *raftpb.ConfigState, data []byte) (raftpb.Snapshot, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -249,6 +271,9 @@ func (ms *StorageStableInMemory) CreateSnapshot(idx uint64, configState *raftpb.
 	return ms.snapshot, nil
 }
 
+// SetSnapshot updates the snapshot in stable storage.
+//
+// (etcd raft.MemoryStorage.ApplySnapshot)
 func (ms *StorageStableInMemory) SetSnapshot(snapshot raftpb.Snapshot) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -261,6 +286,9 @@ func (ms *StorageStableInMemory) SetSnapshot(snapshot raftpb.Snapshot) error {
 	return nil
 }
 
+// SetHardState saves the current HardState.
+//
+// (etcd raft.MemoryStorage.SetHardState)
 func (ms *StorageStableInMemory) SetHardState(state raftpb.HardState) error {
 	ms.hardState = state
 	return nil
@@ -272,6 +300,8 @@ func (ms *StorageStableInMemory) SetHardState(state raftpb.HardState) error {
 //
 // The application must ensure that it does not compacts on an index
 // greater than applied index.
+//
+// (etcd raft.MemoryStorage.Compact)
 func (ms *StorageStableInMemory) Compact(compactIndex uint64) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()

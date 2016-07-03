@@ -54,7 +54,7 @@ func Test_StorageStableInMemory_LastIndex(t *testing.T) {
 		t.Fatalf("last index expected 5, got %d", lastIdx)
 	}
 
-	if err = st.Append([]raftpb.Entry{{Index: 6, Term: 5}}); err != nil {
+	if err = st.Append([]raftpb.Entry{{Index: 6, Term: 5}}...); err != nil {
 		t.Fatal(err)
 	}
 	lastIdx, err = st.LastIndex()
@@ -246,7 +246,7 @@ func Test_StorageStableInMemory_Append(t *testing.T) {
 		copy(original, tt.entries)
 
 		st := &StorageStableInMemory{snapshotEntries: tt.entries}
-		if err := st.Append(tt.entriesToAppend); err != tt.werr {
+		if err := st.Append(tt.entriesToAppend...); err != tt.werr {
 			t.Fatalf("#%d: error expected %v, got %v", i, tt.werr, err)
 		}
 
