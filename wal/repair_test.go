@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gyuho/distdb/raftpb"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 type corruptFunc func(string, int64) error

@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gyuho/distdb/fileutil"
-	"github.com/gyuho/distdb/raftpb"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 // createEmptyEntries creates empty slice of entries for testing.
@@ -204,8 +204,8 @@ func TestSave(t *testing.T) {
 
 	// save hard states
 	hardstates := []raftpb.HardState{
-		{Term: 1, VotedFor: 1, CommitIndex: 1},
-		{Term: 2, VotedFor: 2, CommitIndex: 2},
+		{VotedFor: 1, CommittedIndex: 1, Term: 1},
+		{VotedFor: 2, CommittedIndex: 2, Term: 2},
 	}
 	for _, st := range hardstates {
 		if err = w.Save(st, nil); err != nil {

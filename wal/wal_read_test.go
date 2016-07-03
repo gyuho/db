@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gyuho/distdb/raftpb"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 func TestOpenWALRead(t *testing.T) {

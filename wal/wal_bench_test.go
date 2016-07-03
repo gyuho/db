@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gyuho/distdb/raftpb"
+	"github.com/gyuho/db/raft/raftpb"
 )
 
 func benchmarkWriteEntry(b *testing.B, size, batch int) {

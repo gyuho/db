@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gyuho/distdb/fileutil"
+	"github.com/gyuho/db/fileutil"
 )
 
 // filePipeline pipelines disk space allocation.

@@ -4,11 +4,11 @@ set -e
 <<COMMENT
 go get -v github.com/golang/protobuf/protoc-gen-go
 
-printf "generating proto in raftpb\n"
-protoc --go_out=. raftpb/*.proto
+printf "generating proto in raft/raftpb\n"
+protoc --go_out=. raft/raftpb/*.proto
 
-printf "generating proto in walpb\n"
-protoc --go_out=. walpb/*.proto
+printf "generating proto in wal/walpb\n"
+protoc --go_out=. wal/walpb/*.proto
 COMMENT
 
 # for now, be conservative about what version of protoc we expect
@@ -27,12 +27,12 @@ pushd "${GOGOPROTO_ROOT}"
 	make install
 popd
 
-printf "Generating raftpb\n"
+printf "Generating raft/raftpb\n"
 protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
-	raftpb/*.proto;
+	raft/raftpb/*.proto;
 
-printf "Generating walpb\n"
+printf "Generating wal/walpb\n"
 protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
-	walpb/*.proto;
+	wal/walpb/*.proto;

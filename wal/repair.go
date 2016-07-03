@@ -4,9 +4,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/gyuho/distdb/crc"
-	"github.com/gyuho/distdb/fileutil"
-	"github.com/gyuho/distdb/walpb"
+	"github.com/gyuho/db/crc"
+	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/wal/walpb"
 )
 
 // Repair repairs the last WAL file by truncating

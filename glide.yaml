@@ -1,4 +1,4 @@
-package: github.com/gyuho/distdb
+package: github.com/gyuho/db
 import:
 - package: github.com/gogo/protobuf
   subpackages:

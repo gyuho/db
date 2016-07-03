@@ -1,5 +1,5 @@
 package wal
 
-import "github.com/gyuho/distdb/xlog"
+import "github.com/gyuho/db/xlog"
 
 var logger = xlog.NewLogger("wal")
