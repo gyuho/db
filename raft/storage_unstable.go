@@ -165,7 +165,7 @@ func (su *storageUnstable) truncateAndAppend(entries ...raftpb.Entry) {
 		// ➝ indexOffset = firstIndexInEntriesToAppend = 9
 		// ➝ su.entries  = entries to append           = [9, 10, 11, 12, 13]
 		//
-		raftLogger.Infof("replacing unstable entries from index %d", firstIndexInEntriesToAppend)
+		raftLogger.Infof("replacing unstable entries from index '%d'", firstIndexInEntriesToAppend)
 		su.indexOffset = firstIndexInEntriesToAppend
 		su.entries = entries
 

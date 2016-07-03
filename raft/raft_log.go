@@ -109,7 +109,7 @@ func (rg *raftLog) lastIndex() uint64 {
 func (rg *raftLog) term(index uint64) (uint64, error) {
 	dummyIndex := rg.firstIndex() - 1
 	if index < dummyIndex || rg.lastIndex() < index {
-		raftLogger.Warningf("index '%d' is out of range [dummy index=%d, last index=%d]", index, dummyIndex, rg.lastIndex())
+		raftLogger.Warningf("out-of-range index '%d' [dummy index=%d, last index=%d]", index, dummyIndex, rg.lastIndex())
 		return 0, nil
 	}
 
