@@ -8,6 +8,34 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
+func Test_raftLog(t *testing.T) { // (etcd raft TestLogRestore)
+
+}
+
+func Test_raftLog_mustCheckOutOfBounds(t *testing.T) { // (etcd raft TestIsOutOfBounds)
+
+}
+
+func Test_raftLog_slice(t *testing.T) { // (etcd raft TestSlice)
+
+}
+
+func Test_raftLog_unstableEntries(t *testing.T) { // (etcd raft TestUnstableEnts)
+
+}
+
+func Test_raftLog_hasNextEntriesToApply(t *testing.T) { // (etcd raft TestHasNextEnts)
+
+}
+
+func Test_raftLog_nextEntriesToApply(t *testing.T) { // (etcd raft TestNextEnts)
+
+}
+
+func Test_raftLog_isUpToDate(t *testing.T) { // (etcd raft TestIsUpToDate)
+
+}
+
 func Test_raftLog_appendToStorageUnstable(t *testing.T) { // (etcd raft TestAppend)
 	existingEntries := []raftpb.Entry{
 		{Index: 1, Term: 1},
@@ -79,6 +107,14 @@ func Test_raftLog_appendToStorageUnstable(t *testing.T) { // (etcd raft TestAppe
 	}
 }
 
+func Test_raftLog_findConflictingTerm(t *testing.T) { // (etcd raft TestFindConflict)
+
+}
+
+func Test_raftLog_maybeAppend(t *testing.T) { // (etcd raft TestLogMaybeAppend)
+
+}
+
 func Test_raftLog_term(t *testing.T) { // (etcd raft TestTerm)
 	var (
 		indexOffset uint64 = 100
@@ -118,4 +154,28 @@ func Test_raftLog_term(t *testing.T) { // (etcd raft TestTerm)
 			t.Fatalf("#%d: term expected %d, got %d", i, tt.wterm, term)
 		}
 	}
+}
+
+func Test_raftLog_term_UnstableSnapshot(t *testing.T) { // (etcd raft TestTermWithUnstableSnapshot)
+
+}
+
+func Test_raftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
+
+}
+
+func Test_raftLog_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableToWithSnap)
+
+}
+
+func Test_raftLog_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
+
+}
+
+func Test_raftLog_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd raft TestCompaction)
+
+}
+
+func Test_raftLog_maybeCommit_appliedTo_Compact_SideEffects(t *testing.T) { // (etcd raft TestCompactionSideEffects)
+
 }
