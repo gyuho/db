@@ -10,11 +10,11 @@ import (
 
 func Test_raftLog(t *testing.T) { // (etcd raft TestLogRestore)
 	var (
-		ms              = NewStorageStableInMemory()
 		index    uint64 = 1000
 		term     uint64 = 1000
 		snapshot        = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: index, Term: term}}
 	)
+	ms := NewStorageStableInMemory()
 	ms.SetSnapshot(snapshot)
 	rg := newRaftLog(ms)
 
@@ -45,17 +45,17 @@ func Test_raftLog(t *testing.T) { // (etcd raft TestLogRestore)
 
 func Test_raftLog_mustCheckOutOfBounds(t *testing.T) { // (etcd raft TestIsOutOfBounds)
 	var (
-		ms                 = NewStorageStableInMemory()
 		indexOffset uint64 = 100
-		firstIndex         = indexOffset + 1
-
-		num uint64 = 100
-
-		snapshot = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: indexOffset}}
+		snapshot           = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: indexOffset}}
 	)
+	ms := NewStorageStableInMemory()
 	ms.SetSnapshot(snapshot)
 	rg := newRaftLog(ms)
 
+	var (
+		firstIndex        = indexOffset + 1
+		num        uint64 = 100
+	)
 	for i := uint64(1); i <= num; i++ { // lasat index 200
 		rg.appendToStorageUnstable(raftpb.Entry{Index: i + indexOffset})
 	}
@@ -148,7 +148,270 @@ func Test_raftLog_mustCheckOutOfBounds(t *testing.T) { // (etcd raft TestIsOutOf
 }
 
 func Test_raftLog_slice(t *testing.T) { // (etcd raft TestSlice)
+	var (
+		indexOffset uint64 = 100
+		snapshot           = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: indexOffset}}
+		num         uint64 = 100
+		midIndex           = indexOffset + num/2 // 150
+		lastIndex          = indexOffset + num   // 200
 
+		midIndexEntry = raftpb.Entry{Index: midIndex, Term: midIndex}
+	)
+	ms := NewStorageStableInMemory()
+	ms.SetSnapshot(snapshot)
+	for i := uint64(1); i < num/2; i++ {
+		ms.Append(raftpb.Entry{Index: indexOffset + i, Term: indexOffset + i})
+	}
+	rg := newRaftLog(ms)
+
+	for i := num / 2; i <= num; i++ {
+		rg.appendToStorageUnstable(raftpb.Entry{Index: indexOffset + i, Term: indexOffset + i})
+	}
+	// rg.storageUnstable.indexOffset == 150
+
+	tests := []struct {
+		startIndex, endIndex uint64
+		limitSize            uint64
+
+		wEntries []raftpb.Entry
+		wError   error
+
+		toPanic bool
+	}{
+		{ // no limit, ErrCompacted
+			indexOffset - 1, indexOffset + 1,
+			math.MaxUint64,
+
+			nil,
+			ErrCompacted, // if firstIndex > startIndex { return ErrCompacted }
+			// firstIndex 100 + 1 > startIndex 99
+
+			false,
+		},
+
+		{ // no limit, ErrCompacted
+			indexOffset, indexOffset + 1,
+			math.MaxUint64,
+
+			nil,
+			ErrCompacted, // if firstIndex > startIndex { return ErrCompacted }
+			// firstIndex 100 + 1 > startIndex 100
+
+			false,
+		},
+
+		{ // no limit
+			midIndex - 1, midIndex + 1,
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: midIndex - 1, Term: midIndex - 1}, {Index: midIndex, Term: midIndex}},
+			nil,
+
+			false,
+		},
+
+		{ // no limit
+			midIndex - 3, midIndex + 2, // [147, 148, 149] + [150, 151]
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{
+				{Index: midIndex - 3, Term: midIndex - 3},
+				{Index: midIndex - 2, Term: midIndex - 2},
+				{Index: midIndex - 1, Term: midIndex - 1},
+				{Index: midIndex, Term: midIndex},
+				{Index: midIndex + 1, Term: midIndex + 1},
+			},
+			nil,
+
+			false,
+		},
+
+		{ // no limit
+			midIndex, midIndex + 1,
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: midIndex, Term: midIndex}},
+			nil,
+
+			false,
+		},
+
+		{ // no limit
+			lastIndex - 1, lastIndex + 1,
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: lastIndex - 1, Term: lastIndex - 1}, {Index: lastIndex, Term: lastIndex}},
+			nil,
+
+			false,
+		},
+
+		{ // no limit
+			lastIndex - 1, lastIndex,
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: lastIndex - 1, Term: lastIndex - 1}},
+			nil,
+
+			false,
+		},
+
+		{ // no limit
+			lastIndex, lastIndex + 1,
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: lastIndex, Term: lastIndex}},
+			nil,
+
+			false,
+		},
+
+		{ // no limit
+			lastIndex + 1, lastIndex + 1,
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			nil,
+			nil,
+
+			false,
+		},
+
+		{ // no limit, and expect panic
+			lastIndex - 5, lastIndex + 2, // MUST "endIndex <= rg.firstIndex() + len(rg.entries)"
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			nil,
+			nil,
+
+			true,
+		},
+
+		{ // no limit, and expect panic
+			lastIndex + 1, lastIndex + 2, // MUST "endIndex <= rg.firstIndex() + len(rg.entries)"
+			math.MaxUint64,
+
+			// slice returns the entries[startIndex, endIndex)
+			nil,
+			nil,
+
+			true,
+		},
+
+		{ // with limit 0, but to ensure that it returns at least one entry
+			midIndex - 1, midIndex + 1,
+			0,
+
+			// slice returns the entries[startIndex, endIndex)
+			// []raftpb.Entry{{Index: midIndex - 1, Term: midIndex - 1}, {Index: midIndex, Term: midIndex}},
+			[]raftpb.Entry{{Index: midIndex - 1, Term: midIndex - 1}},
+			nil,
+
+			false,
+		},
+
+		{ // with limit size of only one entry
+			midIndex - 1, midIndex + 1,
+			uint64(midIndexEntry.Size() + 1),
+
+			// slice returns the entries[startIndex, endIndex)
+			// []raftpb.Entry{{Index: midIndex - 1, Term: midIndex - 1}, {Index: midIndex, Term: midIndex}},
+			[]raftpb.Entry{{Index: midIndex - 1, Term: midIndex - 1}},
+			nil,
+
+			false,
+		},
+
+		{ // with limit size of 1 entry
+			midIndex - 2, midIndex + 1,
+			uint64(midIndexEntry.Size() + 1),
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: midIndex - 2, Term: midIndex - 2}},
+			nil,
+
+			false,
+		},
+
+		{ // with limit size of 2 entries
+			midIndex - 1, midIndex + 1,
+			uint64(midIndexEntry.Size() * 2),
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: midIndex - 1, Term: midIndex - 1}, {Index: midIndex, Term: midIndex}},
+			nil,
+
+			false,
+		},
+
+		{ // with limit size of 3 entries
+			midIndex - 1, midIndex + 2,
+			uint64(midIndexEntry.Size() * 3),
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: midIndex - 1, Term: midIndex - 1}, {Index: midIndex, Term: midIndex}, {Index: midIndex + 1, Term: midIndex + 1}},
+			nil,
+
+			false,
+		},
+
+		{ // with limit size of 1 entry
+			midIndex, midIndex + 2,
+			uint64(midIndexEntry.Size()),
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: midIndex, Term: midIndex}},
+			nil,
+
+			false,
+		},
+
+		{ // with limit size of 2 entries
+			midIndex, midIndex + 2,
+			uint64(midIndexEntry.Size() * 2),
+
+			// slice returns the entries[startIndex, endIndex)
+			[]raftpb.Entry{{Index: midIndex, Term: midIndex}, {Index: midIndex + 1, Term: midIndex + 1}},
+			nil,
+
+			false,
+		},
+	}
+
+	for i, tt := range tests {
+		func() {
+			defer func() {
+				err := recover()
+				if err != nil {
+					t.Logf("#%d: panic with %v", i, err)
+				}
+
+				switch {
+				case err == nil && tt.toPanic:
+					t.Fatalf("#%d: expected panic but didn't", i)
+
+				case err != nil && !tt.toPanic:
+					t.Fatalf("#%d: expected no panic but got panic error (%v)", i, err)
+				}
+			}()
+
+			entries, err := rg.slice(tt.startIndex, tt.endIndex, tt.limitSize)
+			if err != tt.wError {
+				t.Fatalf("#%d: error expected %v, got %v", i, tt.wError, err)
+			}
+
+			if !reflect.DeepEqual(entries, tt.wEntries) {
+				t.Fatalf("#%d: entries expected %+v, got %+v", i, tt.wEntries, entries)
+			}
+		}()
+	}
 }
 
 func Test_raftLog_unstableEntries(t *testing.T) { // (etcd raft TestUnstableEnts)

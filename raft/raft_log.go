@@ -157,7 +157,7 @@ func (rg *raftLog) matchTerm(index, term uint64) bool {
 // (etcd raft.raftLog.mustCheckOutOfBounds)
 func (rg *raftLog) mustCheckOutOfBounds(startIndex, endIndex uint64) error {
 	if startIndex > endIndex {
-		raftLogger.Panicf("invalid raft log indexes [start index = %d | end index = %d]", startIndex, endIndex)
+		raftLogger.Panicf("invalid raft log indexes [start index=%d | end index=%d]", startIndex, endIndex)
 	}
 
 	firstIndex := rg.firstIndex()
@@ -167,7 +167,7 @@ func (rg *raftLog) mustCheckOutOfBounds(startIndex, endIndex uint64) error {
 
 	entryN := rg.lastIndex() - firstIndex + 1
 	if endIndex > firstIndex+entryN {
-		raftLogger.Panicf("entries[%d, %d) is out of bound [first index = %d | last index = %d]", startIndex, endIndex, firstIndex, rg.lastIndex())
+		raftLogger.Panicf("entries[%d, %d) is out of bound [first index=%d | last index=%d]", startIndex, endIndex, firstIndex, rg.lastIndex())
 	}
 
 	return nil
@@ -189,20 +189,20 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 
 	// For example,
 	//
-	// entries in stable storage        = [10, 11, 12]
-	// entries in unstable storage      = [13, 14]
-	// index offset in unstable storage = 13
+	// entries in stable storage        = [147, 148, 149]
+	// entries in unstable storage      = [150, 151]
+	// index offset in unstable storage = 150
 	//
-	// slice(startIndex=11, endIndex=15)
+	// slice(startIndex=148, endIndex=152)
 	//
 	// ➝ startIndex < index offset in unstable storage
-	// ➝         11 < 13
+	// ➝        148 < 150
 	//
 	// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-	// ➝ stableStorage.Entries( 11 , min (15,13) )
-	// ➝ stableStorage.Entries( 11 , 13 )
+	// ➝ stableStorage.Entries( 148 , min(152,150) )
+	// ➝ stableStorage.Entries( 148 , 150 )
 	//   == stableStorage.Entries[startIndex, endIndex)
-	// ➝ [11, 12]
+	// ➝ [148, 149]
 	//
 	if startIndex < rg.storageUnstable.indexOffset { // try stable storage entries
 		stableEntries, err := rg.storageStable.Entries(startIndex, minUint64(endIndex, rg.storageUnstable.indexOffset), limitSize)
@@ -217,9 +217,9 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 			}
 		}
 
-		// stableEntriesN = len([10, 11, 12]) = 3
+		// stableEntriesN = len([147, 148, 149]) = 3
 		// expectedN      = min(index offset in unstable storage, endIndex) - startIndex
-		//                = min(13, 15) - 10 = 3
+		//                = min(150,152) - 147 = 150 - 147 = 3
 		//
 		// stableEntriesN >= expectedN
 		// ➝ need to check limits
@@ -234,80 +234,77 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 
 		// For example,
 		//
-		// entries in stable storage        = [10, 11, 12]
-		// entries in unstable storage      = [14, 15]
-		// index offset in unstable storage = 14
+		// entries in stable storage        = [147, 148, 149]
+		// entries in unstable storage      = [151, 152]
+		// index offset in unstable storage = 151
 		//
-		// slice(startIndex=11, endIndex=15)
+		// slice(startIndex=147, endIndex=153)
 		//
 		// ➝ startIndex < index offset in unstable storage
-		// ➝         11 < 14
+		// ➝        147 < 151
 		//
 		// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-		// ➝ stableStorage.Entries( 11 , min (15,14) )
-		// ➝ stableStorage.Entries( 11 , 14 )
+		// ➝ stableStorage.Entries( 147 , min(153,151) )
+		// ➝ stableStorage.Entries( 147 , 151 )
 		//
-		// endIndex > ms.lastIndex()+1 == 12 + 1 == 13
-		//       14 > 13
+		// endIndex > ms.lastIndex()+1 == 149 + 1 == 150
+		//      153 > 150
 		// ➝ out of bound panic!
 
 		// For example,
 		//
-		// entries in stable storage        = [11, 12]
-		// entries in unstable storage      = [13, 14]
-		// index offset in unstable storage = 13
+		// entries in stable storage        = [148, 149]
+		// entries in unstable storage      = [150, 151]
+		// index offset in unstable storage = 150
 		//
-		// slice(startIndex=11, endIndex=15)
+		// slice(startIndex=148, endIndex=152)
 		//
 		// ➝ startIndex < index offset in unstable storage
-		// ➝         11 < 13
+		// ➝        148 < 150
 		//
 		// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-		// ➝ stableStorage.Entries( 11 , min (15,13) )
-		// ➝ stableStorage.Entries( 11 , 13 )
+		// ➝ stableStorage.Entries( 148 , min (152,150) )
+		// ➝ stableStorage.Entries( 148 , 150 )
 		// ➝ stableStorage.Entries[startIndex, endIndex)
-		// ➝ [11, 12]
+		// ➝ [148, 149]
 		//
-		// stableEntriesN = len([11, 12]) = 2
+		// stableEntriesN = len([148, 149]) = 2
 		// expectedN      = min(index offset in unstable storage, endIndex) - startIndex
-		//                = min(13, 15) - 10 = 3
+		//                = min(150,152) - 148 = 150 - 148 = 2
 		//
-		// stableEntriesN < expectedN
-		// ➝ no need to check limits
-		//
-		// ???
-		// Then [13, 14] in unstable storage won't return
+		// stableEntriesN >= expectedN
+		// ➝ need to check limits
 
 		entries = stableEntries
 	}
 
 	// For example,
 	//
-	// entries in stable storage        = [10, 11, 12]
-	// entries in unstable storage      = [13, 14]
-	// index offset in unstable storage = 13
+	// entries in stable storage        = [147, 148, 149]
+	// entries in unstable storage      = [150, 151]
+	// index offset in unstable storage = 150
 	//
-	// slice(startIndex=11, endIndex=15)
+	// slice(startIndex=148, endIndex=152)
 	//
 	// ➝ startIndex < index offset in unstable storage
-	// ➝         11 < 13
+	// ➝        148 < 150
 	//
 	// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-	// ➝ stableStorage.Entries( 11 , min (15,13) )
-	// ➝ stableStorage.Entries( 11 , 13 )
+	// ➝ stableStorage.Entries( 148 , min(152,150) )
+	// ➝ stableStorage.Entries( 148 , 150 )
 	//   == stableStorage.Entries[startIndex, endIndex)
-	// ➝ [11, 12]
+	// ➝ [148, 149]
 	//
 	//
 	// ➝ endIndex > index offset in unstable storage
-	// ➝       15 > 13
+	// ➝      151 > 150
 	//
 	// ➝ ents = unstableEntries.slice( max( startIndex , index offset in unstable storage ) , endIndex )
-	//        = unstableEntries.slice( max(13,13), 15 )
-	//        = unstableEntries.slice(13, 15)
-	//        = [13, 14]
+	//        = unstableEntries.slice( max(150,150), 152 )
+	//        = unstableEntries.slice( 150, 152 )
+	//        = [150, 151]
 	//
-	// ➝ return [11, 12] + [13, 14]
+	// ➝ return [148, 149] + [150, 151]
 	//
 	if endIndex > rg.storageUnstable.indexOffset { // try unstable storage entries
 		unstableEntries := rg.storageUnstable.slice(maxUint64(startIndex, rg.storageUnstable.indexOffset), endIndex)
