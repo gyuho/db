@@ -445,55 +445,55 @@ func (rg *raftLog) isUpToDate(index, term uint64) bool {
 // those unstable entries to stable storage.
 //
 // (etcd raft.raftLog.stableTo)
-func (rg *raftLog) persistedEntriesAt(index, term uint64) {
-	rg.storageUnstable.persistedEntriesAt(index, term)
+func (rg *raftLog) persistedEntriesAt(indexToPersist, termToPersist uint64) {
+	rg.storageUnstable.persistedEntriesAt(indexToPersist, termToPersist)
 }
 
 // persistedSnapshotAt updates snapshot metadata after processing the incoming snapshot.
 //
 // (etcd raft.raftLog.stableSnapTo)
-func (rg *raftLog) persistedSnapshotAt(index uint64) {
-	rg.storageUnstable.persistedSnapshotAt(index)
+func (rg *raftLog) persistedSnapshotAt(indexToPersist uint64) {
+	rg.storageUnstable.persistedSnapshotAt(indexToPersist)
 }
 
 // commitTo updates raftLog's committedIndex.
 //
 // (etcd raft.raftLog.commitTo)
-func (rg *raftLog) commitTo(committedIndex uint64) {
+func (rg *raftLog) commitTo(indexToCommit uint64) {
 	// to never decrease commit index
-	if rg.committedIndex < committedIndex {
-		if rg.lastIndex() < committedIndex {
+	if rg.committedIndex < indexToCommit {
+		if rg.lastIndex() < indexToCommit {
 			raftLogger.Panicf("got wrong commit index '%d', smaller than last index '%d' (possible log corruption, truncation, lost)",
-				committedIndex, rg.lastIndex())
+				indexToCommit, rg.lastIndex())
 		}
-		rg.committedIndex = committedIndex
+		rg.committedIndex = indexToCommit
 	}
 }
 
 // appliedTo updates raftLog's appliedIndex.
 //
 // (etcd raft.raftLog.appliedTo)
-func (rg *raftLog) appliedTo(appliedIndex uint64) {
-	if appliedIndex == 0 {
+func (rg *raftLog) appliedTo(indexToApply uint64) {
+	if indexToApply == 0 {
 		return
 	}
 
-	// MUST "rg.committedIndex >= appliedIndex"
-	if rg.committedIndex < appliedIndex || appliedIndex < rg.appliedIndex {
+	// MUST "rg.committedIndex >= indexToApply"
+	if rg.committedIndex < indexToApply || indexToApply < rg.appliedIndex {
 		raftLogger.Panicf("got wrong applied index '%d' [commit index=%d | previous applied index=%d]",
-			appliedIndex, rg.committedIndex, rg.appliedIndex)
+			indexToApply, rg.committedIndex, rg.appliedIndex)
 	}
 
-	rg.appliedIndex = appliedIndex
+	rg.appliedIndex = indexToApply
 }
 
 // maybeCommit returns true if commitTo operation was successful
 // with given index and term.
 //
 // (etcd raft.raftLog.maybeCommit)
-func (rg *raftLog) maybeCommit(index, term uint64) bool {
-	if index > rg.committedIndex && rg.zeroTermOnErrCompacted(rg.term(index)) == term {
-		rg.commitTo(index)
+func (rg *raftLog) maybeCommit(indexToCommit, termToCommit uint64) bool {
+	if indexToCommit > rg.committedIndex && rg.zeroTermOnErrCompacted(rg.term(indexToCommit)) == termToCommit {
+		rg.commitTo(indexToCommit)
 		return true
 	}
 	return false
@@ -536,18 +536,18 @@ func (rg *raftLog) findConflict(entries ...raftpb.Entry) uint64 {
 	return 0
 }
 
-// maybeAppend returns the last index of new entries and true, if appends were successful.
+// maybeAppend returns the last index of new entries and true, if successful.
 // Otherwise, it returns 0 and false.
 //
 // (etcd raft.raftLog.maybeAppend)
-func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...raftpb.Entry) (uint64, bool) {
+func (rg *raftLog) maybeAppend(index, term, indexToCommit uint64, entries ...raftpb.Entry) (uint64, bool) {
 	if rg.matchTerm(index, term) {
 		conflictingIndex := rg.findConflict(entries...)
 		switch {
 		case conflictingIndex == 0:
 
 		case conflictingIndex <= rg.committedIndex:
-			raftLogger.Panicf("conflicting entry index %d must be greater than committed index %d", conflictingIndex, rg.committedIndex)
+			raftLogger.Panicf("conflicting entry index '%d' must be greater than committed index '%d'", conflictingIndex, rg.committedIndex)
 
 		default:
 			// For example
@@ -555,7 +555,7 @@ func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...ra
 			// entries in unstable = [10(term 7), 11(term 7), 12(term 8)]
 			// index               = 10
 			// term                =  7
-			// committedIndex      = 12
+			// indexToCommit       = 12
 			//
 			// entries to append         = [11(term 8), 12(term 8)]
 			// ➝ conflicting entry index = 11
@@ -574,15 +574,15 @@ func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...ra
 			// ➝ entries in unstable = [10(term 7), 11(term 8), 12(term 8)]
 		}
 
-		// committedIndex = 12
-		// lastNewIndex   = index + len(entries)
-		//                = 10 + 2
-		//                = 12
-		// commitTo( min( committedIndex , lastNewIndex ) )
+		// indexToCommit = 12
+		// lastNewIndex  = index + len(entries)
+		//               = 10 + 2
+		//               = 12
+		// commitTo( min( indexToCommit , lastNewIndex ) )
 		// = commitTo( min(12,12) ) = commitTo(12)
 		//
 		lastNewIndex := index + uint64(len(entries))
-		rg.commitTo(minUint64(committedIndex, lastNewIndex))
+		rg.commitTo(minUint64(indexToCommit, lastNewIndex))
 		return lastNewIndex, true
 	}
 

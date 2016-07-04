@@ -466,7 +466,7 @@ func Test_raftLog_unstableEntries(t *testing.T) { // (etcd raft TestUnstableEnts
 	}
 }
 
-func Test_raftLog_hasNextEntriesToApply(t *testing.T) { // (etcd raft TestHasNextEnts, TestNextEnts)
+func Test_raftLog_NextEntries(t *testing.T) { // (etcd raft TestHasNextEnts, TestNextEnts)
 	tests := []struct {
 		snapshotToApply                raftpb.Snapshot
 		entriesStorageUnstableToAppend []raftpb.Entry
@@ -805,7 +805,311 @@ func Test_raftLog_findConflict(t *testing.T) { // (etcd raft TestFindConflict)
 }
 
 func Test_raftLog_maybeAppend(t *testing.T) { // (etcd raft TestLogMaybeAppend)
+	tests := []struct {
+		entriesStorageUnstableToAppend []raftpb.Entry
+		indexToCommitForUnstable       uint64
 
+		index, term, indexToCommitForMaybeAppend uint64
+		entriesToMaybeAppend                     []raftpb.Entry
+
+		wLastNewIndex   uint64
+		wAppended       bool
+		wCommittedIndex uint64
+
+		entriesStorageUnstableAfterMaybeAppend []raftpb.Entry
+		toPanic                                bool
+	}{
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			3, // index to commit
+			nil,
+
+			3, // lastNewIndex := index + uint64(len(entries))
+			true,
+			3, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			4, // index to commit is 4, but lastNewIndex will still be 3 without new entries
+			nil,
+
+			3, // lastNewIndex := index + uint64(len(entries))
+			true,
+			3, // committed index does not grow bigger than last new index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			2, // index to commit
+			nil,
+
+			3, // lastNewIndex := index + uint64(len(entries))
+			true,
+			2, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			0, // index to commit
+			nil,
+
+			3, // lastNewIndex := index + uint64(len(entries))
+			true,
+			1, // committed index never decreases
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 2, // term is not matching
+			3, // index to commit
+			[]raftpb.Entry{{Index: 4, Term: 4}},
+
+			0, // lastNewIndex := index + uint64(len(entries))
+			false,
+			1, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			4, 3, // index out of bound
+			3, // index to commit
+			[]raftpb.Entry{{Index: 5, Term: 4}},
+
+			0, // lastNewIndex := index + uint64(len(entries))
+			false,
+			1, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			0, 0,
+			3, // index to commit
+			nil,
+
+			0, // lastNewIndex := index + uint64(len(entries))
+			true,
+			1, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			3, // index to commit
+			[]raftpb.Entry{{Index: 4, Term: 4}},
+
+			4, // lastNewIndex := index + uint64(len(entries))
+			true,
+			3, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}, {Index: 4, Term: 4}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			4, // index to commit
+			[]raftpb.Entry{{Index: 4, Term: 4}},
+
+			4, // lastNewIndex := index + uint64(len(entries))
+			true,
+			4, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}, {Index: 4, Term: 4}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			5, // index to commit
+			[]raftpb.Entry{{Index: 4, Term: 4}},
+
+			4, // lastNewIndex := index + uint64(len(entries))
+			true,
+			4, // committed index does not grow bigger than last new index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}, {Index: 4, Term: 4}},
+			false,
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			3, 3,
+			5, // index to commit
+			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 4}},
+
+			5, // lastNewIndex := index + uint64(len(entries))
+			true,
+			5, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}, {Index: 4, Term: 4}, {Index: 5, Term: 4}},
+			false,
+		},
+
+		{ // with conflicting entries to maybeAppend
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			2, 2,
+			3, // index to commit
+			[]raftpb.Entry{{Index: 3, Term: 4}}, // conflicting, so it will truncate
+
+			3, // lastNewIndex := index + uint64(len(entries))
+			true,
+			3, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 4}},
+			false,
+		},
+
+		{ // with conflicting entries to maybeAppend
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			1, 1,
+			3, // index to commit
+			[]raftpb.Entry{{Index: 2, Term: 4}}, // conflicting, so it will truncate
+
+			2, // lastNewIndex
+			true,
+			2, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 4}},
+			false,
+		},
+
+		{ // with conflicting entries to maybeAppend
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			1, 1,
+			3, // index to commit
+			[]raftpb.Entry{{Index: 2, Term: 4}, {Index: 3, Term: 4}}, // conflicting, so it will truncate
+
+			3, // lastNewIndex
+			true,
+			3, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 4}, {Index: 3, Term: 4}},
+			false,
+		},
+
+		{ // with conflicting entries to maybeAppend
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			1, // indexToCommitForUnstable
+
+			0, 0, // conflict with existing committed entry
+			3, // index to commit
+			[]raftpb.Entry{{Index: 1, Term: 4}}, // conflicting, so it will truncate
+
+			1, // lastNewIndex
+			true,
+			1, // committed index
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 4}, {Index: 3, Term: 4}},
+			true, // conflict with existing committed entry
+		},
+	}
+
+	for i, tt := range tests {
+		rg := newRaftLog(NewStorageStableInMemory())
+		rg.appendToStorageUnstable(tt.entriesStorageUnstableToAppend...)
+		rg.commitTo(tt.indexToCommitForUnstable)
+
+		func() {
+			defer func() {
+				err := recover()
+				if err != nil {
+					t.Logf("#%d: panic with %v", i, err)
+				}
+
+				switch {
+				case err == nil && tt.toPanic:
+					t.Fatalf("#%d: expected panic but didn't", i)
+
+				case err != nil && !tt.toPanic:
+					t.Fatalf("#%d: expected no panic but got panic error (%v)", i, err)
+				}
+			}()
+
+			// maybeAppend returns the last index of new entries and true, if successful.
+			// Otherwise, it returns 0 and false.
+			lastNewIndex, appended := rg.maybeAppend(tt.index, tt.term, tt.indexToCommitForMaybeAppend, tt.entriesToMaybeAppend...)
+			newCommittedIndex := rg.committedIndex
+
+			if lastNewIndex != tt.wLastNewIndex {
+				t.Fatalf("#%d: last new index expected %d, got %d", i, tt.wLastNewIndex, lastNewIndex)
+			}
+			if appended != tt.wAppended {
+				t.Fatalf("#%d: appended expected %v, got %v", i, tt.wAppended, appended)
+			}
+			if newCommittedIndex != tt.wCommittedIndex {
+				t.Fatalf("#%d: committed index expected %d, got %d", i, tt.wCommittedIndex, newCommittedIndex)
+			}
+			if !reflect.DeepEqual(tt.entriesStorageUnstableAfterMaybeAppend, rg.unstableEntries()) {
+				t.Fatalf("#%d: unstable entries expected %+v, got %+v", i, rg.unstableEntries(), tt.entriesStorageUnstableAfterMaybeAppend)
+			}
+
+			if appended && len(tt.entriesToMaybeAppend) > 0 {
+				ents, err := rg.slice(rg.lastIndex()-uint64(len(tt.entriesToMaybeAppend))+1, rg.lastIndex()+1, math.MaxUint64)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(tt.entriesToMaybeAppend, ents) {
+					t.Fatalf("#%d: appended entries expected %+v, got %+v", i, tt.entriesToMaybeAppend, ents)
+				}
+			}
+		}()
+	}
 }
 
 func Test_raftLog_term(t *testing.T) { // (etcd raft TestTerm)
