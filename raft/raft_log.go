@@ -69,6 +69,7 @@ func (rg *raftLog) String() string {
 }
 
 // firstIndex gets the first index from unstable storage first.
+// If snapshot exists, it returns ms.snapshotEntries[0].Index + 1.
 // If it's not available, try to get the first index in stable storage.
 //
 // (etcd raft.raftLog.firstIndex)
@@ -430,12 +431,14 @@ func (rg *raftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 {
 	}
 }
 
-// isUpToDate returns true if the given (lastIndex, term) log is more
+// isUpToDate returns true if the given (index, term) log is more
 // up-to-date than the last entry in the existing logs.
+// It returns true, first if the term is greater than the last term.
+// Second if the index is greater than the last index.
 //
 // (etcd raft.raftLog.isUpToDate)
-func (rg *raftLog) isUpToDate(lastIndex, term uint64) bool {
-	return term > rg.lastTerm() || (term == rg.lastTerm() && lastIndex >= rg.lastIndex())
+func (rg *raftLog) isUpToDate(index, term uint64) bool {
+	return term > rg.lastTerm() || (term == rg.lastTerm() && index >= rg.lastIndex())
 }
 
 // persistedEntriesAt updates unstable entries and indexes after persisting
@@ -477,7 +480,7 @@ func (rg *raftLog) appliedTo(appliedIndex uint64) {
 
 	// MUST "rg.committedIndex >= appliedIndex"
 	if rg.committedIndex < appliedIndex || appliedIndex < rg.appliedIndex {
-		raftLogger.Panicf("got wrong applied index %d [commit index=%d | previous applied index=%d]",
+		raftLogger.Panicf("got wrong applied index '%d' [commit index=%d | previous applied index=%d]",
 			appliedIndex, rg.committedIndex, rg.appliedIndex)
 	}
 

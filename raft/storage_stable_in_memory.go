@@ -279,7 +279,7 @@ func (ms *StorageStableInMemory) SetSnapshot(snapshot raftpb.Snapshot) error {
 	defer ms.mu.Unlock()
 
 	ms.snapshot = snapshot
-	ms.snapshotEntries = []raftpb.Entry{
+	ms.snapshotEntries = []raftpb.Entry{ // metadata in the first entry as a dummy entry
 		{Index: snapshot.Metadata.Index, Term: snapshot.Metadata.Term},
 	}
 
