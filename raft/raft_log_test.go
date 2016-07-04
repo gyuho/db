@@ -415,7 +415,55 @@ func Test_raftLog_slice(t *testing.T) { // (etcd raft TestSlice)
 }
 
 func Test_raftLog_unstableEntries(t *testing.T) { // (etcd raft TestUnstableEnts)
+	tests := []struct {
+		existingEntriesStorageStable   []raftpb.Entry
+		existingEntriesStorageUnstable []raftpb.Entry
 
+		storageUnstableIndexOffset uint64
+		wEntriesStorageUnstable    []raftpb.Entry
+	}{
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+			nil,
+
+			3,
+			nil,
+		},
+
+		{
+			nil,
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+
+			1,
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+		},
+	}
+	for i, tt := range tests {
+		ms := NewStorageStableInMemory()
+		ms.Append(tt.existingEntriesStorageStable...)
+
+		rg := newRaftLog(ms)
+		rg.appendToStorageUnstable(tt.existingEntriesStorageUnstable...)
+
+		uents := rg.unstableEntries()
+		if len(uents) > 0 {
+			rg.persistedEntriesAt(uents[len(uents)-1].Index, uents[len(uents)-1].Term)
+		}
+
+		if !reflect.DeepEqual(uents, tt.wEntriesStorageUnstable) {
+			t.Fatalf("#%d: unstable entries expected %+v, got %+v", i, tt.wEntriesStorageUnstable, uents)
+		}
+
+		var nextIdx uint64
+		if len(tt.existingEntriesStorageStable) > 0 {
+			nextIdx = tt.existingEntriesStorageStable[len(tt.existingEntriesStorageStable)-1].Index + 1
+		} else if len(tt.existingEntriesStorageUnstable) > 0 {
+			nextIdx = tt.existingEntriesStorageUnstable[0].Index + uint64(len(tt.existingEntriesStorageUnstable))
+		}
+		if rg.storageUnstable.indexOffset != nextIdx {
+			t.Fatalf("#%d: unstable index offset expected %d, got %d", i, nextIdx, rg.storageUnstable.indexOffset)
+		}
+	}
 }
 
 func Test_raftLog_hasNextEntriesToApply(t *testing.T) { // (etcd raft TestHasNextEnts)
