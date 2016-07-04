@@ -309,8 +309,9 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 	if endIndex > rg.storageUnstable.indexOffset { // try unstable storage entries
 		unstableEntries := rg.storageUnstable.slice(maxUint64(startIndex, rg.storageUnstable.indexOffset), endIndex)
 		if len(entries) > 0 { // there are entries from stable storage
-			// (X) ??? race condition in etcd integration test!
+			// (X)
 			// entries = append(entries, unstableEntries...)
+			// ??? race condition in etcd integration test!
 
 			// entries = append([]raftpb.Entry{}, entries...)
 			//
@@ -512,14 +513,14 @@ func (rg *raftLog) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
 	return rg.lastIndex()
 }
 
-// findConflictingTerm finds the first entry index with conflicting term.
+// findConflict finds the first entry index with conflicting term.
 // An entry is conflicting if it has the same index but different term.
 // If the given entries contain new entries, which still does not match in
 // the terms with those extra entries, it returns the index of first new entry.
 // The index of given entries must be continuously increasing.
 //
 // (etcd raft.raftLog.findConflict)
-func (rg *raftLog) findConflictingTerm(entries ...raftpb.Entry) uint64 {
+func (rg *raftLog) findConflict(entries ...raftpb.Entry) uint64 {
 	for _, ent := range entries {
 		if !rg.matchTerm(ent.Index, ent.Term) {
 			if ent.Index <= rg.lastIndex() {
@@ -538,7 +539,7 @@ func (rg *raftLog) findConflictingTerm(entries ...raftpb.Entry) uint64 {
 // (etcd raft.raftLog.maybeAppend)
 func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...raftpb.Entry) (uint64, bool) {
 	if rg.matchTerm(index, term) {
-		conflictingIndex := rg.findConflictingTerm(entries...)
+		conflictingIndex := rg.findConflict(entries...)
 		switch {
 		case conflictingIndex == 0:
 

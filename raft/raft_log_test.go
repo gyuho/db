@@ -501,8 +501,93 @@ func Test_raftLog_appendToStorageUnstable(t *testing.T) { // (etcd raft TestAppe
 	}
 }
 
-func Test_raftLog_findConflictingTerm(t *testing.T) { // (etcd raft TestFindConflict)
+func Test_raftLog_findConflict(t *testing.T) { // (etcd raft TestFindConflict)
+	tests := []struct {
+		existingEntries  []raftpb.Entry
+		entriesToCompare []raftpb.Entry
 
+		firstConflictingEntryIndex uint64
+	}{
+		{ // no conflict, because it's empty
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{},
+			0,
+		},
+
+		{ // no conflict, because they are equal
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			0,
+		},
+
+		{ // no conflict, because they have equal terms
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			0,
+		},
+
+		{ // no conflict, because they have equal terms
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 3, Term: 3}},
+			0,
+		},
+
+		{ // no conflict, but with new entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}, {Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			4, // terms with those extra entries, it returns the index of first new entry
+		},
+
+		{ // no conflict, but with new entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 2, Term: 2}, {Index: 3, Term: 3}, {Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			4, // terms with those extra entries, it returns the index of first new entry
+		},
+
+		{ // no conflict, but with new entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 3, Term: 3}, {Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			4, // terms with those extra entries, it returns the index of first new entry
+		},
+
+		{ // no conflict, but with new entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
+			4, // terms with those extra entries, it returns the index of first new entry
+		},
+
+		{ // conflicts with existing entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 1, Term: 4}, {Index: 2, Term: 4}}, // same index but different term
+			1,
+		},
+
+		{ // conflicts with existing entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 2, Term: 1}, {Index: 3, Term: 3}}, // same index but different term
+			2,
+		},
+
+		{ // conflicts with existing entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 2, Term: 1}, {Index: 3, Term: 4}, {Index: 4, Term: 4}}, // same index but different term
+			2,
+		},
+
+		{ // conflicts with existing entries
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 3, Term: 1}, {Index: 4, Term: 2}, {Index: 5, Term: 4}}, // same index but different term
+			3,
+		},
+	}
+	for i, tt := range tests {
+		rg := newRaftLog(NewStorageStableInMemory())
+		rg.appendToStorageUnstable(tt.existingEntries...)
+
+		if cidx := rg.findConflict(tt.entriesToCompare...); cidx != tt.firstConflictingEntryIndex {
+			t.Fatalf("#%d: conflicting entry index expected %d, got %d", i, tt.firstConflictingEntryIndex, cidx)
+		}
+	}
 }
 
 func Test_raftLog_maybeAppend(t *testing.T) { // (etcd raft TestLogMaybeAppend)
