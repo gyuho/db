@@ -19,7 +19,7 @@ type storageUnstable struct {
 	entries []raftpb.Entry
 }
 
-// maybeFirstIndex returns the index of first available entry in snapshot.
+// maybeFirstIndex returns the index of first available entry in incoming snapshot.
 //
 // (etcd raft.unstable.maybeFirstIndex)
 func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {

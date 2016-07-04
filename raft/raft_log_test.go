@@ -9,11 +9,142 @@ import (
 )
 
 func Test_raftLog(t *testing.T) { // (etcd raft TestLogRestore)
+	var (
+		ms              = NewStorageStableInMemory()
+		index    uint64 = 1000
+		term     uint64 = 1000
+		snapshot        = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: index, Term: term}}
+	)
+	ms.SetSnapshot(snapshot)
+	rg := newRaftLog(ms)
 
+	if entN := len(rg.allEntries()); entN != 0 {
+		t.Fatalf("entry number expected 0, got %d", entN)
+	}
+
+	if fidx := rg.firstIndex(); fidx != index+1 { // get snapshot index + 1
+		t.Fatalf("first index expected %d, got %d", index+1, fidx)
+	}
+
+	if rg.committedIndex != index { // newRaftLog sets this
+		t.Fatalf("committed index expected %d, got %d", index, rg.committedIndex)
+	}
+
+	if rg.storageUnstable.indexOffset != index+1 { // rg.storageUnstable.indexOffset = lastIndex + 1
+		t.Fatalf("unstable index offset expected %d, got %d", index+1, rg.storageUnstable.indexOffset)
+	}
+
+	tm, err := rg.term(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tm != term {
+		t.Fatalf("term for index %d expected %d, got %d", index, term, tm)
+	}
 }
 
 func Test_raftLog_mustCheckOutOfBounds(t *testing.T) { // (etcd raft TestIsOutOfBounds)
+	var (
+		ms                 = NewStorageStableInMemory()
+		indexOffset uint64 = 100
+		firstIndex         = indexOffset + 1
 
+		num uint64 = 100
+
+		snapshot = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: indexOffset}}
+	)
+	ms.SetSnapshot(snapshot)
+	rg := newRaftLog(ms)
+
+	for i := uint64(1); i <= num; i++ { // lasat index 200
+		rg.appendToStorageUnstable(raftpb.Entry{Index: i + indexOffset})
+	}
+
+	tests := []struct {
+		startIndex, endIndex uint64
+
+		toPanic      bool
+		errCompacted bool
+	}{
+		{
+			firstIndex, firstIndex,
+
+			false,
+			false,
+		},
+
+		{
+			firstIndex + num/2, firstIndex + num/2,
+
+			false,
+			false,
+		},
+
+		{
+			firstIndex + num - 1, firstIndex + num - 1,
+
+			false,
+			false,
+		},
+
+		{
+			firstIndex + num, firstIndex + num, // endIndex <= rg.firstIndex() + len(rg.entries) == 201
+
+			false,
+			false,
+		},
+
+		{
+			firstIndex - 1, firstIndex + 1,
+
+			false,
+			true, // if firstIndex > startIndex { return ErrCompacted }
+		},
+
+		{
+			firstIndex - 2, firstIndex + 1,
+
+			false,
+			true, // if firstIndex > startIndex { return ErrCompacted }
+		},
+
+		{
+			firstIndex + num, firstIndex + num + 1, // out of bound with index 202
+
+			true,
+			false,
+		},
+
+		{
+			firstIndex + num + 1, firstIndex + num + 1, // out of bound with index 202
+
+			true,
+			false,
+		},
+	}
+
+	for i, tt := range tests {
+		func() {
+			defer func() {
+				err := recover()
+				if err != nil {
+					t.Logf("#%d: panic with %v", i, err)
+				}
+
+				switch {
+				case err == nil && tt.toPanic:
+					t.Fatalf("#%d: expected panic but didn't", i)
+
+				case err != nil && !tt.toPanic:
+					t.Fatalf("#%d: expected no panic but got panic error (%v)", i, err)
+				}
+			}()
+
+			if err := rg.mustCheckOutOfBounds(tt.startIndex, tt.endIndex); tt.errCompacted && err != ErrCompacted {
+				t.Fatalf("#%d: error expected %v, got %v", i, ErrCompacted, err)
+			}
+		}()
+	}
 }
 
 func Test_raftLog_slice(t *testing.T) { // (etcd raft TestSlice)
