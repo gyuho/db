@@ -5,6 +5,16 @@ import (
 	"fmt"
 )
 
+// IsEmptySnapshot returns true if the given Snapshot is empty.
+func IsEmptySnapshot(snap Snapshot) bool {
+	return snap.Metadata.Index == 0
+}
+
+// Equal returns true, if two SoftState-s are equal.
+func (s *SoftState) Equal(st *SoftState) bool {
+	return s.LeaderID == st.LeaderID && s.NodeState == st.NodeState
+}
+
 // checkHardState returns true if two states are equal
 func checkHardState(a, b HardState) bool {
 	return a.CommittedIndex == b.CommittedIndex && a.Term == b.Term && a.VotedFor == b.VotedFor
@@ -16,18 +26,6 @@ var EmptyHardState = HardState{}
 // IsEmptyHardState returns true if the given HardState is empty.
 func IsEmptyHardState(st HardState) bool {
 	return checkHardState(st, EmptyHardState)
-}
-
-// IsEmptySnapshot returns true if the given Snapshot is empty.
-func IsEmptySnapshot(snap Snapshot) bool {
-	return snap.Metadata.Index == 0
-}
-
-// MustStoreHardState returns true, if the given hard state needs to be stored in the disk.
-// Raft stores the state on all servers before responding to RPCs.
-func MustStoreHardState(prev, cur HardState, entN int) bool {
-	// different, then need to store the HardState to disk
-	return entN != 0 || prev.Term != cur.Term || prev.VotedFor != cur.VotedFor
 }
 
 // IsResponseMessage returns true if the message type is response.
