@@ -1614,6 +1614,101 @@ func Test_raftLog_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd raft Te
 	}
 }
 
-func Test_raftLog_maybeCommit_appliedTo_Compact_SideEffects(t *testing.T) { // (etcd raft TestCompactionSideEffects)
+func Test_raftLog_maybeCommit_appliedTo_Compact_manual(t *testing.T) { // (etcd raft TestCompactionSideEffects)
+	ms := NewStorageStableInMemory()
+	for i := uint64(1); i <= 1000; i++ {
+		ms.Append(raftpb.Entry{Index: i, Term: i})
+	}
 
+	rg := newRaftLog(ms)
+
+	if ok := rg.maybeCommit(2000, 2000); ok {
+		t.Fatal("maybeCommit must have failed")
+	}
+
+	if ok := rg.maybeCommit(1000, 1000); !ok {
+		t.Fatal("maybeCommit failed")
+	}
+	if rg.committedIndex != 1000 {
+		t.Fatalf("committed index expected 1000, got %d", rg.committedIndex)
+	}
+
+	rg.appliedTo(1000)
+	if rg.appliedIndex != 1000 {
+		t.Fatalf("applied index expected 1000, got %d", rg.appliedIndex)
+	}
+
+	if rg.lastIndex() != 1000 {
+		t.Fatalf("last index expected 1000, got %d", rg.lastIndex())
+	}
+
+	// append more unstable entries
+	for i := uint64(1001); i <= 1500; i++ {
+		rg.appendToStorageUnstable(raftpb.Entry{Index: i, Term: i})
+	}
+
+	if rg.storageUnstable.indexOffset != 1001 {
+		t.Fatalf("unstable storage offset expected %d, got %d", 1001, rg.storageUnstable.indexOffset)
+	}
+
+	// match all the index and terms
+	for i := uint64(1); i <= 1500; i++ {
+		tm, err := rg.term(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tm != i {
+			t.Fatalf("term expected %d, got %d", i, tm)
+		}
+		if !rg.matchTerm(i, i) {
+			t.Fatalf("term doesn't match for index %d, term %d", i, i)
+		}
+	}
+
+	unstableEntries := rg.unstableEntries()
+	if len(unstableEntries) != 500 {
+		t.Fatalf("len(unstableEntries) expected 500, got %d", len(unstableEntries))
+	}
+	if unstableEntries[0].Index != 1001 {
+		t.Fatalf("unstableEntries[0].Index expected 1001, got %d", unstableEntries[0].Index)
+	}
+	if unstableEntries[0].Term != 1001 {
+		t.Fatalf("unstableEntries[0].Term expected 1001, got %d", unstableEntries[0].Term)
+	}
+
+	// append one more entry
+	rg.appendToStorageUnstable(raftpb.Entry{Index: 1501, Term: 1501})
+	if rg.lastIndex() != 1501 {
+		t.Fatalf("last index expected 1501, got %d", rg.lastIndex())
+	}
+
+	ents, err := rg.entries(1500, math.MaxUint64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wents := []raftpb.Entry{{Index: 1500, Term: 1500}, {Index: 1501, Term: 1501}}
+	if !reflect.DeepEqual(ents, wents) {
+		t.Fatalf("entries expected %+v, got %+v", wents, ents)
+	}
+
+	// compact at 900
+	err = ms.Compact(900)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rg.lastIndex() != 1501 {
+		t.Fatalf("last index expected 1501, got %d", rg.lastIndex())
+	}
+	for i := uint64(900); i <= 1501; i++ {
+		tm, err := rg.term(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tm != i {
+			t.Fatalf("term expected %d, got %d", i, tm)
+		}
+		if !rg.matchTerm(i, i) {
+			t.Fatalf("term doesn't match for index %d, term %d", i, i)
+		}
+	}
 }
