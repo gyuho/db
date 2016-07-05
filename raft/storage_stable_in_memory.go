@@ -271,10 +271,10 @@ func (ms *StorageStableInMemory) CreateSnapshot(idx uint64, configState *raftpb.
 	return ms.snapshot, nil
 }
 
-// SetSnapshot updates the snapshot in stable storage.
+// ApplySnapshot updates the snapshot in stable storage.
 //
 // (etcd raft.MemoryStorage.ApplySnapshot)
-func (ms *StorageStableInMemory) SetSnapshot(snapshot raftpb.Snapshot) error {
+func (ms *StorageStableInMemory) ApplySnapshot(snapshot raftpb.Snapshot) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 

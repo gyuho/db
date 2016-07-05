@@ -15,7 +15,7 @@ func Test_raftLog(t *testing.T) { // (etcd raft TestLogRestore)
 		snapshot        = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: index, Term: term}}
 	)
 	ms := NewStorageStableInMemory()
-	ms.SetSnapshot(snapshot)
+	ms.ApplySnapshot(snapshot)
 	rg := newRaftLog(ms)
 
 	if entN := len(rg.allEntries()); entN != 0 {
@@ -49,7 +49,7 @@ func Test_raftLog_mustCheckOutOfBounds(t *testing.T) { // (etcd raft TestIsOutOf
 		snapshot           = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: indexOffset}}
 	)
 	ms := NewStorageStableInMemory()
-	ms.SetSnapshot(snapshot)
+	ms.ApplySnapshot(snapshot)
 	rg := newRaftLog(ms)
 
 	var (
@@ -158,7 +158,7 @@ func Test_raftLog_slice(t *testing.T) { // (etcd raft TestSlice)
 		midIndexEntry = raftpb.Entry{Index: midIndex, Term: midIndex}
 	)
 	ms := NewStorageStableInMemory()
-	ms.SetSnapshot(snapshot)
+	ms.ApplySnapshot(snapshot)
 	for i := uint64(1); i < num/2; i++ {
 		ms.Append(raftpb.Entry{Index: indexOffset + i, Term: indexOffset + i})
 	}
@@ -529,7 +529,7 @@ func Test_raftLog_NextEntries(t *testing.T) { // (etcd raft TestHasNextEnts, Tes
 	}
 	for i, tt := range tests {
 		st := NewStorageStableInMemory()
-		st.SetSnapshot(tt.snapshotToApply)
+		st.ApplySnapshot(tt.snapshotToApply)
 
 		// rg.committedIndex = firstIndex - 1 == 3
 		// rg.appliedIndex   = firstIndex - 1 == 3
@@ -1118,7 +1118,7 @@ func Test_raftLog_term(t *testing.T) { // (etcd raft TestTerm)
 		num         uint64 = 300
 	)
 	ms := NewStorageStableInMemory()
-	ms.SetSnapshot(raftpb.Snapshot{
+	ms.ApplySnapshot(raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{Index: indexOffset, Term: 1},
 	})
 	rg := newRaftLog(ms)
