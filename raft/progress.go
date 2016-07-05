@@ -162,7 +162,7 @@ func (pr *Progress) snapshotFailed() {
 }
 
 func (pr *Progress) String() string {
-	return fmt.Sprintf("[state %q | match index %d | next index %d | paused(waiting) %v | pending Snapshot index %d]",
+	return fmt.Sprintf("[state=%q | match index=%d | next index=%d | paused(waiting)=%v | pending Snapshot index=%d]",
 		pr.State,
 		pr.MatchIndex,
 		pr.NextIndex,
