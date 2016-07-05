@@ -1187,6 +1187,47 @@ func Test_raftLog_term_restoreIncomingSnapshot(t *testing.T) { // (etcd raft Tes
 
 func Test_raftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
 	tests := []struct {
+		entriesToAppendToStorageUnstable []raftpb.Entry
+
+		indexToPersist uint64
+		termToPersist  uint64
+
+		storageUnstableIndexOffset uint64
+		storageUnstableEntries     []raftpb.Entry
+	}{
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+
+			1, // index to persist
+			1, // term  to persist
+
+			2, // unstable entries index offset
+			[]raftpb.Entry{{Index: 2, Term: 2}},
+		},
+	}
+
+	for i, tt := range tests {
+		rg := newRaftLog(NewStorageStableInMemory())
+
+		// appendToStorageUnstable will truncate and append
+		rg.appendToStorageUnstable(tt.entriesToAppendToStorageUnstable...)
+
+		// only update unstable entries if term is matched with an unstable entry
+		// Then, su.indexOffset = index + 1
+		rg.persistedEntriesAt(tt.indexToPersist, tt.termToPersist)
+
+		// after persist
+		if rg.storageUnstable.indexOffset != tt.storageUnstableIndexOffset {
+			t.Fatalf("#%d: unstable storage index offset expected %d, got %d", i, tt.storageUnstableIndexOffset, rg.storageUnstable.indexOffset)
+		}
+		if !reflect.DeepEqual(rg.unstableEntries(), tt.storageUnstableEntries) {
+			t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntries)
+		}
+	}
+}
+
+func Test_raftLog_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableToWithSnap)
+	tests := []struct {
 		snapshotToApply                  raftpb.Snapshot
 		entriesToAppendToStorageUnstable []raftpb.Entry
 
@@ -1330,10 +1371,6 @@ func Test_raftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
 			t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntries)
 		}
 	}
-}
-
-func Test_raftLog_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableToWithSnap)
-
 }
 
 func Test_raftLog_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
