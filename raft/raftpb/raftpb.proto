@@ -44,9 +44,9 @@ message Snapshot {
 // HardState is the current state of the Raft node.
 // It is stored in stable storage before messages are sent.
 message HardState {
-	uint64 VotedFor    = 1;
+	uint64 VotedFor       = 1;
 	uint64 CommittedIndex = 2;
-	uint64 Term        = 3;
+	uint64 Term           = 3;
 }
 
 enum CONFIG_CHANGE_TYPE {
