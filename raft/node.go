@@ -10,16 +10,21 @@ import (
 //
 // (etcd raft.Node)
 type Node interface {
-	// GetStatus returns the current status of the Raft state machine.
+	// GetNodeStatus returns the current status of the Raft state machine.
 	//
 	// (etcd raft.Node.Status)
-	GetStatus() Status
+	GetNodeStatus() NodeStatus
 
 	// Tick increments the internal logical clock in the Node, by a single tick.
 	// Election timeouts and heartbeat timeouts are in units of ticks.
 	//
 	// (etcd raft.Node.Tick)
 	Tick()
+
+	// Step advances the state machine based on the given raftpb.Message.
+	//
+	// (etcd raft.Node.Step)
+	Step(ctx context.Context, msg raftpb.Message) error
 
 	// Campaign changes the node state to Candidate, and starts a campaign to become Leader.
 	//
@@ -43,10 +48,10 @@ type Node interface {
 	// (etcd raft.Node.ApplyConfChange)
 	ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState
 
-	// Step advances the state machine based on the given raftpb.Message.
+	// Stop stops(terminates) the Node.
 	//
-	// (etcd raft.Node.Step)
-	Step(ctx context.Context, msg raftpb.Message) error
+	// (etcd raft.Node.Stop)
+	Stop()
 
 	// NodeReady returns a channel that receives point-in-time state of Node.
 	// Advance() method must be followed, after applying the state in NodeReady.
@@ -80,11 +85,6 @@ type Node interface {
 	// (etcd raft.Node.Advance)
 	Advance()
 
-	// Stop stops(terminates) the Node.
-	//
-	// (etcd raft.Node.Stop)
-	Stop()
-
 	// ReportUnreachable reports that Node with the given ID is not reachable for the last send.
 	//
 	// (etcd raft.Node.ReportUnreachable)
@@ -96,10 +96,163 @@ type Node interface {
 	ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS)
 }
 
-// Peer contains peer ID and context data.
-//
-// (etcd raft.Peer)
-type Peer struct {
-	ID   uint64
-	Data []byte
+// node implements Node interface.
+type node struct {
+	proposeCh      chan raftpb.Message
+	receiveCh      chan raftpb.Message
+	configChangeCh chan raftpb.ConfigChange
+	configStateCh  chan raftpb.ConfigState
+	nodeReadyCh    chan NodeReady
+
+	advanceCh chan struct{}
+	tickCh    chan struct{}
+	doneCh    chan struct{}
+	stopCh    chan struct{}
+
+	statusChCh chan chan NodeStatus
+}
+
+// tickChBufferSize buffers node.tickCh, so Raft node can buffer some ticks
+// when the node is busy processing Raft messages. Raft node will resume
+// processing buffered ticks when it becomes idle.
+const tickChBufferSize = 128
+
+func newNode() node {
+	return node{
+		proposeCh:      make(chan raftpb.Message),
+		receiveCh:      make(chan raftpb.Message),
+		configChangeCh: make(chan raftpb.ConfigChange),
+		configStateCh:  make(chan raftpb.ConfigState),
+		nodeReadyCh:    make(chan NodeReady),
+
+		advanceCh: make(chan struct{}),
+		tickCh:    make(chan struct{}, tickChBufferSize),
+		doneCh:    make(chan struct{}),
+		stopCh:    make(chan struct{}),
+
+		statusChCh: make(chan chan NodeStatus),
+	}
+}
+
+func (nd *node) GetNodeStatus() NodeStatus {
+	ch := make(chan NodeStatus)
+	nd.statusChCh <- ch
+	return <-ch
+}
+
+func (nd *node) Tick() {
+	select {
+	case nd.tickCh <- struct{}{}:
+
+	case <-nd.doneCh:
+
+	default:
+		raftLogger.Warningln("Tick missed to fire, since Node was blocking too long!")
+	}
+}
+
+func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
+	chToReceive := nd.receiveCh
+	if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL {
+		chToReceive = nd.proposeCh
+	}
+
+	select {
+	case chToReceive <- msg:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-nd.doneCh:
+		return ErrStopped
+	}
+}
+
+func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
+	// to ignore unexpected local messages received over network
+	if raftpb.IsInternalMessage(msg.Type) {
+		raftLogger.Warningf("Step received internal message %q from network", msg.Type)
+		return nil
+	}
+	return nd.step(ctx, msg)
+}
+
+func (nd *node) Campaign(ctx context.Context) error {
+	return nd.step(ctx, raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_CAMPAIGN_START})
+}
+
+func (nd *node) Propose(ctx context.Context, data []byte) error {
+	return nd.step(ctx, raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_PROPOSAL,
+		Entries: []raftpb.Entry{
+			{Data: data},
+		},
+	})
+}
+
+func (nd *node) ProposeConfigChange(ctx context.Context, cc raftpb.ConfigChange) error {
+	data, err := cc.Marshal()
+	if err != nil {
+		return err
+	}
+	return nd.Step(ctx, raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_PROPOSAL,
+		Entries: []raftpb.Entry{
+			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Data: data},
+		},
+	})
+}
+
+func (nd *node) ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState {
+	select {
+	case nd.configChangeCh <- cc:
+	case <-nd.doneCh:
+	}
+
+	var configState raftpb.ConfigState
+	select {
+	case configState = <-nd.configStateCh:
+	case <-nd.doneCh:
+	}
+
+	return &configState
+}
+
+func (nd *node) Stop() {
+	select {
+	case nd.stopCh <- struct{}{}:
+		// not stopped yet, so trigger stop
+
+	case <-nd.doneCh: // node has already been stopped, no need to do anything
+		return
+	}
+
+	// wait until Stop has been acknowledged by node.run()
+	<-nd.doneCh
+}
+
+func (nd *node) NodeReady() <-chan NodeReady {
+	return nd.nodeReadyCh
+}
+
+func (nd *node) Advance() {
+	select {
+	case nd.advanceCh <- struct{}{}:
+	case <-nd.doneCh:
+	}
+}
+
+func (nd *node) ReportUnreachable(targetID uint64) {
+	select {
+	case nd.receiveCh <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_UNREACHABLE_FOLLOWER, From: targetID}:
+	case <-nd.doneCh:
+	}
+}
+
+func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
+	rejected := status == raftpb.SNAPSHOT_STATUS_FAILED
+
+	select {
+	case nd.receiveCh <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_SNAPSHOT_RESPONSE, From: targetID, Reject: rejected}:
+	case <-nd.doneCh:
+	}
 }

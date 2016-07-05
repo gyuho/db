@@ -1,4 +1,4 @@
 package raft
 
-type Status struct {
+type NodeStatus struct {
 }

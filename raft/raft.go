@@ -13,6 +13,9 @@ const NoLeaderNodeID uint64 = 0
 
 // Config contains the parameters to start a Raft node.
 type Config struct {
+	// Logger implements system logging for Raft.
+	Logger Logger
+
 	// ID is the id of the Raft node, and 0 when there's no leader.
 	// (etcd raft.Config.ID)
 	ID uint64
@@ -21,9 +24,6 @@ type Config struct {
 	// It should only be set when starting a new Raft cluster.
 	// (etcd raft.Config.peers)
 	allNodeIDs []uint64
-
-	// Logger implements system logging for Raft.
-	Logger Logger
 
 	// StorageStable implements storage for Raft logs, where a node stores its
 	// entries and states, reads the persisted data when needed.
@@ -103,6 +103,14 @@ func (c *Config) validate() error {
 	}
 
 	return nil
+}
+
+// Peer contains peer ID and context data.
+//
+// (etcd raft.Peer)
+type Peer struct {
+	ID   uint64
+	Data []byte
 }
 
 // raftNode represents Raft-algorithm-specific node.
