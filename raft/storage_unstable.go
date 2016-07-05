@@ -1,6 +1,8 @@
 package raft
 
-import "github.com/gyuho/db/raft/raftpb"
+import (
+	"github.com/gyuho/db/raft/raftpb"
+)
 
 // storageUnstable stores unstable entries that have not yet
 // been written to the Storage.
@@ -19,7 +21,7 @@ type storageUnstable struct {
 	entries []raftpb.Entry
 }
 
-// maybeFirstIndex returns the index of first available entry in snapshot.
+// maybeFirstIndex returns the index of first available entry in incoming snapshot.
 //
 // (etcd raft.unstable.maybeFirstIndex)
 func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {
@@ -88,8 +90,7 @@ func (su *storageUnstable) persistedEntriesAt(index, term uint64) {
 		return
 	}
 
-	// only update unstable entries if term
-	// is matched with an unstable entry
+	// only update unstable entries if term is matched with an unstable entry
 	if tm == term && index >= su.indexOffset {
 		// entries      = [10, 11, 12]
 		// indexOffset = 0 + 10 = 10
@@ -165,7 +166,7 @@ func (su *storageUnstable) truncateAndAppend(entries ...raftpb.Entry) {
 		// ➝ indexOffset = firstIndexInEntriesToAppend = 9
 		// ➝ su.entries  = entries to append           = [9, 10, 11, 12, 13]
 		//
-		raftLogger.Infof("replacing unstable entries from index %d", firstIndexInEntriesToAppend)
+		raftLogger.Infof("replacing unstable entries from index '%d'", firstIndexInEntriesToAppend)
 		su.indexOffset = firstIndexInEntriesToAppend
 		su.entries = entries
 

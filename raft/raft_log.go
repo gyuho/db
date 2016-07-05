@@ -62,13 +62,14 @@ func newRaftLog(storageStable StorageStable) *raftLog {
 }
 
 func (rg *raftLog) String() string {
-	return fmt.Sprintf("[commit index = %d | applied index = %d | unstable.indexOffset = %d | len(unstanble.entries) = %d]",
+	return fmt.Sprintf("[committed index=%d | applied index=%d | unstable.indexOffset=%d | len(unstanble.entries)=%d]",
 		rg.committedIndex, rg.appliedIndex,
 		rg.storageUnstable.indexOffset, len(rg.storageUnstable.entries),
 	)
 }
 
 // firstIndex gets the first index from unstable storage first.
+// If snapshot exists, it returns ms.snapshotEntries[0].Index + 1.
 // If it's not available, try to get the first index in stable storage.
 //
 // (etcd raft.raftLog.firstIndex)
@@ -109,7 +110,7 @@ func (rg *raftLog) lastIndex() uint64 {
 func (rg *raftLog) term(index uint64) (uint64, error) {
 	dummyIndex := rg.firstIndex() - 1
 	if index < dummyIndex || rg.lastIndex() < index {
-		raftLogger.Warningf("index '%d' is out of range [dummy index=%d, last index=%d]", index, dummyIndex, rg.lastIndex())
+		raftLogger.Warningf("out-of-range index '%d' [dummy index=%d | last index=%d], returning term '0'", index, dummyIndex, rg.lastIndex())
 		return 0, nil
 	}
 
@@ -157,7 +158,7 @@ func (rg *raftLog) matchTerm(index, term uint64) bool {
 // (etcd raft.raftLog.mustCheckOutOfBounds)
 func (rg *raftLog) mustCheckOutOfBounds(startIndex, endIndex uint64) error {
 	if startIndex > endIndex {
-		raftLogger.Panicf("invalid raft log indexes [start index = %d | end index = %d]", startIndex, endIndex)
+		raftLogger.Panicf("invalid raft log indexes [start index=%d | end index=%d]", startIndex, endIndex)
 	}
 
 	firstIndex := rg.firstIndex()
@@ -167,7 +168,7 @@ func (rg *raftLog) mustCheckOutOfBounds(startIndex, endIndex uint64) error {
 
 	entryN := rg.lastIndex() - firstIndex + 1
 	if endIndex > firstIndex+entryN {
-		raftLogger.Panicf("entries[%d, %d) is out of bound [first index = %d | last index = %d]", startIndex, endIndex, firstIndex, rg.lastIndex())
+		raftLogger.Panicf("entries[%d, %d) is out of bound [first index=%d | last index=%d]", startIndex, endIndex, firstIndex, rg.lastIndex())
 	}
 
 	return nil
@@ -189,20 +190,20 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 
 	// For example,
 	//
-	// entries in stable storage        = [10, 11, 12]
-	// entries in unstable storage      = [13, 14]
-	// index offset in unstable storage = 13
+	// entries in stable storage        = [147, 148, 149]
+	// entries in unstable storage      = [150, 151]
+	// index offset in unstable storage = 150
 	//
-	// slice(startIndex=11, endIndex=15)
+	// slice(startIndex=148, endIndex=152)
 	//
 	// ➝ startIndex < index offset in unstable storage
-	// ➝         11 < 13
+	// ➝        148 < 150
 	//
 	// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-	// ➝ stableStorage.Entries( 11 , min (15,13) )
-	// ➝ stableStorage.Entries( 11 , 13 )
+	// ➝ stableStorage.Entries( 148 , min(152,150) )
+	// ➝ stableStorage.Entries( 148 , 150 )
 	//   == stableStorage.Entries[startIndex, endIndex)
-	// ➝ [11, 12]
+	// ➝ [148, 149]
 	//
 	if startIndex < rg.storageUnstable.indexOffset { // try stable storage entries
 		stableEntries, err := rg.storageStable.Entries(startIndex, minUint64(endIndex, rg.storageUnstable.indexOffset), limitSize)
@@ -217,9 +218,9 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 			}
 		}
 
-		// stableEntriesN = len([10, 11, 12]) = 3
+		// stableEntriesN = len([147, 148, 149]) = 3
 		// expectedN      = min(index offset in unstable storage, endIndex) - startIndex
-		//                = min(13, 15) - 10 = 3
+		//                = min(150,152) - 147 = 150 - 147 = 3
 		//
 		// stableEntriesN >= expectedN
 		// ➝ need to check limits
@@ -234,86 +235,84 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 
 		// For example,
 		//
-		// entries in stable storage        = [10, 11, 12]
-		// entries in unstable storage      = [14, 15]
-		// index offset in unstable storage = 14
+		// entries in stable storage        = [147, 148, 149]
+		// entries in unstable storage      = [151, 152]
+		// index offset in unstable storage = 151
 		//
-		// slice(startIndex=11, endIndex=15)
+		// slice(startIndex=147, endIndex=153)
 		//
 		// ➝ startIndex < index offset in unstable storage
-		// ➝         11 < 14
+		// ➝        147 < 151
 		//
 		// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-		// ➝ stableStorage.Entries( 11 , min (15,14) )
-		// ➝ stableStorage.Entries( 11 , 14 )
+		// ➝ stableStorage.Entries( 147 , min(153,151) )
+		// ➝ stableStorage.Entries( 147 , 151 )
 		//
-		// endIndex > ms.lastIndex()+1 == 12 + 1 == 13
-		//       14 > 13
+		// endIndex > ms.lastIndex()+1 == 149 + 1 == 150
+		//      153 > 150
 		// ➝ out of bound panic!
 
 		// For example,
 		//
-		// entries in stable storage        = [11, 12]
-		// entries in unstable storage      = [13, 14]
-		// index offset in unstable storage = 13
+		// entries in stable storage        = [148, 149]
+		// entries in unstable storage      = [150, 151]
+		// index offset in unstable storage = 150
 		//
-		// slice(startIndex=11, endIndex=15)
+		// slice(startIndex=148, endIndex=152)
 		//
 		// ➝ startIndex < index offset in unstable storage
-		// ➝         11 < 13
+		// ➝        148 < 150
 		//
 		// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-		// ➝ stableStorage.Entries( 11 , min (15,13) )
-		// ➝ stableStorage.Entries( 11 , 13 )
+		// ➝ stableStorage.Entries( 148 , min (152,150) )
+		// ➝ stableStorage.Entries( 148 , 150 )
 		// ➝ stableStorage.Entries[startIndex, endIndex)
-		// ➝ [11, 12]
+		// ➝ [148, 149]
 		//
-		// stableEntriesN = len([11, 12]) = 2
+		// stableEntriesN = len([148, 149]) = 2
 		// expectedN      = min(index offset in unstable storage, endIndex) - startIndex
-		//                = min(13, 15) - 10 = 3
+		//                = min(150,152) - 148 = 150 - 148 = 2
 		//
-		// stableEntriesN < expectedN
-		// ➝ no need to check limits
-		//
-		// ???
-		// Then [13, 14] in unstable storage won't return
+		// stableEntriesN >= expectedN
+		// ➝ need to check limits
 
 		entries = stableEntries
 	}
 
 	// For example,
 	//
-	// entries in stable storage        = [10, 11, 12]
-	// entries in unstable storage      = [13, 14]
-	// index offset in unstable storage = 13
+	// entries in stable storage        = [147, 148, 149]
+	// entries in unstable storage      = [150, 151]
+	// index offset in unstable storage = 150
 	//
-	// slice(startIndex=11, endIndex=15)
+	// slice(startIndex=148, endIndex=152)
 	//
 	// ➝ startIndex < index offset in unstable storage
-	// ➝         11 < 13
+	// ➝        148 < 150
 	//
 	// ➝ stableStorage.Entries( startIndex , min( endIndex , index offset in unstable storage ) )
-	// ➝ stableStorage.Entries( 11 , min (15,13) )
-	// ➝ stableStorage.Entries( 11 , 13 )
+	// ➝ stableStorage.Entries( 148 , min(152,150) )
+	// ➝ stableStorage.Entries( 148 , 150 )
 	//   == stableStorage.Entries[startIndex, endIndex)
-	// ➝ [11, 12]
+	// ➝ [148, 149]
 	//
 	//
 	// ➝ endIndex > index offset in unstable storage
-	// ➝       15 > 13
+	// ➝      151 > 150
 	//
 	// ➝ ents = unstableEntries.slice( max( startIndex , index offset in unstable storage ) , endIndex )
-	//        = unstableEntries.slice( max(13,13), 15 )
-	//        = unstableEntries.slice(13, 15)
-	//        = [13, 14]
+	//        = unstableEntries.slice( max(150,150), 152 )
+	//        = unstableEntries.slice( 150, 152 )
+	//        = [150, 151]
 	//
-	// ➝ return [11, 12] + [13, 14]
+	// ➝ return [148, 149] + [150, 151]
 	//
 	if endIndex > rg.storageUnstable.indexOffset { // try unstable storage entries
 		unstableEntries := rg.storageUnstable.slice(maxUint64(startIndex, rg.storageUnstable.indexOffset), endIndex)
 		if len(entries) > 0 { // there are entries from stable storage
-			// (X) ??? race condition in etcd integration test!
+			// (X)
 			// entries = append(entries, unstableEntries...)
+			// ??? race condition in etcd integration test!
 
 			// entries = append([]raftpb.Entry{}, entries...)
 			//
@@ -385,7 +384,7 @@ func (rg *raftLog) snapshot() (raftpb.Snapshot, error) {
 //
 // (etcd raft.raftLog.restore)
 func (rg *raftLog) restoreIncomingSnapshot(snap raftpb.Snapshot) {
-	raftLogger.Infof("raft log %q is restroing the incoming snapshot [snapshot index=%d | snapshot term=%d]", rg, snap.Metadata.Index, snap.Metadata.Term)
+	raftLogger.Infof("log %v is restroing the incoming snapshot [snapshot index=%d | snapshot term=%d]", rg, snap.Metadata.Index, snap.Metadata.Term)
 	rg.committedIndex = snap.Metadata.Index
 	rg.storageUnstable.restoreIncomingSnapshot(snap)
 }
@@ -432,67 +431,69 @@ func (rg *raftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 {
 	}
 }
 
-// isUpToDate returns true if the given (lastIndex, term) log is more
+// isUpToDate returns true if the given (index, term) log is more
 // up-to-date than the last entry in the existing logs.
+// It returns true, first if the term is greater than the last term.
+// Second if the index is greater than the last index.
 //
 // (etcd raft.raftLog.isUpToDate)
-func (rg *raftLog) isUpToDate(lastIndex, term uint64) bool {
-	return term > rg.lastTerm() || (term == rg.lastTerm() && lastIndex >= rg.lastIndex())
+func (rg *raftLog) isUpToDate(index, term uint64) bool {
+	return term > rg.lastTerm() || (term == rg.lastTerm() && index >= rg.lastIndex())
 }
 
 // persistedEntriesAt updates unstable entries and indexes after persisting
 // those unstable entries to stable storage.
 //
 // (etcd raft.raftLog.stableTo)
-func (rg *raftLog) persistedEntriesAt(index, term uint64) {
-	rg.storageUnstable.persistedEntriesAt(index, term)
+func (rg *raftLog) persistedEntriesAt(indexToPersist, termToPersist uint64) {
+	rg.storageUnstable.persistedEntriesAt(indexToPersist, termToPersist)
 }
 
 // persistedSnapshotAt updates snapshot metadata after processing the incoming snapshot.
 //
 // (etcd raft.raftLog.stableSnapTo)
-func (rg *raftLog) persistedSnapshotAt(index uint64) {
-	rg.storageUnstable.persistedSnapshotAt(index)
+func (rg *raftLog) persistedSnapshotAt(indexToPersist uint64) {
+	rg.storageUnstable.persistedSnapshotAt(indexToPersist)
 }
 
 // commitTo updates raftLog's committedIndex.
 //
 // (etcd raft.raftLog.commitTo)
-func (rg *raftLog) commitTo(committedIndex uint64) {
+func (rg *raftLog) commitTo(indexToCommit uint64) {
 	// to never decrease commit index
-	if rg.committedIndex < committedIndex {
-		if rg.lastIndex() < committedIndex {
+	if rg.committedIndex < indexToCommit {
+		if rg.lastIndex() < indexToCommit {
 			raftLogger.Panicf("got wrong commit index '%d', smaller than last index '%d' (possible log corruption, truncation, lost)",
-				committedIndex, rg.lastIndex())
+				indexToCommit, rg.lastIndex())
 		}
-		rg.committedIndex = committedIndex
+		rg.committedIndex = indexToCommit
 	}
 }
 
 // appliedTo updates raftLog's appliedIndex.
 //
 // (etcd raft.raftLog.appliedTo)
-func (rg *raftLog) appliedTo(appliedIndex uint64) {
-	if appliedIndex == 0 {
+func (rg *raftLog) appliedTo(indexToApply uint64) {
+	if indexToApply == 0 {
 		return
 	}
 
-	// MUST "rg.committedIndex >= appliedIndex"
-	if rg.committedIndex < appliedIndex || appliedIndex < rg.appliedIndex {
-		raftLogger.Panicf("got wrong applied index %d [commit index=%d | previous applied index=%d]",
-			appliedIndex, rg.committedIndex, rg.appliedIndex)
+	// MUST "rg.committedIndex >= indexToApply"
+	if rg.committedIndex < indexToApply || indexToApply < rg.appliedIndex {
+		raftLogger.Panicf("got wrong applied index '%d' [commit index=%d | previous applied index=%d]",
+			indexToApply, rg.committedIndex, rg.appliedIndex)
 	}
 
-	rg.appliedIndex = appliedIndex
+	rg.appliedIndex = indexToApply
 }
 
-// maybeCommit returns true if commitTo operation was successful
-// with given index and term.
+// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
+// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
 //
 // (etcd raft.raftLog.maybeCommit)
-func (rg *raftLog) maybeCommit(index, term uint64) bool {
-	if index > rg.committedIndex && rg.zeroTermOnErrCompacted(rg.term(index)) == term {
-		rg.commitTo(index)
+func (rg *raftLog) maybeCommit(indexToCommit, termToCommit uint64) bool {
+	if indexToCommit > rg.committedIndex && rg.zeroTermOnErrCompacted(rg.term(indexToCommit)) == termToCommit {
+		rg.commitTo(indexToCommit)
 		return true
 	}
 	return false
@@ -515,14 +516,14 @@ func (rg *raftLog) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
 	return rg.lastIndex()
 }
 
-// findConflictingTerm finds the first entry index with conflicting term.
+// findConflict finds the first entry index with conflicting term.
 // An entry is conflicting if it has the same index but different term.
 // If the given entries contain new entries, which still does not match in
 // the terms with those extra entries, it returns the index of first new entry.
 // The index of given entries must be continuously increasing.
 //
 // (etcd raft.raftLog.findConflict)
-func (rg *raftLog) findConflictingTerm(entries ...raftpb.Entry) uint64 {
+func (rg *raftLog) findConflict(entries ...raftpb.Entry) uint64 {
 	for _, ent := range entries {
 		if !rg.matchTerm(ent.Index, ent.Term) {
 			if ent.Index <= rg.lastIndex() {
@@ -535,18 +536,18 @@ func (rg *raftLog) findConflictingTerm(entries ...raftpb.Entry) uint64 {
 	return 0
 }
 
-// maybeAppend returns the last index of new entries and true, if appends were successful.
+// maybeAppend returns the last index of new entries and true, if successful.
 // Otherwise, it returns 0 and false.
 //
 // (etcd raft.raftLog.maybeAppend)
-func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...raftpb.Entry) (uint64, bool) {
+func (rg *raftLog) maybeAppend(index, term, indexToCommit uint64, entries ...raftpb.Entry) (uint64, bool) {
 	if rg.matchTerm(index, term) {
-		conflictingIndex := rg.findConflictingTerm(entries...)
+		conflictingIndex := rg.findConflict(entries...)
 		switch {
 		case conflictingIndex == 0:
 
 		case conflictingIndex <= rg.committedIndex:
-			raftLogger.Panicf("conflicting entry index %d must be greater than committed index %d", conflictingIndex, rg.committedIndex)
+			raftLogger.Panicf("conflicting entry index '%d' must be greater than committed index '%d'", conflictingIndex, rg.committedIndex)
 
 		default:
 			// For example
@@ -554,7 +555,7 @@ func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...ra
 			// entries in unstable = [10(term 7), 11(term 7), 12(term 8)]
 			// index               = 10
 			// term                =  7
-			// committedIndex      = 12
+			// indexToCommit       = 12
 			//
 			// entries to append         = [11(term 8), 12(term 8)]
 			// ➝ conflicting entry index = 11
@@ -573,15 +574,15 @@ func (rg *raftLog) maybeAppend(index, term, committedIndex uint64, entries ...ra
 			// ➝ entries in unstable = [10(term 7), 11(term 8), 12(term 8)]
 		}
 
-		// committedIndex = 12
-		// lastNewIndex   = index + len(entries)
-		//                = 10 + 2
-		//                = 12
-		// commitTo( min( committedIndex , lastNewIndex ) )
+		// indexToCommit = 12
+		// lastNewIndex  = index + len(entries)
+		//               = 10 + 2
+		//               = 12
+		// commitTo( min( indexToCommit , lastNewIndex ) )
 		// = commitTo( min(12,12) ) = commitTo(12)
 		//
 		lastNewIndex := index + uint64(len(entries))
-		rg.commitTo(minUint64(committedIndex, lastNewIndex))
+		rg.commitTo(minUint64(indexToCommit, lastNewIndex))
 		return lastNewIndex, true
 	}
 
