@@ -62,7 +62,7 @@ func newRaftLog(storageStable StorageStable) *raftLog {
 }
 
 func (rg *raftLog) String() string {
-	return fmt.Sprintf("[commit index = %d | applied index = %d | unstable.indexOffset = %d | len(unstanble.entries) = %d]",
+	return fmt.Sprintf("[committed index=%d | applied index=%d | unstable.indexOffset=%d | len(unstanble.entries)=%d]",
 		rg.committedIndex, rg.appliedIndex,
 		rg.storageUnstable.indexOffset, len(rg.storageUnstable.entries),
 	)
@@ -110,7 +110,7 @@ func (rg *raftLog) lastIndex() uint64 {
 func (rg *raftLog) term(index uint64) (uint64, error) {
 	dummyIndex := rg.firstIndex() - 1
 	if index < dummyIndex || rg.lastIndex() < index {
-		raftLogger.Warningf("out-of-range index '%d' [dummy index=%d, last index=%d]", index, dummyIndex, rg.lastIndex())
+		raftLogger.Warningf("out-of-range index '%d' [dummy index=%d | last index=%d], returning term '0'", index, dummyIndex, rg.lastIndex())
 		return 0, nil
 	}
 
@@ -384,7 +384,7 @@ func (rg *raftLog) snapshot() (raftpb.Snapshot, error) {
 //
 // (etcd raft.raftLog.restore)
 func (rg *raftLog) restoreIncomingSnapshot(snap raftpb.Snapshot) {
-	raftLogger.Infof("raft log %q is restroing the incoming snapshot [snapshot index=%d | snapshot term=%d]", rg, snap.Metadata.Index, snap.Metadata.Term)
+	raftLogger.Infof("log %v is restroing the incoming snapshot [snapshot index=%d | snapshot term=%d]", rg, snap.Metadata.Index, snap.Metadata.Term)
 	rg.committedIndex = snap.Metadata.Index
 	rg.storageUnstable.restoreIncomingSnapshot(snap)
 }

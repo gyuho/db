@@ -88,8 +88,7 @@ func (su *storageUnstable) persistedEntriesAt(index, term uint64) {
 		return
 	}
 
-	// only update unstable entries if term
-	// is matched with an unstable entry
+	// only update unstable entries if term is matched with an unstable entry
 	if tm == term && index >= su.indexOffset {
 		// entries      = [10, 11, 12]
 		// indexOffset = 0 + 10 = 10

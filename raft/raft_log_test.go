@@ -1153,12 +1153,183 @@ func Test_raftLog_term(t *testing.T) { // (etcd raft TestTerm)
 	}
 }
 
-func Test_raftLog_term_UnstableSnapshot(t *testing.T) { // (etcd raft TestTermWithUnstableSnapshot)
+func Test_raftLog_term_restoreIncomingSnapshot(t *testing.T) { // (etcd raft TestTermWithUnstableSnapshot)
+	var (
+		snapshotIndex         uint64 = 100
+		unstableSnapshotIndex        = snapshotIndex + 5
+	)
+	ms := NewStorageStableInMemory()
+	ms.ApplySnapshot(raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: snapshotIndex, Term: 1}})
 
+	rg := newRaftLog(ms)
+	rg.restoreIncomingSnapshot(raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: unstableSnapshotIndex, Term: 1}})
+	// dummyIndex (first entry index) is now 105
+
+	tests := []struct {
+		index uint64
+		wterm uint64
+	}{
+		{snapshotIndex, 0},     // 0, if "index < dummyIndex || rg.lastIndex() < index"
+		{snapshotIndex + 1, 0}, // 0, if "index < dummyIndex || rg.lastIndex() < index"
+		{snapshotIndex - 1, 0}, // 0, if "index < dummyIndex || rg.lastIndex() < index"
+		{unstableSnapshotIndex, 1},
+	}
+	for i, tt := range tests {
+		term, err := rg.term(tt.index)
+		if err != nil {
+			t.Fatalf("#%d: term error (%v)", i, err)
+		}
+		if term != tt.wterm {
+			t.Fatalf("#%d: term expected %d, got %d", i, tt.wterm, term)
+		}
+	}
 }
 
 func Test_raftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
+	tests := []struct {
+		snapshotToApply                  raftpb.Snapshot
+		entriesToAppendToStorageUnstable []raftpb.Entry
 
+		indexToPersist uint64
+		termToPersist  uint64
+
+		storageUnstableIndexOffset uint64
+		storageUnstableEntries     []raftpb.Entry
+	}{
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			nil, // to append
+
+			4, 2, // to persist
+
+			6,   // indexOffset after append
+			nil, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			nil, // to append
+
+			5, 2, // to persist
+
+			6,   // indexOffset after append
+			nil, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			nil, // to append
+
+			6, 2, // to persist
+
+			6,   // indexOffset after append
+			nil, // entries after append, persists
+		},
+
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			nil, // to append
+
+			4, 3, // to persist
+
+			6,   // indexOffset after append
+			nil, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			nil, // to append
+
+			5, 3, // to persist
+
+			6,   // indexOffset after append
+			nil, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			nil, // to append
+
+			6, 3, // to persist
+
+			6,   // indexOffset after append
+			nil, // entries after append, persists
+		},
+
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // to append
+
+			4, 2, // to persist
+
+			6, // indexOffset after append
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // to append
+
+			5, 2, // to persist
+
+			6, // indexOffset after append
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // to append
+
+			6, 2, // to persist
+
+			7,   // indexOffset after append
+			nil, // entries after append, persists
+		},
+
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // to append
+
+			4, 3, // to persist
+
+			6, // indexOffset after append
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // to append
+
+			5, 3, // to persist
+
+			6, // indexOffset after append
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // entries after append, persists
+		},
+		{
+			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // to append
+
+			6, 3, // to persist
+
+			6, // indexOffset after append
+			[]raftpb.Entry{{Index: 6, Term: 2}}, // entries after append, persists
+		},
+	}
+
+	for i, tt := range tests {
+		ms := NewStorageStableInMemory()
+		ms.ApplySnapshot(tt.snapshotToApply)
+
+		rg := newRaftLog(ms)
+
+		// appendToStorageUnstable will truncate and append
+		rg.appendToStorageUnstable(tt.entriesToAppendToStorageUnstable...)
+
+		// only update unstable entries if term is matched with an unstable entry
+		// Then, su.indexOffset = index + 1
+		rg.persistedEntriesAt(tt.indexToPersist, tt.termToPersist)
+
+		// after persist
+		if rg.storageUnstable.indexOffset != tt.storageUnstableIndexOffset {
+			t.Fatalf("#%d: unstable storage index offset expected %d, got %d", i, tt.storageUnstableIndexOffset, rg.storageUnstable.indexOffset)
+		}
+		if !reflect.DeepEqual(rg.unstableEntries(), tt.storageUnstableEntries) {
+			t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntries)
+		}
+	}
 }
 
 func Test_raftLog_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableToWithSnap)
