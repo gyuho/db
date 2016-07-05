@@ -9,19 +9,19 @@ import (
 )
 
 func Test_StorageStableInMemory_FirstIndex(t *testing.T) {
-	ents := []raftpb.Entry{
+	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
 		{Index: 4, Term: 4},
 		{Index: 5, Term: 5},
 	}
-	st := &StorageStableInMemory{snapshotEntries: ents}
+	st := &StorageStableInMemory{snapshotEntries: snapshotEntries}
 
-	firstIdx, err := st.FirstIndex()
+	firstIndex, err := st.FirstIndex()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstIdx != 4 {
-		t.Fatalf("last index expected 4, got %d", firstIdx)
+	if firstIndex != 4 {
+		t.Fatalf("last index expected 4, got %d", firstIndex)
 	}
 
 	// compact up to index 4
@@ -29,75 +29,91 @@ func Test_StorageStableInMemory_FirstIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	firstIdx, err = st.FirstIndex()
+	firstIndex, err = st.FirstIndex()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstIdx != 5 {
-		t.Fatalf("last index expected 5, got %d", firstIdx)
+	if firstIndex != 5 {
+		t.Fatalf("last index expected 5, got %d", firstIndex)
 	}
 }
 
 func Test_StorageStableInMemory_LastIndex(t *testing.T) {
-	ents := []raftpb.Entry{
+	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
 		{Index: 4, Term: 4},
 		{Index: 5, Term: 5},
 	}
-	st := &StorageStableInMemory{snapshotEntries: ents}
+	st := &StorageStableInMemory{snapshotEntries: snapshotEntries}
 
-	lastIdx, err := st.LastIndex()
+	lastIndex, err := st.LastIndex()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lastIdx != 5 {
-		t.Fatalf("last index expected 5, got %d", lastIdx)
+	if lastIndex != 5 {
+		t.Fatalf("last index expected 5, got %d", lastIndex)
 	}
 
 	if err = st.Append([]raftpb.Entry{{Index: 6, Term: 5}}...); err != nil {
 		t.Fatal(err)
 	}
-	lastIdx, err = st.LastIndex()
+	lastIndex, err = st.LastIndex()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lastIdx != 6 {
-		t.Fatalf("last index expected 6, got %d", lastIdx)
+	if lastIndex != 6 {
+		t.Fatalf("last index expected 6, got %d", lastIndex)
 	}
 }
 
 func Test_StorageStableInMemory_Term(t *testing.T) {
-	ents := []raftpb.Entry{
-		{Index: 3, Term: 3},
-		{Index: 4, Term: 4},
-		{Index: 5, Term: 5},
-	}
+	snapshotEntries := []raftpb.Entry{{Index: 3, Term: 3}, {Index: 4, Term: 4}, {Index: 5, Term: 5}}
 	tests := []struct {
 		entryIdx uint64
 
-		werr  error
-		wterm uint64
+		werr    error
+		wterm   uint64
+		toPanic bool
 	}{
-		{2, ErrCompacted, 0},
-		{3, nil, 3},
-		{4, nil, 4},
-		{5, nil, 5},
+		{2, ErrCompacted, 0, false},
+		{3, nil, 3, false},
+		{4, nil, 4, false},
+		{5, nil, 5, false},
+		{6, nil, 0, true},
 	}
 
 	for i, tt := range tests {
-		st := &StorageStableInMemory{snapshotEntries: ents}
-		term, err := st.Term(tt.entryIdx)
-		if err != tt.werr {
-			t.Fatalf("#%d: error expected %v, got %v", i, tt.werr, err)
-		}
-		if term != tt.wterm {
-			t.Fatalf("#%d: term expected %d, got %d", i, tt.wterm, term)
-		}
+		st := &StorageStableInMemory{snapshotEntries: snapshotEntries}
+
+		func() {
+			defer func() {
+				err := recover()
+				if err != nil {
+					t.Logf("#%d: panic with %v", i, err)
+				}
+
+				switch {
+				case err == nil && tt.toPanic:
+					t.Fatalf("#%d: expected panic but didn't", i)
+
+				case err != nil && !tt.toPanic:
+					t.Fatalf("#%d: expected no panic but got panic error (%v)", i, err)
+				}
+			}()
+
+			term, err := st.Term(tt.entryIdx)
+			if err != tt.werr {
+				t.Fatalf("#%d: error expected %v, got %v", i, tt.werr, err)
+			}
+			if term != tt.wterm {
+				t.Fatalf("#%d: term expected %d, got %d", i, tt.wterm, term)
+			}
+		}()
 	}
 }
 
 func Test_StorageStableInMemory_Entries(t *testing.T) {
-	ents := []raftpb.Entry{
+	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
 		{Index: 4, Term: 4},
 		{Index: 5, Term: 5},
@@ -150,35 +166,35 @@ func Test_StorageStableInMemory_Entries(t *testing.T) {
 
 		// limit to 2 entries
 		{
-			4, 7, uint64(ents[1].Size() + ents[2].Size()),
+			4, 7, uint64(snapshotEntries[1].Size() + snapshotEntries[2].Size()),
 			nil,
 			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
 		},
 
 		// limit to 2 entries
 		{
-			4, 7, uint64(ents[1].Size() + ents[2].Size() + ents[3].Size()/2),
+			4, 7, uint64(snapshotEntries[1].Size() + snapshotEntries[2].Size() + snapshotEntries[3].Size()/2),
 			nil,
 			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
 		},
 
 		// limit to 2 entries
 		{
-			4, 7, uint64(ents[1].Size() + ents[2].Size() + ents[3].Size() - 1),
+			4, 7, uint64(snapshotEntries[1].Size() + snapshotEntries[2].Size() + snapshotEntries[3].Size() - 1),
 			nil,
 			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}},
 		},
 
 		// limit to 3 entries
 		{
-			4, 7, uint64(ents[1].Size() + ents[2].Size() + ents[3].Size()),
+			4, 7, uint64(snapshotEntries[1].Size() + snapshotEntries[2].Size() + snapshotEntries[3].Size()),
 			nil,
 			[]raftpb.Entry{{Index: 4, Term: 4}, {Index: 5, Term: 5}, {Index: 6, Term: 6}},
 		},
 	}
 
 	for i, tt := range tests {
-		st := &StorageStableInMemory{snapshotEntries: ents}
+		st := &StorageStableInMemory{snapshotEntries: snapshotEntries}
 		entries, err := st.Entries(tt.startIdx, tt.endIdx, tt.limitSize)
 		if err != tt.werr {
 			t.Fatalf("#%d: error expected %v, got %v", i, tt.werr, err)
@@ -191,7 +207,7 @@ func Test_StorageStableInMemory_Entries(t *testing.T) {
 
 func Test_StorageStableInMemory_Append(t *testing.T) {
 	tests := []struct {
-		entries         []raftpb.Entry
+		snapshotEntries []raftpb.Entry
 		entriesToAppend []raftpb.Entry
 
 		werr     error
@@ -242,10 +258,10 @@ func Test_StorageStableInMemory_Append(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		original := make([]raftpb.Entry, len(tt.entries))
-		copy(original, tt.entries)
+		original := make([]raftpb.Entry, len(tt.snapshotEntries))
+		copy(original, tt.snapshotEntries)
 
-		st := &StorageStableInMemory{snapshotEntries: tt.entries}
+		st := &StorageStableInMemory{snapshotEntries: tt.snapshotEntries}
 		if err := st.Append(tt.entriesToAppend...); err != tt.werr {
 			t.Fatalf("#%d: error expected %v, got %v", i, tt.werr, err)
 		}
@@ -255,15 +271,15 @@ func Test_StorageStableInMemory_Append(t *testing.T) {
 		}
 
 		// make sure 'Append' did not manipulate the original entries
-		if !reflect.DeepEqual(original, tt.entries) {
-			t.Fatalf("#%d: original snapshot entries expected %+v, got %+v", i, tt.entries, original)
+		if !reflect.DeepEqual(original, tt.snapshotEntries) {
+			t.Fatalf("#%d: original snapshot entries expected %+v, got %+v", i, tt.snapshotEntries, original)
 		}
 	}
 }
 
 func Test_StorageStableInMemory_CreateSnapshot(t *testing.T) {
 	var (
-		ents = []raftpb.Entry{
+		snapshotEntries = []raftpb.Entry{
 			{Index: 3, Term: 3},
 			{Index: 4, Term: 4},
 			{Index: 5, Term: 5},
@@ -283,7 +299,7 @@ func Test_StorageStableInMemory_CreateSnapshot(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		st := &StorageStableInMemory{snapshotEntries: ents}
+		st := &StorageStableInMemory{snapshotEntries: snapshotEntries}
 		snap, err := st.CreateSnapshot(tt.snapshotIndex, &cs, data)
 		if err != tt.werr {
 			t.Fatalf("#%d: error expected %v, got %v", i, tt.werr, err)
@@ -295,7 +311,7 @@ func Test_StorageStableInMemory_CreateSnapshot(t *testing.T) {
 }
 
 func Test_StorageStableInMemory_Compact(t *testing.T) {
-	ents := []raftpb.Entry{
+	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
 		{Index: 4, Term: 4},
 		{Index: 5, Term: 5},
@@ -315,7 +331,7 @@ func Test_StorageStableInMemory_Compact(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		st := &StorageStableInMemory{snapshotEntries: ents}
+		st := &StorageStableInMemory{snapshotEntries: snapshotEntries}
 		if err := st.Compact(tt.compactIndex); err != tt.werr {
 			t.Fatalf("#%d: error expected %v, got %v", i, tt.werr, err)
 		}

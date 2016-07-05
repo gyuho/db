@@ -328,7 +328,7 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 		}
 	}
 
-	return limitEntries(entries, limitSize), nil
+	return limitEntries(limitSize, entries...), nil
 }
 
 // entries returns the entries[startIndex,rg.endIndex+1) with size limit.

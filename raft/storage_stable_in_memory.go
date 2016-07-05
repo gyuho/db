@@ -102,7 +102,7 @@ func (ms *StorageStableInMemory) Entries(startIndex, endIndex, limitSize uint64)
 	}
 
 	entries := ms.snapshotEntries[startIndex-firstEntryIndexInStorage : endIndex-firstEntryIndexInStorage]
-	return limitEntries(entries, limitSize), nil
+	return limitEntries(limitSize, entries...), nil
 }
 
 // Snapshot returns the snapshot of stable storage.
@@ -348,25 +348,4 @@ func (ms *StorageStableInMemory) Compact(compactIndex uint64) error {
 	ms.snapshotEntries = tmps
 
 	return nil
-}
-
-func limitEntries(entries []raftpb.Entry, limitSize uint64) []raftpb.Entry {
-	if len(entries) == 0 {
-		return entries
-	}
-
-	var (
-		total int
-		i     int
-	)
-	for i = 0; i < len(entries); i++ {
-		total += entries[i].Size()
-
-		// to return at least one entry
-		if i != 0 && uint64(total) > limitSize {
-			break
-		}
-	}
-
-	return entries[:i]
 }
