@@ -15,8 +15,8 @@ func (s *SoftState) Equal(st *SoftState) bool {
 	return s.LeaderID == st.LeaderID && s.NodeState == st.NodeState
 }
 
-// checkHardState returns true if two states are equal
-func checkHardState(a, b HardState) bool {
+// CheckHardStateEqual returns true if two states are equal
+func CheckHardStateEqual(a, b HardState) bool {
 	return a.CommittedIndex == b.CommittedIndex && a.Term == b.Term && a.VotedFor == b.VotedFor
 }
 
@@ -25,7 +25,7 @@ var EmptyHardState = HardState{}
 
 // IsEmptyHardState returns true if the given HardState is empty.
 func IsEmptyHardState(st HardState) bool {
-	return checkHardState(st, EmptyHardState)
+	return CheckHardStateEqual(st, EmptyHardState)
 }
 
 // IsResponseMessage returns true if the message type is response.
