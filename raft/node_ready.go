@@ -78,11 +78,3 @@ func (nr NodeReady) ContainsUpdates() bool {
 		len(nr.MessagesToSend) > 0 ||
 		nr.LeaderReadState.Index != 0
 }
-
-// Peer contains peer ID and context data.
-//
-// (etcd raft.Peer)
-type Peer struct {
-	ID   uint64
-	Data []byte
-}
