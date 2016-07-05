@@ -16,6 +16,15 @@ enum NODE_STATE {
 	LEADER    = 2;
 }
 
+// SoftState provides state that is useful for logging and debugging.
+// The state is volatile and does not need to be persisted to the WAL.
+//
+// (etcd raftpb.SoftState)
+message SoftState {
+	NODE_STATE NodeState = 1;
+	uint64     LeaderID  = 2;
+}
+
 // PROGRESS_STATE represents the state of Progress.
 // Progress is leader's view of its followers' progress.
 // Leader maintains progresses of all followers, and
