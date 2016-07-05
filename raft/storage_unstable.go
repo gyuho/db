@@ -1,6 +1,8 @@
 package raft
 
-import "github.com/gyuho/db/raft/raftpb"
+import (
+	"github.com/gyuho/db/raft/raftpb"
+)
 
 // storageUnstable stores unstable entries that have not yet
 // been written to the Storage.

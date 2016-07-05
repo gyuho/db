@@ -1202,7 +1202,47 @@ func Test_raftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
 			1, // term  to persist
 
 			2, // unstable entries index offset
-			[]raftpb.Entry{{Index: 2, Term: 2}},
+			[]raftpb.Entry{{Index: 2, Term: 2}}, // unstable entries after append, persist
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+
+			2, // index to persist
+			2, // term  to persist
+
+			3,   // unstable entries index offset
+			nil, // unstable entries after append, persist
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+
+			3, // index to persist (bad index)
+			1, // term  to persist
+
+			1, // unstable entries index offset
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}}, // unstable entries after append, persist
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+
+			2, // index to persist
+			3, // term  to persist (bad term)
+
+			1, // unstable entries index offset (bad term, so offset doesn't change)
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}}, // unstable entries after append, persist
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+
+			2, // index to persist
+			1, // term  to persist (bad term)
+
+			1, // unstable entries index offset (bad term, so offset doesn't change)
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}}, // unstable entries after append, persist
 		},
 	}
 
