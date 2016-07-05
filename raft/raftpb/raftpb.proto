@@ -368,7 +368,7 @@ enum MESSAGE_TYPE {
 	// (etcd: raft.raftpb.MsgTimeoutNow)
 	FORCE_ELECTION_TIMEOUT = 14;
 
-	// LEADER_COMMITTED_INDEX_REQUEST is used to serve clients' read-only queries without
+	// LEADER_CURRENT_COMMITTED_INDEX_REQUEST is used to serve clients' read-only queries without
 	// going through Raft, but still with 'quorum-get' on. It bypasses the Raft log, but
 	// still preserves the linearizability of reads, with lower costs.
 	//
@@ -400,13 +400,13 @@ enum MESSAGE_TYPE {
 	//
 	// (Raft 6.4 Processing read-only queries more efficiently, page 72)
 	// (etcd: raft.raftpb.MsgReadIndex)
-	LEADER_COMMITTED_INDEX_REQUEST = 15;
+	LEADER_CURRENT_COMMITTED_INDEX_REQUEST = 15;
 
-	// LEADER_COMMITTED_INDEX_RESPONSE is response to LEADER_COMMITTED_INDEX_REQUEST.
+	// LEADER_CURRENT_COMMITTED_INDEX_RESPONSE is response to LEADER_CURRENT_COMMITTED_INDEX_REQUEST.
 	//
 	// (Raft 6.4 Processing read-only queries more efficiently, page 72)
 	// (etcd: raft.raftpb.MsgReadIndexResp)
-	LEADER_COMMITTED_INDEX_RESPONSE = 16;
+	LEADER_CURRENT_COMMITTED_INDEX_RESPONSE = 16;
 }
 
 // Message contains messages between nodes.
