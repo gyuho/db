@@ -1192,8 +1192,8 @@ func Test_raftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
 		indexToPersist uint64
 		termToPersist  uint64
 
-		storageUnstableIndexOffset uint64
-		storageUnstableEntries     []raftpb.Entry
+		storageUnstableIndexOffsetAfterPersist uint64
+		storageUnstableEntriesAfterPersist     []raftpb.Entry
 	}{
 		{
 			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
@@ -1257,11 +1257,11 @@ func Test_raftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
 		rg.persistedEntriesAt(tt.indexToPersist, tt.termToPersist)
 
 		// after persist
-		if rg.storageUnstable.indexOffset != tt.storageUnstableIndexOffset {
-			t.Fatalf("#%d: unstable storage index offset expected %d, got %d", i, tt.storageUnstableIndexOffset, rg.storageUnstable.indexOffset)
+		if rg.storageUnstable.indexOffset != tt.storageUnstableIndexOffsetAfterPersist {
+			t.Fatalf("#%d: unstable storage index offset expected %d, got %d", i, tt.storageUnstableIndexOffsetAfterPersist, rg.storageUnstable.indexOffset)
 		}
-		if !reflect.DeepEqual(rg.unstableEntries(), tt.storageUnstableEntries) {
-			t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntries)
+		if !reflect.DeepEqual(rg.unstableEntries(), tt.storageUnstableEntriesAfterPersist) {
+			t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntriesAfterPersist)
 		}
 	}
 }
@@ -1274,8 +1274,8 @@ func Test_raftLog_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableTo
 		indexToPersist uint64
 		termToPersist  uint64
 
-		storageUnstableIndexOffset uint64
-		storageUnstableEntries     []raftpb.Entry
+		storageUnstableIndexOffsetAfterPersist uint64
+		storageUnstableEntriesAfterPersist     []raftpb.Entry
 	}{
 		{
 			raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 5, Term: 2}},
@@ -1404,17 +1404,99 @@ func Test_raftLog_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableTo
 		rg.persistedEntriesAt(tt.indexToPersist, tt.termToPersist)
 
 		// after persist
-		if rg.storageUnstable.indexOffset != tt.storageUnstableIndexOffset {
-			t.Fatalf("#%d: unstable storage index offset expected %d, got %d", i, tt.storageUnstableIndexOffset, rg.storageUnstable.indexOffset)
+		if rg.storageUnstable.indexOffset != tt.storageUnstableIndexOffsetAfterPersist {
+			t.Fatalf("#%d: unstable storage index offset expected %d, got %d", i, tt.storageUnstableIndexOffsetAfterPersist, rg.storageUnstable.indexOffset)
 		}
-		if !reflect.DeepEqual(rg.unstableEntries(), tt.storageUnstableEntries) {
-			t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntries)
+		if !reflect.DeepEqual(rg.unstableEntries(), tt.storageUnstableEntriesAfterPersist) {
+			t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntriesAfterPersist)
 		}
 	}
 }
 
 func Test_raftLog_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
+	tests := []struct {
+		entriesToAppendToStorageUnstable []raftpb.Entry
+		initialCommittedIndex            uint64
 
+		indexToCommit   uint64
+		wCommittedIndex uint64
+
+		storageUnstableIndexOffsetAfterCommitTo uint64
+		storageUnstableEntriesAfterCommitTo     []raftpb.Entry
+		toPanic                                 bool
+	}{
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}}, // to append
+			2,
+
+			3, // index to commit
+			3, // expected committedIndex afterwards
+
+			1, // indexOffset after commit
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}}, // entries after commit
+			false, // to panic
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}}, // to append
+			2,
+
+			1, // index to commit
+			2, // expected committedIndex afterwards (ensure that commitTo never decreases the committed index)
+
+			1, // indexOffset after commit
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}}, // entries after commit
+			false, // to panic
+		},
+
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}}, // to append
+			2,
+
+			4, // index to commit (out of range "rg.lastIndex() < indexToCommit", so panic)
+			0, // expected committedIndex afterwards
+
+			1, // indexOffset after commit
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}}, // entries after commit
+			true, // to panic
+		},
+	}
+
+	for i, tt := range tests {
+		rg := newRaftLog(NewStorageStableInMemory())
+		rg.appendToStorageUnstable(tt.entriesToAppendToStorageUnstable...) // appendToStorageUnstable will truncate and append
+		rg.commitTo(tt.initialCommittedIndex)
+
+		func() {
+			defer func() {
+				err := recover()
+				if err != nil {
+					t.Logf("#%d: panic with %v", i, err)
+				}
+
+				switch {
+				case err == nil && tt.toPanic:
+					t.Fatalf("#%d: expected panic but didn't", i)
+
+				case err != nil && !tt.toPanic:
+					t.Fatalf("#%d: expected no panic but got panic error (%v)", i, err)
+				}
+			}()
+
+			rg.commitTo(tt.indexToCommit)
+
+			// after commitTo
+			if rg.committedIndex != tt.wCommittedIndex {
+				t.Fatalf("#%d: committed index expected %d, got %d", i, tt.wCommittedIndex, rg.committedIndex)
+			}
+			if rg.storageUnstable.indexOffset != tt.storageUnstableIndexOffsetAfterCommitTo {
+				t.Fatalf("#%d: unstable storage index offset expected %d, got %d", i, tt.storageUnstableIndexOffsetAfterCommitTo, rg.storageUnstable.indexOffset)
+			}
+			if !reflect.DeepEqual(rg.unstableEntries(), tt.storageUnstableEntriesAfterCommitTo) {
+				t.Fatalf("#%d: unstable storage entries expected %+v, got %+v", i, rg.unstableEntries(), tt.storageUnstableEntriesAfterCommitTo)
+			}
+		}()
+	}
 }
 
 func Test_raftLog_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd raft TestCompaction)
