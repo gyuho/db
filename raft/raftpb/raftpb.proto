@@ -108,7 +108,7 @@ enum MESSAGE_TYPE {
 	//
 	//   idx1 = Leader.Follower.Progress.Match
 	//   idx2 = Leader.raftLog.CommittedIndex
-	//   Leader.LEADER_HEARTBEAT_REQUEST.CommittedIndex = min(idx1, idx2)
+	//   Leader.LEADER_HEARTBEAT_REQUEST.CurrentCommittedIndex = min(idx1, idx2)
 	//
 	// So that the followers can update their CommittedIndex.
 	//
@@ -216,10 +216,10 @@ enum MESSAGE_TYPE {
 	//   entries       = Leader.raftLog.entries(newLogIndex, Leader.maxMsgSize)
 	//   leaderCommit  = Leader.raftLog.CommittedIndex
 	//
-	//   Leader.LEADER_APPEND_REQUEST.LogTerm        = prevLogTerm
-	//   Leader.LEADER_APPEND_REQUEST.LogIndex       = prevLogIndex
-	//   Leader.LEADER_APPEND_REQUEST.Entries        = entries
-	//   Leader.LEADER_APPEND_REQUEST.CommittedIndex = leaderCommit
+	//   Leader.LEADER_APPEND_REQUEST.CurrentCommittedIndex = leaderCommit
+	//   Leader.LEADER_APPEND_REQUEST.LogIndex              = prevLogIndex
+	//   Leader.LEADER_APPEND_REQUEST.LogTerm               = prevLogTerm
+	//   Leader.LEADER_APPEND_REQUEST.Entries               = entries
 	//
 	// (etcd: raft.raftpb.MsgApp)
 	LEADER_APPEND_REQUEST = 8;
@@ -248,7 +248,7 @@ enum MESSAGE_TYPE {
 	//         term1 == term2
 	//
 	//         THEN
-	//            idx1 = Leader.LEADER_APPEND_REQUEST.CommittedIndex
+	//            idx1 = Leader.LEADER_APPEND_REQUEST.CurrentCommittedIndex
 	//            idx2 = Leader.LEADER_APPEND_REQUEST.LogIndex + len(new entries)
 	//            Follower.raftLog.commitTo(min(idx1, idx2))
 	//
@@ -279,9 +279,9 @@ enum MESSAGE_TYPE {
 	//         idx1 >= idx2
 	//            THEN false
 	//
+	//         idx   = Leader.LEADER_SNAPSHOT_REQUEST.Index
 	//         term1 = Follower.raftLog.term(Leader.LEADER_SNAPSHOT_REQUEST.Index)
 	//         term2 = Leader.LEADER_SNAPSHOT_REQUEST.Term
-	//         idx   = Leader.LEADER_SNAPSHOT_REQUEST.Index
 	//         term1 == term2
 	//            THEN Follower.raftLog.commitTo(idx)
 	//            AND THEN false
@@ -382,6 +382,67 @@ message Message {
 	// (etcd: raft.raftpb.Message.To)
 	uint64 To   = 3;
 
+	// CurrentCommittedIndex is the index of highest log entry that is known to be
+	// committed (initialized to 0, increasing monotonically). It is the
+	// highest log position that is known to be in stable storage on a
+	// quorum of nodes in the cluster.
+	//
+	//
+	// Leader updates CurrentCommittedIndex when sending out AppendEntries:
+	//
+	//   Leader.Message.CurrentCommittedIndex = Leader.raftLog.committed
+	//
+	// (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
+	//
+	//
+	// Follower receives/reads Leader.CurrentCommittedIndex in AppendEntries
+	// and AppendEntries is only successful when:
+	//
+	//   i) Follower.raftLog.CommittedIndex > Leader.Message.LogIndex
+	//   (etcd: raft.*raft.handleAppendEntries, raft.*Progress.maybeUpdate)
+	//
+	//   OR
+	//
+	//   ii) Follower.term(Leader.LogIndex) == Leader.Message.LogTerm
+	//
+	//   Conflicts:
+	//
+	//      Follower.term(Leader.Message.Entries[i].Index)
+	//         != Leader.Message.Entries[i].Term
+	//
+	//   Then overwrite with Leader's log.
+	//
+	//   idx1 = Leader.Message.CurrentCommittedIndex
+	//   idx2 = Leader.Message.LogIndex + len(Leader.Message.Entries)
+	//   Follower.raftLog.commitTo(min(idx1, idx2))
+	//
+	//   (etcd: raft.*raftLog.maybeAppend)
+	//
+	//
+	// (etcd: raft.raftpb.Message.Commit)
+	uint64 CurrentCommittedIndex = 4;
+
+	// CurrentTerm is the latest term that server has seen,
+	// initialized to 0 on first boot, increasing monotonically.
+	// CurrentTerm is 0 for local messages.
+	//
+	// CurrentTerm gets updated whenever node sends out messages.
+	//
+	// If a node receives a message with higher CurrentTerm,
+	// it reverts back to Follower.
+	// (etcd: raft.Step)
+	//
+	// If a node receives a message with lower CurrentTerm,
+	// it ignores that message.
+	// (etcd: raft.Step)
+	//
+	// Candidate starts an election by increasing CurrentTerm by 1.
+	//
+	// Follower overwrites its CurrentTerm with leader's CurrentTerm.
+	//
+	// (etcd: raft.raftpb.Message.Term)
+	uint64 CurrentTerm = 5;
+
 	// LogIndex is the index of log entry immediately preceding the new ones.
 	//
 	//
@@ -389,8 +450,8 @@ message Message {
 	//
 	//   i) RequestVote with:
 	//
-	//      Leader.Message.LogTerm  = Leader.raftLog.lastTerm()
 	//      Leader.Message.LogIndex = Leader.raftLog.lastIndex()
+	//      Leader.Message.LogTerm  = Leader.raftLog.lastTerm()
 	//
 	//   so that Follower can reject or not.
 	//   (etcd: raft.*raft.campaign with raftpb.MsgVote)
@@ -399,8 +460,8 @@ message Message {
 	//
 	//   ii) AppendEntries with:
 	//
-	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
 	//      Leader.Message.LogIndex = Leader.Follower.Progress.Next - 1
+	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
 	//
 	//   to tell its Follower where those new entries start.
 	//   (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
@@ -425,68 +486,7 @@ message Message {
 	//
 	//
 	// (etcd: raft.raftpb.Message.Index)
-	uint64 LogIndex = 4;
-
-	// CommittedIndex is the index of highest log entry that is known to be
-	// committed (initialized to 0, increasing monotonically). It is the
-	// highest log position that is known to be in stable storage on a
-	// quorum of nodes in the cluster.
-	//
-	//
-	// Leader updates CommittedIndex when sending out AppendEntries:
-	//
-	//   Leader.Message.CommittedIndex = Leader.raftLog.committed
-	//
-	// (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
-	//
-	//
-	// Follower receives/reads Leader.CommittedIndex in AppendEntries
-	// and AppendEntries is only successful when:
-	//
-	//   i) Follower.raftLog.CommittedIndex > Leader.Message.LogIndex
-	//   (etcd: raft.*raft.handleAppendEntries, raft.*Progress.maybeUpdate)
-	//
-	//   OR
-	//
-	//   ii) Follower.term(Leader.LogIndex) == Leader.Message.LogTerm
-	//
-	//   Conflicts:
-	//
-	//      Follower.term(Leader.Message.Entries[i].Index)
-	//         != Leader.Message.Entries[i].Term
-	//
-	//   Then overwrite with Leader's log.
-	//
-	//   idx1 = Leader.Message.CommittedIndex
-	//   idx2 = Leader.Message.LogIndex + len(Leader.Message.Entries)
-	//   Follower.raftLog.commitTo(min(idx1, idx2))
-	//
-	//   (etcd: raft.*raftLog.maybeAppend)
-	//
-	//
-	// (etcd: raft.raftpb.Message.Commit)
-	uint64 CommittedIndex = 5;
-
-	// CurrentTerm is the latest term that server has seen,
-	// initialized to 0 on first boot, increasing monotonically.
-	// CurrentTerm is 0 for local messages.
-	//
-	// CurrentTerm gets updated whenever node sends out messages.
-	//
-	// If a node receives a message with higher CurrentTerm,
-	// it reverts back to Follower.
-	// (etcd: raft.Step)
-	//
-	// If a node receives a message with lower CurrentTerm,
-	// it ignores that message.
-	// (etcd: raft.Step)
-	//
-	// Candidate starts an election by increasing CurrentTerm by 1.
-	//
-	// Follower overwrites its CurrentTerm with leader's CurrentTerm.
-	//
-	// (etcd: raft.raftpb.Message.Term)
-	uint64 CurrentTerm = 6;
+	uint64 LogIndex = 6;
 
 	// LogTerm is the term of LogIndex, where new log entries start.
 	//
@@ -495,8 +495,8 @@ message Message {
 	//
 	//   AppendEntries with:
 	//
-	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
 	//      Leader.Message.LogIndex = Leader.Follower.Progress.Next - 1
+	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
 	//
 	//   to tell followers where new log entries start.
 	//   New log entries start from Leader.Follower.Progress.Next.
@@ -507,8 +507,8 @@ message Message {
 	//
 	//   RequestVote with:
 	//
-	//      Leader.Message.LogTerm  = Follower.raftLog.lastTerm().
-	//      Leader.Message.LogIndex = Follower.raftLog.lastIndex().
+	//      Leader.Message.LogIndex = Follower.raftLog.lastIndex()
+	//      Leader.Message.LogTerm  = Follower.raftLog.lastTerm()
 	//
 	//   (etcd: raft.*raft.campaign with raftpb.MsgVote)
 	//
@@ -523,9 +523,9 @@ message Message {
 	//
 	//      OR
 	//
-	//      ii) Leader.Message.LogTerm == Follower.raftLog.lastTerm()
+	//      ii) Leader.Message.LogIndex >= Follower.raftLog.lastIndex()
 	//          AND
-	//          Leader.Message.LogIndex >= Follower.raftLog.lastIndex()
+	//          Leader.Message.LogTerm  == Follower.raftLog.lastTerm()
 	//
 	//   (etcd: raft.*raftLog.isUpToDate with raftpb.MsgVoteResp)
 	//
@@ -604,14 +604,14 @@ message Message {
 	// (etcd: raft.raftpb.Message.Reject, raftpb.MsgVoteResp)
 	bool Reject = 10;
 
-	// RejectHint is used to tell Leader the correct index.
+	// RejectHintFollowerLastIndex is used to tell Leader the correct last index of Follower.
 	//
 	// Follower sets:
 	//
-	//   Follower.Message.Type = raftpb.MsgAppResp
-	//   Follower.Message.LogIndex = Leader.Message.LogIndex
-	//   Follower.Message.Reject = true
-	//   Follower.Message.RejectHint = Follower.raftLog.lastIndex()
+	//   Follower.Message.Type       = raftpb.MsgAppResp
+	//   Follower.Message.LogIndex   = Leader.Message.LogIndex
+	//   Follower.Message.Reject     = true
+	//   Follower.Message.RejectHintFollowerLastIndex = Follower.raftLog.lastIndex()
 	//
 	//   (etcd: raft.*raft.handleAppendEntries)
 	//
@@ -619,12 +619,12 @@ message Message {
 	// and decreases(updates):
 	//
 	//   idx1 = Follower.Message.LogIndex
-	//   idx2 = Follower.Message.RejectHint
+	//   idx2 = Follower.Message.RejectHintFollowerLastIndex
 	//   Leader.Follower.Progress.Next = min(idx1, idx2)
 	//
 	//   (etcd: raft.stepLeader with raftpb.MsgAppResp)
 	//
 	//
 	// (etcd: raft.raftpb.Message.RejectHint, raftpb.MsgAppResp)
-	uint64 RejectHint = 11;
+	uint64 RejectHintFollowerLastIndex = 11;
 }
