@@ -487,8 +487,8 @@ func (rg *raftLog) appliedTo(indexToApply uint64) {
 	rg.appliedIndex = indexToApply
 }
 
-// maybeCommit returns true if commitTo operation was successful
-// with given index and term.
+// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
+// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
 //
 // (etcd raft.raftLog.maybeCommit)
 func (rg *raftLog) maybeCommit(indexToCommit, termToCommit uint64) bool {

@@ -1500,7 +1500,118 @@ func Test_raftLog_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
 }
 
 func Test_raftLog_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd raft TestCompaction)
+	var entriesToAppendToStorageStable []raftpb.Entry
+	for i := uint64(1); i <= 1000; i++ {
+		entriesToAppendToStorageStable = append(entriesToAppendToStorageStable, raftpb.Entry{Index: i, Term: i})
+	}
 
+	tests := []struct {
+		entriesToAppendToStorageStable []raftpb.Entry
+
+		indexToMaybeCommit uint64
+		termToMaybeCommit  uint64
+
+		wCommittedIndex uint64
+
+		indexToApply uint64
+
+		indexToCompact                     uint64
+		wErrorAfterCompact                 error
+		numberOfLeftEntriesInStorageStable int
+		toPanic                            bool
+	}{
+		{
+			entriesToAppendToStorageStable, // to append to stable storage
+
+			1000, // index to commit
+			1000, // term to commit
+			1000, // expected committedIndex
+			1000, // index to apply
+
+			300, // index to compact on
+			nil,
+			700,
+			false, // to panic
+		},
+
+		{
+			entriesToAppendToStorageStable, // to append to stable storage
+
+			1000, // index to commit
+			1000, // term to commit
+			1000, // expected committedIndex
+			1000, // index to apply
+
+			800, // index to compact on
+			nil,
+			200,
+			false, // to panic
+		},
+
+		{
+			entriesToAppendToStorageStable, // to append to stable storage
+
+			1000, // index to commit
+			1000, // term to commit
+			1000, // expected committedIndex
+			1000, // index to apply
+
+			1001, // index to compact on (out of bound with "compactIndex > ms.lastIndex()", so panic)
+			nil,
+			0,
+			true, // to panic
+		},
+	}
+
+	for i, tt := range tests {
+		ms := NewStorageStableInMemory()
+		ms.Append(tt.entriesToAppendToStorageStable...)
+
+		rg := newRaftLog(ms)
+
+		// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
+		// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
+		rg.maybeCommit(tt.indexToMaybeCommit, tt.termToMaybeCommit)
+
+		if rg.committedIndex != tt.wCommittedIndex {
+			t.Fatalf("#%d: committed index expected %d, got %d", i, tt.wCommittedIndex, rg.committedIndex)
+		}
+
+		rg.appliedTo(tt.indexToApply)
+
+		func() {
+			defer func() {
+				err := recover()
+				if err != nil {
+					t.Logf("#%d: panic with %v", i, err)
+				}
+
+				switch {
+				case err == nil && tt.toPanic:
+					t.Fatalf("#%d: expected panic but didn't", i)
+
+				case err != nil && !tt.toPanic:
+					t.Fatalf("#%d: expected no panic but got panic error (%v)", i, err)
+				}
+			}()
+
+			// panic if "compactIndex > ms.lastIndex()"
+			err := ms.Compact(tt.indexToCompact)
+			if err != tt.wErrorAfterCompact {
+				t.Fatalf("#%d: compact error expected %v, got %v", i, tt.wErrorAfterCompact, err)
+			}
+
+			// after compact
+			if len(rg.allEntries()) != tt.numberOfLeftEntriesInStorageStable {
+				t.Fatalf("#%d: number of left entires expected %d, got %d", i, tt.numberOfLeftEntriesInStorageStable, len(rg.allEntries()))
+			}
+
+			err = ms.Compact(tt.indexToCompact)
+			if err != ErrCompacted {
+				t.Fatalf("#%d: second compaction error expected %v, got %v", i, ErrCompacted, err)
+			}
+		}()
+	}
 }
 
 func Test_raftLog_maybeCommit_appliedTo_Compact_SideEffects(t *testing.T) { // (etcd raft TestCompactionSideEffects)
