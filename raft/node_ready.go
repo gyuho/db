@@ -14,7 +14,7 @@ type LeaderReadState struct {
 
 // NodeReady represents entries and messages that are ready to read,
 // ready to save to stable storage, ready to commit, ready to be
-// sent to other peers.
+// sent to other peers. NodeReady is point-in-time state of a Node.
 //
 // All fields in Ready are read-only.
 //

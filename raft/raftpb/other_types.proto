@@ -55,8 +55,8 @@ enum PROGRESS_STATE {
 	SNAPSHOT = 2;
 }
 
-// SNAPSHOT_STATE represents the state of snapshot.
-enum SNAPSHOT_STATE {
+// SNAPSHOT_STATUS represents the state of snapshot.
+enum SNAPSHOT_STATUS {
 	FINISHED = 0;
 	FAILED   = 1;
 }
