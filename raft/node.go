@@ -106,8 +106,11 @@ type node struct {
 
 	advanceCh chan struct{}
 	tickCh    chan struct{}
-	doneCh    chan struct{}
-	stopCh    chan struct{}
+
+	stopCh chan struct{}
+
+	// <-nd.stopCh ➝ close(doneCh)
+	doneCh chan struct{}
 
 	statusChCh chan chan NodeStatus
 }
@@ -127,8 +130,8 @@ func newNode() node {
 
 		advanceCh: make(chan struct{}),
 		tickCh:    make(chan struct{}, tickChBufferSize),
-		doneCh:    make(chan struct{}),
 		stopCh:    make(chan struct{}),
+		doneCh:    make(chan struct{}),
 
 		statusChCh: make(chan chan NodeStatus),
 	}
@@ -168,8 +171,8 @@ func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
 }
 
 func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
-	// to ignore unexpected local messages received over network
 	if raftpb.IsInternalMessage(msg.Type) {
+		// ignore unexpected local messages received over network
 		raftLogger.Warningf("Step received internal message %q from network", msg.Type)
 		return nil
 	}
@@ -182,10 +185,8 @@ func (nd *node) Campaign(ctx context.Context) error {
 
 func (nd *node) Propose(ctx context.Context, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_PROPOSAL,
-		Entries: []raftpb.Entry{
-			{Data: data},
-		},
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL,
+		Entries: []raftpb.Entry{{Data: data}},
 	})
 }
 
@@ -195,10 +196,8 @@ func (nd *node) ProposeConfigChange(ctx context.Context, cc raftpb.ConfigChange)
 		return err
 	}
 	return nd.Step(ctx, raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_PROPOSAL,
-		Entries: []raftpb.Entry{
-			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Data: data},
-		},
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL,
+		Entries: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Data: data}},
 	})
 }
 
@@ -243,16 +242,29 @@ func (nd *node) Advance() {
 
 func (nd *node) ReportUnreachable(targetID uint64) {
 	select {
-	case nd.receiveCh <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_UNREACHABLE_FOLLOWER, From: targetID}:
+	case nd.receiveCh <- raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_UNREACHABLE_FOLLOWER,
+		From: targetID,
+	}:
 	case <-nd.doneCh:
 	}
 }
 
 func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
-	rejected := status == raftpb.SNAPSHOT_STATUS_FAILED
-
 	select {
-	case nd.receiveCh <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_SNAPSHOT_RESPONSE, From: targetID, Reject: rejected}:
+	case nd.receiveCh <- raftpb.Message{
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_SNAPSHOT_RESPONSE,
+		From:   targetID,
+		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED,
+	}:
 	case <-nd.doneCh:
 	}
+}
+
+func (nd *node) RequestLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
+	return nd.step(ctx, raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_LEADER_CURRENT_COMMITTED_INDEX_REQUEST,
+		From:    fromID,
+		Entries: []raftpb.Entry{{Data: data}},
+	})
 }
