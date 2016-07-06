@@ -481,7 +481,9 @@ func (*Snapshot) ProtoMessage()               {}
 func (*Snapshot) Descriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{3} }
 
 // HardState is the current state of the Raft node.
-// It is stored in stable storage before messages are sent.
+// It must be stored in stable storage before messages are sent.
+//
+// (etcd raftpb.HardState)
 type HardState struct {
 	VotedFor       uint64 `protobuf:"varint,1,opt,name=VotedFor,json=votedFor,proto3" json:"VotedFor,omitempty"`
 	CommittedIndex uint64 `protobuf:"varint,2,opt,name=CommittedIndex,json=committedIndex,proto3" json:"CommittedIndex,omitempty"`
