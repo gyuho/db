@@ -98,19 +98,19 @@ type Node interface {
 
 // node implements Node interface.
 type node struct {
-	proposeCh      chan raftpb.Message
-	receiveCh      chan raftpb.Message
+	tickCh chan struct{}
+
+	proposeCh chan raftpb.Message
+	receiveCh chan raftpb.Message
+
 	configChangeCh chan raftpb.ConfigChange
 	configStateCh  chan raftpb.ConfigState
-	nodeReadyCh    chan NodeReady
 
-	advanceCh chan struct{}
-	tickCh    chan struct{}
+	nodeReadyCh chan NodeReady
+	advanceCh   chan struct{}
 
 	stopCh chan struct{}
-
-	// <-nd.stopCh ➝ close(doneCh)
-	doneCh chan struct{}
+	doneCh chan struct{} // <-nd.stopCh ➝ close(doneCh)
 
 	statusChCh chan chan NodeStatus
 }
@@ -122,16 +122,19 @@ const tickChBufferSize = 128
 
 func newNode() node {
 	return node{
-		proposeCh:      make(chan raftpb.Message),
-		receiveCh:      make(chan raftpb.Message),
+		tickCh: make(chan struct{}, tickChBufferSize),
+
+		proposeCh: make(chan raftpb.Message),
+		receiveCh: make(chan raftpb.Message),
+
 		configChangeCh: make(chan raftpb.ConfigChange),
 		configStateCh:  make(chan raftpb.ConfigState),
-		nodeReadyCh:    make(chan NodeReady),
 
-		advanceCh: make(chan struct{}),
-		tickCh:    make(chan struct{}, tickChBufferSize),
-		stopCh:    make(chan struct{}),
-		doneCh:    make(chan struct{}),
+		nodeReadyCh: make(chan NodeReady),
+		advanceCh:   make(chan struct{}),
+
+		stopCh: make(chan struct{}),
+		doneCh: make(chan struct{}),
 
 		statusChCh: make(chan chan NodeStatus),
 	}
