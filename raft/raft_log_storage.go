@@ -7,15 +7,15 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// raftLog represents raft log and its storage.
+// raftLogStorage represents raft log and its storage.
 //
 // (etcd raft.raftLog)
-type raftLog struct {
+type raftLogStorage struct {
 	// storageStable contains all stable entries since the last snapshot.
 	storageStable StorageStable
 
 	// storageUnstable contains all unstable entries and snapshot to store into stableStorage.
-	// No need to define in pointer because 'raftLog' will be passed with pointer.
+	// No need to define in pointer because 'raftLogStorage' will be passed with pointer.
 	storageUnstable storageUnstable
 
 	// committedIndex is the higest log position that is known to be stored in
@@ -28,15 +28,15 @@ type raftLog struct {
 	appliedIndex uint64
 }
 
-// newRaftLog returns a new raftLog with specified stable storage.
+// newRaftLogStorage returns a new raftLogStorage with specified stable storage.
 //
 // (etcd raft.raftLog.newLog)
-func newRaftLog(storageStable StorageStable) *raftLog {
+func newRaftLogStorage(storageStable StorageStable) *raftLogStorage {
 	if storageStable == nil {
 		raftLogger.Panic("stable storage must not be nil")
 	}
 
-	rg := &raftLog{
+	rg := &raftLogStorage{
 		storageStable: storageStable,
 	}
 
@@ -61,7 +61,7 @@ func newRaftLog(storageStable StorageStable) *raftLog {
 	return rg
 }
 
-func (rg *raftLog) String() string {
+func (rg *raftLogStorage) String() string {
 	return fmt.Sprintf("[committed index=%d | applied index=%d | unstable.indexOffset=%d | len(unstanble.entries)=%d]",
 		rg.committedIndex, rg.appliedIndex,
 		rg.storageUnstable.indexOffset, len(rg.storageUnstable.entries),
@@ -73,7 +73,7 @@ func (rg *raftLog) String() string {
 // If it's not available, try to get the first index in stable storage.
 //
 // (etcd raft.raftLog.firstIndex)
-func (rg *raftLog) firstIndex() uint64 {
+func (rg *raftLogStorage) firstIndex() uint64 {
 	if index, ok := rg.storageUnstable.maybeFirstIndex(); ok {
 		return index
 	}
@@ -90,7 +90,7 @@ func (rg *raftLog) firstIndex() uint64 {
 // If it's not available, try to get the last index in stable storage.
 //
 // (etcd raft.raftLog.lastIndex)
-func (rg *raftLog) lastIndex() uint64 {
+func (rg *raftLogStorage) lastIndex() uint64 {
 	if index, ok := rg.storageUnstable.maybeLastIndex(); ok {
 		return index
 	}
@@ -107,7 +107,7 @@ func (rg *raftLog) lastIndex() uint64 {
 // If it's not available, try to get the term in stable storage.
 //
 // (etcd raft.raftLog.term)
-func (rg *raftLog) term(index uint64) (uint64, error) {
+func (rg *raftLogStorage) term(index uint64) (uint64, error) {
 	dummyIndex := rg.firstIndex() - 1
 	if index < dummyIndex || rg.lastIndex() < index {
 		raftLogger.Warningf("out-of-range index '%d' [dummy index=%d | last index=%d], returning term '0'", index, dummyIndex, rg.lastIndex())
@@ -132,7 +132,7 @@ func (rg *raftLog) term(index uint64) (uint64, error) {
 // lastTerm returns the term of raftLog's last log entry.
 //
 // (etcd raft.raftLog.lastTerm)
-func (rg *raftLog) lastTerm() uint64 {
+func (rg *raftLogStorage) lastTerm() uint64 {
 	tm, err := rg.term(rg.lastIndex())
 	if err != nil {
 		raftLogger.Panicf("raftLog.term(rg.lastIndex) error (%v)", err)
@@ -143,7 +143,7 @@ func (rg *raftLog) lastTerm() uint64 {
 // matchTerm returns true if log index does actually has the 'term'.
 //
 // (etcd raft.raftLog.matchTerm)
-func (rg *raftLog) matchTerm(index, term uint64) bool {
+func (rg *raftLogStorage) matchTerm(index, term uint64) bool {
 	tm, err := rg.term(index)
 	if err != nil {
 		return false
@@ -156,7 +156,7 @@ func (rg *raftLog) matchTerm(index, term uint64) bool {
 //   rg.firstIndex() <= startIndex <= endIndex <= rg.firstIndex() + len(rg.entries)
 //
 // (etcd raft.raftLog.mustCheckOutOfBounds)
-func (rg *raftLog) mustCheckOutOfBounds(startIndex, endIndex uint64) error {
+func (rg *raftLogStorage) mustCheckOutOfBounds(startIndex, endIndex uint64) error {
 	if startIndex > endIndex {
 		raftLogger.Panicf("invalid raft log indexes [start index=%d | end index=%d]", startIndex, endIndex)
 	}
@@ -177,7 +177,7 @@ func (rg *raftLog) mustCheckOutOfBounds(startIndex, endIndex uint64) error {
 // slice returns the entries[startIndex, endIndex) with limit size.
 //
 // (etcd raft.raftLog.slice)
-func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry, error) {
+func (rg *raftLogStorage) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry, error) {
 	if err := rg.mustCheckOutOfBounds(startIndex, endIndex); err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func (rg *raftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftpb.Entry
 // entries returns the entries[startIndex,rg.endIndex+1) with size limit.
 //
 // (etcd raft.raftLog.entries)
-func (rg *raftLog) entries(startIndex, limitSize uint64) ([]raftpb.Entry, error) {
+func (rg *raftLogStorage) entries(startIndex, limitSize uint64) ([]raftpb.Entry, error) {
 	if startIndex > rg.lastIndex() {
 		return nil, nil
 	}
@@ -344,7 +344,7 @@ func (rg *raftLog) entries(startIndex, limitSize uint64) ([]raftpb.Entry, error)
 // unstableEntries returns all unstable entries in raft log.
 //
 // (etcd raft.raftLog.unstableEntries)
-func (rg *raftLog) unstableEntries() []raftpb.Entry {
+func (rg *raftLogStorage) unstableEntries() []raftpb.Entry {
 	if len(rg.storageUnstable.entries) == 0 {
 		return nil
 	}
@@ -354,7 +354,7 @@ func (rg *raftLog) unstableEntries() []raftpb.Entry {
 // allEntries returns all entries in raft log, except the first dummy entry.
 //
 // (etcd raft.raftLog.allEntries)
-func (rg *raftLog) allEntries() []raftpb.Entry {
+func (rg *raftLogStorage) allEntries() []raftpb.Entry {
 	entries, err := rg.entries(rg.firstIndex(), math.MaxUint64)
 	if err != nil {
 		switch err {
@@ -372,7 +372,7 @@ func (rg *raftLog) allEntries() []raftpb.Entry {
 // If not available, try the one in stable storage.
 //
 // (etcd raft.raftLog.snapshot)
-func (rg *raftLog) snapshot() (raftpb.Snapshot, error) {
+func (rg *raftLogStorage) snapshot() (raftpb.Snapshot, error) {
 	if rg.storageUnstable.incomingSnapshot != nil { // try the unstable storage first
 		return *rg.storageUnstable.incomingSnapshot, nil
 	}
@@ -383,7 +383,7 @@ func (rg *raftLog) snapshot() (raftpb.Snapshot, error) {
 // restoreIncomingSnapshot sets unstable storage with incoming snapshot.
 //
 // (etcd raft.raftLog.restore)
-func (rg *raftLog) restoreIncomingSnapshot(snap raftpb.Snapshot) {
+func (rg *raftLogStorage) restoreIncomingSnapshot(snap raftpb.Snapshot) {
 	raftLogger.Infof("log %v is restroing the incoming snapshot [snapshot index=%d | snapshot term=%d]", rg, snap.Metadata.Index, snap.Metadata.Term)
 	rg.committedIndex = snap.Metadata.Index
 	rg.storageUnstable.restoreIncomingSnapshot(snap)
@@ -393,7 +393,7 @@ func (rg *raftLog) restoreIncomingSnapshot(snap raftpb.Snapshot) {
 // availablefor execution.
 //
 // (etcd raft.raftLog.hasNextEnts)
-func (rg *raftLog) hasNextEntriesToApply() (uint64, bool) {
+func (rg *raftLogStorage) hasNextEntriesToApply() (uint64, bool) {
 	maxStart := maxUint64(rg.appliedIndex+1, rg.firstIndex())
 	return maxStart, rg.committedIndex >= maxStart
 }
@@ -401,7 +401,7 @@ func (rg *raftLog) hasNextEntriesToApply() (uint64, bool) {
 // nextEntriesToApply returns all the available entries ready for applying(execution).
 //
 // (etcd raft.raftLog.nextEnts)
-func (rg *raftLog) nextEntriesToApply() []raftpb.Entry {
+func (rg *raftLogStorage) nextEntriesToApply() []raftpb.Entry {
 	maxStart, ok := rg.hasNextEntriesToApply()
 	if !ok {
 		return nil
@@ -417,7 +417,7 @@ func (rg *raftLog) nextEntriesToApply() []raftpb.Entry {
 // zeroTermOnErrCompacted returns 0 if specified error is ErrCompacted.
 //
 // (etcd raft.raftLog.zeroTermOnErrCompacted)
-func (rg *raftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 {
+func (rg *raftLogStorage) zeroTermOnErrCompacted(term uint64, err error) uint64 {
 	switch err {
 	case nil:
 		return term
@@ -437,7 +437,7 @@ func (rg *raftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 {
 // Second if the index is greater than the last index.
 //
 // (etcd raft.raftLog.isUpToDate)
-func (rg *raftLog) isUpToDate(index, term uint64) bool {
+func (rg *raftLogStorage) isUpToDate(index, term uint64) bool {
 	return term > rg.lastTerm() || (term == rg.lastTerm() && index >= rg.lastIndex())
 }
 
@@ -445,21 +445,21 @@ func (rg *raftLog) isUpToDate(index, term uint64) bool {
 // those unstable entries to stable storage.
 //
 // (etcd raft.raftLog.stableTo)
-func (rg *raftLog) persistedEntriesAt(indexToPersist, termToPersist uint64) {
+func (rg *raftLogStorage) persistedEntriesAt(indexToPersist, termToPersist uint64) {
 	rg.storageUnstable.persistedEntriesAt(indexToPersist, termToPersist)
 }
 
 // persistedSnapshotAt updates snapshot metadata after processing the incoming snapshot.
 //
 // (etcd raft.raftLog.stableSnapTo)
-func (rg *raftLog) persistedSnapshotAt(indexToPersist uint64) {
+func (rg *raftLogStorage) persistedSnapshotAt(indexToPersist uint64) {
 	rg.storageUnstable.persistedSnapshotAt(indexToPersist)
 }
 
 // commitTo updates raftLog's committedIndex.
 //
 // (etcd raft.raftLog.commitTo)
-func (rg *raftLog) commitTo(indexToCommit uint64) {
+func (rg *raftLogStorage) commitTo(indexToCommit uint64) {
 	// to never decrease commit index
 	if rg.committedIndex < indexToCommit {
 		if rg.lastIndex() < indexToCommit {
@@ -473,7 +473,7 @@ func (rg *raftLog) commitTo(indexToCommit uint64) {
 // appliedTo updates raftLog's appliedIndex.
 //
 // (etcd raft.raftLog.appliedTo)
-func (rg *raftLog) appliedTo(indexToApply uint64) {
+func (rg *raftLogStorage) appliedTo(indexToApply uint64) {
 	if indexToApply == 0 {
 		return
 	}
@@ -491,7 +491,7 @@ func (rg *raftLog) appliedTo(indexToApply uint64) {
 // and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
 //
 // (etcd raft.raftLog.maybeCommit)
-func (rg *raftLog) maybeCommit(indexToCommit, termToCommit uint64) bool {
+func (rg *raftLogStorage) maybeCommit(indexToCommit, termToCommit uint64) bool {
 	if indexToCommit > rg.committedIndex && rg.zeroTermOnErrCompacted(rg.term(indexToCommit)) == termToCommit {
 		rg.commitTo(indexToCommit)
 		return true
@@ -503,7 +503,7 @@ func (rg *raftLog) maybeCommit(indexToCommit, termToCommit uint64) bool {
 // and returns the last index of raftLog.
 //
 // (etcd raft.raftLog.append)
-func (rg *raftLog) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
+func (rg *raftLogStorage) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
 	if len(entries) == 0 {
 		return rg.lastIndex()
 	}
@@ -523,7 +523,7 @@ func (rg *raftLog) appendToStorageUnstable(entries ...raftpb.Entry) uint64 {
 // The index of given entries must be continuously increasing.
 //
 // (etcd raft.raftLog.findConflict)
-func (rg *raftLog) findConflict(entries ...raftpb.Entry) uint64 {
+func (rg *raftLogStorage) findConflict(entries ...raftpb.Entry) uint64 {
 	for _, ent := range entries {
 		if !rg.matchTerm(ent.Index, ent.Term) {
 			if ent.Index <= rg.lastIndex() {
@@ -540,7 +540,7 @@ func (rg *raftLog) findConflict(entries ...raftpb.Entry) uint64 {
 // Otherwise, it returns 0 and false.
 //
 // (etcd raft.raftLog.maybeAppend)
-func (rg *raftLog) maybeAppend(index, term, indexToCommit uint64, entries ...raftpb.Entry) (uint64, bool) {
+func (rg *raftLogStorage) maybeAppend(index, term, indexToCommit uint64, entries ...raftpb.Entry) (uint64, bool) {
 	if rg.matchTerm(index, term) {
 		conflictingIndex := rg.findConflict(entries...)
 		switch {

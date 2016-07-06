@@ -105,14 +105,6 @@ func (c *Config) validate() error {
 	return nil
 }
 
-// Peer contains peer ID and context data.
-//
-// (etcd raft.Peer)
-type Peer struct {
-	ID   uint64
-	Data []byte
-}
-
 // raftNode represents Raft-algorithm-specific node.
 //
 // (etcd raft.raft)
@@ -130,8 +122,8 @@ type raftNode struct {
 	heartbeatTick        int // for leader
 	heartbeatTickElapsed int // for leader
 
-	raftLog *raftLog
-	msgs    []raftpb.Message
+	raftLogStorage *raftLogStorage
+	msgs           []raftpb.Message
 
 	electionTick        int
 	electionTickElapsed int
@@ -162,4 +154,12 @@ type raftNode struct {
 func newRaftNode(c *Config) *raftNode {
 	raftLogger.SetLogger(c.Logger)
 	return nil
+}
+
+// Peer contains peer ID and context data.
+//
+// (etcd raft.Peer)
+type Peer struct {
+	ID   uint64
+	Data []byte
 }
