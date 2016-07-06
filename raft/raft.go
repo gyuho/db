@@ -111,6 +111,11 @@ type raftNode struct {
 	id    uint64
 	state raftpb.NODE_STATE
 
+	leaderID      uint64               // (etcd raft.raft.lead)
+	idsToProgress map[uint64]*Progress // (etcd raft.raft.prs)
+
+	storageRaftLog *storageRaftLog
+
 	rand *rand.Rand
 
 	// electionTimeoutTickNum is the number of ticks for election to time out.
@@ -148,17 +153,15 @@ type raftNode struct {
 	maxEntryNumPerMsg uint64
 	maxInflightMsgNum int
 
-	leaderID     uint64               // (etcd raft.raft.lead)
-	idToProgress map[uint64]*Progress // (etcd raft.raft.prs)
-
 	leaderCheckQuorum bool
 
 	term      uint64          // (etcd raft.raft.Term)
 	votedFor  uint64          // (etcd raft.raft.Vote)
 	votedFrom map[uint64]bool // (etcd raft.raft.votes)
 
-	storageRaftLog *storageRaftLog
-	msgs           []raftpb.Message
+	// messageMailbox contains a slice of messages to be filtered, processed
+	// by each step method.
+	messageMailbox []raftpb.Message
 
 	// pendingConfigExist is true, then new configuration will be ignored,
 	// in preference to the unapplied configuration.
@@ -183,6 +186,10 @@ func newRaftNode(c *Config) *raftNode {
 		id:    c.ID,
 		state: raftpb.NODE_STATE_FOLLOWER, // 0
 
+		leaderID:       NoLeaderNodeID,
+		idsToProgress:  make(map[uint64]*Progress),
+		storageRaftLog: newStorageRaftLog(c.StorageStable),
+
 		rand: rand.New(rand.NewSource(int64(c.ID))),
 
 		electionTimeoutTickNum:  c.ElectionTickNum,
@@ -191,12 +198,7 @@ func newRaftNode(c *Config) *raftNode {
 		maxEntryNumPerMsg: c.MaxEntryNumPerMsg,
 		maxInflightMsgNum: c.MaxInflightMsgNum,
 
-		leaderID:     NoLeaderNodeID,
-		idToProgress: make(map[uint64]*Progress),
-
 		leaderCheckQuorum: c.LeaderCheckQuorum,
-
-		storageRaftLog: newStorageRaftLog(c.StorageStable),
 	}
 
 	hardState, configState, err := c.StorageStable.GetState()
@@ -215,7 +217,7 @@ func newRaftNode(c *Config) *raftNode {
 		peerIDs = configState.IDs
 	}
 	for _, id := range peerIDs {
-		rnd.idToProgress[id] = &Progress{
+		rnd.idsToProgress[id] = &Progress{
 			NextIndex: 1,
 			inflights: newInflights(rnd.maxInflightMsgNum),
 		}
@@ -233,6 +235,7 @@ func newRaftNode(c *Config) *raftNode {
 	}
 
 	raftLogger.Infof(`
+
 newRaftNode
 
     state = %q
@@ -248,6 +251,7 @@ last term = %d
 committed index = %d
 applied   index = %d
 
+
 `, rnd.state, rnd.id, strings.Join(nodeSlice, ", "),
 		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.lastIndex(),
 		rnd.term, rnd.storageRaftLog.lastTerm(),
@@ -255,6 +259,14 @@ applied   index = %d
 	)
 
 	return rnd
+}
+
+func (rnd *raftNode) quorum() int {
+	return len(rnd.idsToProgress)/2 + 1
+}
+
+func (rnd *raftNode) hasLeader() bool {
+	return rnd.leaderID != NoLeaderNodeID
 }
 
 func (rnd *raftNode) loadHardState(state raftpb.HardState) {
@@ -270,20 +282,38 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 
 // (etcd raft.raft.nodes)
 func (rnd *raftNode) allNodes() []uint64 {
-	allNodes := make([]uint64, 0, len(rnd.idToProgress))
-	for id := range rnd.idToProgress {
+	allNodes := make([]uint64, 0, len(rnd.idsToProgress))
+	for id := range rnd.idsToProgress {
 		allNodes = append(allNodes, id)
 	}
 	sort.Sort(uint64Slice(allNodes))
 	return allNodes
 }
 
-func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
-
-}
-
+// (etcd raft.raft.resetRandomizedElectionTimeout)
 func (rnd *raftNode) RandomizeElectionTickTimeout() {
 	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
+}
+
+// sendMessageToMailbox sends a message, given that the requested message
+// has already set msg.To for its receiver.
+func (rnd *raftNode) sendMessageToMailbox(msg raftpb.Message) {
+	msg.From = rnd.id
+
+	// proposal must go through consensus, which means
+	// proposal is to be forwarded to the leader,
+	// and replicated back to followers.
+	// so it should be treated as local message
+	// by setting msg.LogTerm as 0
+	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL {
+		msg.LogTerm = rnd.term
+	}
+
+	rnd.messageMailbox = append(rnd.messageMailbox, msg)
+}
+
+func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
+
 }
 
 // Peer contains peer ID and context data.
