@@ -8,7 +8,7 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-func Test_raftLogStorage(t *testing.T) { // (etcd raft TestLogRestore)
+func Test_storageRaftLog(t *testing.T) { // (etcd raft TestLogRestore)
 	var (
 		index    uint64 = 1000
 		term     uint64 = 1000
@@ -16,7 +16,7 @@ func Test_raftLogStorage(t *testing.T) { // (etcd raft TestLogRestore)
 	)
 	ms := NewStorageStableInMemory()
 	ms.ApplySnapshot(snapshot)
-	rg := newRaftLogStorage(ms)
+	rg := newStorageRaftLog(ms)
 
 	if entN := len(rg.allEntries()); entN != 0 {
 		t.Fatalf("entry number expected 0, got %d", entN)
@@ -26,7 +26,7 @@ func Test_raftLogStorage(t *testing.T) { // (etcd raft TestLogRestore)
 		t.Fatalf("first index expected %d, got %d", index+1, fidx)
 	}
 
-	if rg.committedIndex != index { // newRaftLogStorage sets this
+	if rg.committedIndex != index { // newStorageRaftLog sets this
 		t.Fatalf("committed index expected %d, got %d", index, rg.committedIndex)
 	}
 
@@ -43,14 +43,14 @@ func Test_raftLogStorage(t *testing.T) { // (etcd raft TestLogRestore)
 	}
 }
 
-func Test_raftLogStorage_mustCheckOutOfBounds(t *testing.T) { // (etcd raft TestIsOutOfBounds)
+func Test_storageRaftLog_mustCheckOutOfBounds(t *testing.T) { // (etcd raft TestIsOutOfBounds)
 	var (
 		indexOffset uint64 = 100
 		snapshot           = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: indexOffset}}
 	)
 	ms := NewStorageStableInMemory()
 	ms.ApplySnapshot(snapshot)
-	rg := newRaftLogStorage(ms)
+	rg := newStorageRaftLog(ms)
 
 	var (
 		firstIndex        = indexOffset + 1
@@ -147,7 +147,7 @@ func Test_raftLogStorage_mustCheckOutOfBounds(t *testing.T) { // (etcd raft Test
 	}
 }
 
-func Test_raftLogStorage_slice(t *testing.T) { // (etcd raft TestSlice)
+func Test_storageRaftLog_slice(t *testing.T) { // (etcd raft TestSlice)
 	var (
 		indexOffset uint64 = 100
 		snapshot           = raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: indexOffset}}
@@ -162,7 +162,7 @@ func Test_raftLogStorage_slice(t *testing.T) { // (etcd raft TestSlice)
 	for i := uint64(1); i < num/2; i++ {
 		ms.Append(raftpb.Entry{Index: indexOffset + i, Term: indexOffset + i})
 	}
-	rg := newRaftLogStorage(ms)
+	rg := newStorageRaftLog(ms)
 
 	for i := num / 2; i <= num; i++ {
 		rg.appendToStorageUnstable(raftpb.Entry{Index: indexOffset + i, Term: indexOffset + i})
@@ -414,7 +414,7 @@ func Test_raftLogStorage_slice(t *testing.T) { // (etcd raft TestSlice)
 	}
 }
 
-func Test_raftLogStorage_unstableEntries(t *testing.T) { // (etcd raft TestUnstableEnts)
+func Test_storageRaftLog_unstableEntries(t *testing.T) { // (etcd raft TestUnstableEnts)
 	tests := []struct {
 		existingEntriesStorageStable   []raftpb.Entry
 		entriesStorageUnstableToAppend []raftpb.Entry
@@ -442,7 +442,7 @@ func Test_raftLogStorage_unstableEntries(t *testing.T) { // (etcd raft TestUnsta
 		ms := NewStorageStableInMemory()
 		ms.Append(tt.existingEntriesStorageStable...)
 
-		rg := newRaftLogStorage(ms)
+		rg := newStorageRaftLog(ms)
 		rg.appendToStorageUnstable(tt.entriesStorageUnstableToAppend...)
 
 		uents := rg.unstableEntries()
@@ -466,7 +466,7 @@ func Test_raftLogStorage_unstableEntries(t *testing.T) { // (etcd raft TestUnsta
 	}
 }
 
-func Test_raftLogStorage_NextEntries(t *testing.T) { // (etcd raft TestHasNextEnts, TestNextEnts)
+func Test_storageRaftLog_NextEntries(t *testing.T) { // (etcd raft TestHasNextEnts, TestNextEnts)
 	tests := []struct {
 		snapshotToApply                raftpb.Snapshot
 		entriesStorageUnstableToAppend []raftpb.Entry
@@ -533,7 +533,7 @@ func Test_raftLogStorage_NextEntries(t *testing.T) { // (etcd raft TestHasNextEn
 
 		// rg.committedIndex = firstIndex - 1 == 3
 		// rg.appliedIndex   = firstIndex - 1 == 3
-		rg := newRaftLogStorage(st)
+		rg := newStorageRaftLog(st)
 
 		rg.appendToStorageUnstable(tt.entriesStorageUnstableToAppend...)
 
@@ -558,7 +558,7 @@ func Test_raftLogStorage_NextEntries(t *testing.T) { // (etcd raft TestHasNextEn
 	}
 }
 
-func Test_raftLogStorage_isUpToDate(t *testing.T) { // (etcd raft TestIsUpToDate)
+func Test_storageRaftLog_isUpToDate(t *testing.T) { // (etcd raft TestIsUpToDate)
 	tests := []struct {
 		entriesStorageUnstableToAppend []raftpb.Entry
 		index, term                    uint64
@@ -630,7 +630,7 @@ func Test_raftLogStorage_isUpToDate(t *testing.T) { // (etcd raft TestIsUpToDate
 	}
 
 	for i, tt := range tests {
-		rg := newRaftLogStorage(NewStorageStableInMemory())
+		rg := newStorageRaftLog(NewStorageStableInMemory())
 		rg.appendToStorageUnstable(tt.entriesStorageUnstableToAppend...)
 
 		// isUpToDate returns true if the given (index, term) log is more
@@ -644,7 +644,7 @@ func Test_raftLogStorage_isUpToDate(t *testing.T) { // (etcd raft TestIsUpToDate
 	}
 }
 
-func Test_raftLogStorage_appendToStorageUnstable(t *testing.T) { // (etcd raft TestAppend)
+func Test_storageRaftLog_appendToStorageUnstable(t *testing.T) { // (etcd raft TestAppend)
 	tests := []struct {
 		existingEntriesStorageStable   []raftpb.Entry
 		entriesStorageUnstableToAppend []raftpb.Entry
@@ -659,7 +659,7 @@ func Test_raftLogStorage_appendToStorageUnstable(t *testing.T) { // (etcd raft T
 
 			2,
 			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
-			3, // because newRaftLogStorage makes "rg.storageUnstable.indexOffset = lastIndex + 1"
+			3, // because newStorageRaftLog makes "rg.storageUnstable.indexOffset = lastIndex + 1"
 		},
 
 		{
@@ -668,7 +668,7 @@ func Test_raftLogStorage_appendToStorageUnstable(t *testing.T) { // (etcd raft T
 
 			3,
 			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 2}},
-			3, // because newRaftLogStorage makes "rg.storageUnstable.indexOffset = lastIndex + 1"
+			3, // because newStorageRaftLog makes "rg.storageUnstable.indexOffset = lastIndex + 1"
 		},
 
 		{ // conflicting entry at index 1
@@ -693,7 +693,7 @@ func Test_raftLogStorage_appendToStorageUnstable(t *testing.T) { // (etcd raft T
 	for i, tt := range tests {
 		ms := NewStorageStableInMemory()
 		ms.Append(tt.existingEntriesStorageStable...)
-		rg := newRaftLogStorage(ms)
+		rg := newStorageRaftLog(ms)
 
 		nindex := rg.appendToStorageUnstable(tt.entriesStorageUnstableToAppend...)
 		if nindex != tt.wNewIndexAfterAppend {
@@ -715,7 +715,7 @@ func Test_raftLogStorage_appendToStorageUnstable(t *testing.T) { // (etcd raft T
 	}
 }
 
-func Test_raftLogStorage_findConflict(t *testing.T) { // (etcd raft TestFindConflict)
+func Test_storageRaftLog_findConflict(t *testing.T) { // (etcd raft TestFindConflict)
 	tests := []struct {
 		entriesStorageUnstableToAppend []raftpb.Entry
 		entriesToCompare               []raftpb.Entry
@@ -795,7 +795,7 @@ func Test_raftLogStorage_findConflict(t *testing.T) { // (etcd raft TestFindConf
 		},
 	}
 	for i, tt := range tests {
-		rg := newRaftLogStorage(NewStorageStableInMemory())
+		rg := newStorageRaftLog(NewStorageStableInMemory())
 		rg.appendToStorageUnstable(tt.entriesStorageUnstableToAppend...)
 
 		if cidx := rg.findConflict(tt.entriesToCompare...); cidx != tt.firstConflictingEntryIndex {
@@ -804,7 +804,7 @@ func Test_raftLogStorage_findConflict(t *testing.T) { // (etcd raft TestFindConf
 	}
 }
 
-func Test_raftLogStorage_maybeAppend(t *testing.T) { // (etcd raft TestLogMaybeAppend)
+func Test_storageRaftLog_maybeAppend(t *testing.T) { // (etcd raft TestLogMaybeAppend)
 	tests := []struct {
 		entriesStorageUnstableToAppend []raftpb.Entry
 		indexToCommitForUnstable       uint64
@@ -1061,7 +1061,7 @@ func Test_raftLogStorage_maybeAppend(t *testing.T) { // (etcd raft TestLogMaybeA
 	}
 
 	for i, tt := range tests {
-		rg := newRaftLogStorage(NewStorageStableInMemory())
+		rg := newStorageRaftLog(NewStorageStableInMemory())
 		rg.appendToStorageUnstable(tt.entriesStorageUnstableToAppend...)
 		rg.commitTo(tt.indexToCommitForUnstable)
 
@@ -1112,7 +1112,7 @@ func Test_raftLogStorage_maybeAppend(t *testing.T) { // (etcd raft TestLogMaybeA
 	}
 }
 
-func Test_raftLogStorage_term(t *testing.T) { // (etcd raft TestTerm)
+func Test_storageRaftLog_term(t *testing.T) { // (etcd raft TestTerm)
 	var (
 		indexOffset uint64 = 100
 		num         uint64 = 300
@@ -1121,7 +1121,7 @@ func Test_raftLogStorage_term(t *testing.T) { // (etcd raft TestTerm)
 	ms.ApplySnapshot(raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{Index: indexOffset, Term: 1},
 	})
-	rg := newRaftLogStorage(ms)
+	rg := newStorageRaftLog(ms)
 
 	for i := uint64(1); i < num; i++ {
 		rg.appendToStorageUnstable(raftpb.Entry{Index: indexOffset + i, Term: i})
@@ -1153,7 +1153,7 @@ func Test_raftLogStorage_term(t *testing.T) { // (etcd raft TestTerm)
 	}
 }
 
-func Test_raftLogStorage_term_restoreIncomingSnapshot(t *testing.T) { // (etcd raft TestTermWithUnstableSnapshot)
+func Test_storageRaftLog_term_restoreIncomingSnapshot(t *testing.T) { // (etcd raft TestTermWithUnstableSnapshot)
 	var (
 		snapshotIndex         uint64 = 100
 		unstableSnapshotIndex        = snapshotIndex + 5
@@ -1161,7 +1161,7 @@ func Test_raftLogStorage_term_restoreIncomingSnapshot(t *testing.T) { // (etcd r
 	ms := NewStorageStableInMemory()
 	ms.ApplySnapshot(raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: snapshotIndex, Term: 1}})
 
-	rg := newRaftLogStorage(ms)
+	rg := newStorageRaftLog(ms)
 	rg.restoreIncomingSnapshot(raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: unstableSnapshotIndex, Term: 1}})
 	// dummyIndex (first entry index) is now 105
 
@@ -1185,7 +1185,7 @@ func Test_raftLogStorage_term_restoreIncomingSnapshot(t *testing.T) { // (etcd r
 	}
 }
 
-func Test_raftLogStorage_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
+func Test_storageRaftLog_persistedEntriesAt(t *testing.T) { // (etcd raft TestStableTo)
 	tests := []struct {
 		entriesToAppendToStorageUnstable []raftpb.Entry
 
@@ -1247,7 +1247,7 @@ func Test_raftLogStorage_persistedEntriesAt(t *testing.T) { // (etcd raft TestSt
 	}
 
 	for i, tt := range tests {
-		rg := newRaftLogStorage(NewStorageStableInMemory())
+		rg := newStorageRaftLog(NewStorageStableInMemory())
 
 		// appendToStorageUnstable will truncate and append
 		rg.appendToStorageUnstable(tt.entriesToAppendToStorageUnstable...)
@@ -1266,7 +1266,7 @@ func Test_raftLogStorage_persistedEntriesAt(t *testing.T) { // (etcd raft TestSt
 	}
 }
 
-func Test_raftLogStorage_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableToWithSnap)
+func Test_storageRaftLog_persistedSnapshotAt(t *testing.T) { // (etcd raft TestStableToWithSnap)
 	tests := []struct {
 		snapshotToApply                  raftpb.Snapshot
 		entriesToAppendToStorageUnstable []raftpb.Entry
@@ -1394,7 +1394,7 @@ func Test_raftLogStorage_persistedSnapshotAt(t *testing.T) { // (etcd raft TestS
 		ms := NewStorageStableInMemory()
 		ms.ApplySnapshot(tt.snapshotToApply)
 
-		rg := newRaftLogStorage(ms)
+		rg := newStorageRaftLog(ms)
 
 		// appendToStorageUnstable will truncate and append
 		rg.appendToStorageUnstable(tt.entriesToAppendToStorageUnstable...)
@@ -1413,7 +1413,7 @@ func Test_raftLogStorage_persistedSnapshotAt(t *testing.T) { // (etcd raft TestS
 	}
 }
 
-func Test_raftLogStorage_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
+func Test_storageRaftLog_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
 	tests := []struct {
 		entriesToAppendToStorageUnstable []raftpb.Entry
 		initialCommittedIndex            uint64
@@ -1463,7 +1463,7 @@ func Test_raftLogStorage_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
 	}
 
 	for i, tt := range tests {
-		rg := newRaftLogStorage(NewStorageStableInMemory())
+		rg := newStorageRaftLog(NewStorageStableInMemory())
 		rg.appendToStorageUnstable(tt.entriesToAppendToStorageUnstable...) // appendToStorageUnstable will truncate and append
 		rg.commitTo(tt.initialCommittedIndex)
 
@@ -1499,7 +1499,7 @@ func Test_raftLogStorage_commitTo(t *testing.T) { // (etcd raft TestCommitTo)
 	}
 }
 
-func Test_raftLogStorage_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd raft TestCompaction)
+func Test_storageRaftLog_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd raft TestCompaction)
 	var entriesToAppendToStorageStable []raftpb.Entry
 	for i := uint64(1); i <= 1000; i++ {
 		entriesToAppendToStorageStable = append(entriesToAppendToStorageStable, raftpb.Entry{Index: i, Term: i})
@@ -1567,7 +1567,7 @@ func Test_raftLogStorage_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd 
 		ms := NewStorageStableInMemory()
 		ms.Append(tt.entriesToAppendToStorageStable...)
 
-		rg := newRaftLogStorage(ms)
+		rg := newStorageRaftLog(ms)
 
 		// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
 		// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
@@ -1614,13 +1614,13 @@ func Test_raftLogStorage_maybeCommit_appliedTo_Compact(t *testing.T) { // (etcd 
 	}
 }
 
-func Test_raftLogStorage_maybeCommit_appliedTo_Compact_manual(t *testing.T) { // (etcd raft TestCompactionSideEffects)
+func Test_storageRaftLog_maybeCommit_appliedTo_Compact_manual(t *testing.T) { // (etcd raft TestCompactionSideEffects)
 	ms := NewStorageStableInMemory()
 	for i := uint64(1); i <= 1000; i++ {
 		ms.Append(raftpb.Entry{Index: i, Term: i})
 	}
 
-	rg := newRaftLogStorage(ms)
+	rg := newStorageRaftLog(ms)
 
 	if ok := rg.maybeCommit(2000, 2000); ok {
 		t.Fatal("maybeCommit must have failed")
