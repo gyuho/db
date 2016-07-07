@@ -20,8 +20,8 @@ type raftNode struct {
 	id    uint64
 	state raftpb.NODE_STATE
 
-	leaderID      uint64                       // (etcd raft.raft.lead)
-	allProgresses map[uint64]*FollowerProgress // (etcd raft.raft.prs)
+	leaderID      uint64               // (etcd raft.raft.lead)
+	allProgresses map[uint64]*Progress // (etcd raft.raft.prs)
 
 	storageRaftLog *storageRaftLog
 
@@ -96,7 +96,7 @@ func newRaftNode(c *Config) *raftNode {
 		state: raftpb.NODE_STATE_FOLLOWER, // 0
 
 		leaderID:       NoneNodeID,
-		allProgresses:  make(map[uint64]*FollowerProgress),
+		allProgresses:  make(map[uint64]*Progress),
 		storageRaftLog: newStorageRaftLog(c.StorageStable),
 
 		rand: rand.New(rand.NewSource(int64(c.ID))),
@@ -127,7 +127,7 @@ func newRaftNode(c *Config) *raftNode {
 		peerIDs = configState.IDs
 	}
 	for _, id := range peerIDs {
-		rnd.allProgresses[id] = &FollowerProgress{
+		rnd.allProgresses[id] = &Progress{
 			NextIndex: 1,
 			inflights: newInflights(rnd.maxInflightMsgNum),
 		}
@@ -140,7 +140,7 @@ func newRaftNode(c *Config) *raftNode {
 	rnd.becomeFollower(rnd.term, rnd.leaderID)
 
 	var nodeSlice []string
-	for _, id := range rnd.allNodes() {
+	for _, id := range rnd.allNodeIDs() {
 		nodeSlice = append(nodeSlice, fmt.Sprintf("%x", id))
 	}
 
@@ -171,6 +171,103 @@ applied   index = %d
 	return rnd
 }
 
+// (etcd raft.raft.nodes)
+func (rnd *raftNode) allNodeIDs() []uint64 {
+	allNodeIDs := make([]uint64, 0, len(rnd.allProgresses))
+	for id := range rnd.allProgresses {
+		allNodeIDs = append(allNodeIDs, id)
+	}
+	sort.Sort(uint64Slice(allNodeIDs))
+	return allNodeIDs
+}
+
+// (etcd raft.raft.quorum)
+func (rnd *raftNode) quorum() int {
+	return len(rnd.allProgresses)/2 + 1
+}
+
+// (etcd raft.raft.resetRandomizedElectionTimeout)
+func (rnd *raftNode) randomizeElectionTickTimeout() {
+	// [electiontimeout, 2 * electiontimeout - 1].
+	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
+}
+
+// (etcd raft.raft.pastElectionTimeout)
+func (rnd *raftNode) pastElectionTimeout() bool {
+	return rnd.electionTimeoutElapsedTickNum >= rnd.randomizedElectionTimeoutTickNum
+}
+
+// (etcd raft.raft.abortLeaderTransfer)
+func (rnd *raftNode) stopLeaderTransfer() {
+	rnd.leaderTransfereeID = NoneNodeID
+}
+
+// (etcd raft.raft.resetPendingConf)
+func (rnd *raftNode) resetPendingConfigExist() {
+	rnd.pendingConfigExist = false
+}
+
+// (etcd raft.raft.reset)
+func (rnd *raftNode) resetWithTerm(term uint64) {
+	if rnd.term != term {
+		rnd.term = term
+		rnd.votedFor = NoneNodeID
+	}
+	rnd.leaderID = NoneNodeID
+	rnd.votedFrom = make(map[uint64]bool)
+
+	rnd.electionTimeoutElapsedTickNum = 0
+	rnd.heartbeatTimeoutElapsedTickNum = 0
+	rnd.randomizeElectionTickTimeout()
+
+	rnd.stopLeaderTransfer()
+	rnd.pendingConfigExist = false
+
+	for id := range rnd.allProgresses {
+		rnd.allProgresses[id] = &Progress{
+			// NextIndex is the starting index of entries for next replication.
+			NextIndex: rnd.storageRaftLog.lastIndex() + 1,
+			inflights: newInflights(rnd.maxInflightMsgNum),
+		}
+
+		if id == rnd.id {
+			// MatchIndex is the highest known matched entry index of this node.
+			rnd.allProgresses[id].MatchIndex = rnd.storageRaftLog.lastIndex()
+		}
+	}
+}
+
+// (etcd raft.raft.setProgress)
+func (rnd *raftNode) updateProgress(id, matchIndex, nextIndex uint64) {
+	rnd.allProgresses[id] = &Progress{
+		MatchIndex: matchIndex,
+		NextIndex:  nextIndex,
+		inflights:  newInflights(rnd.maxInflightMsgNum),
+	}
+}
+
+// (etcd raft.raft.delProgress)
+func (rnd *raftNode) deleteProgress(id uint64) {
+	delete(rnd.allProgresses, id)
+}
+
+// (etcd raft.raft.softState)
+func (rnd *raftNode) softState() *raftpb.SoftState {
+	return &raftpb.SoftState{
+		NodeState: rnd.state,
+		LeaderID:  rnd.leaderID,
+	}
+}
+
+// (etcd raft.raft.hardState)
+func (rnd *raftNode) hardState() raftpb.HardState {
+	return raftpb.HardState{
+		VotedFor:       rnd.votedFor,
+		CommittedIndex: rnd.storageRaftLog.committedIndex,
+		Term:           rnd.term,
+	}
+}
+
 // (etcd raft.raft.loadState)
 func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	if state.CommittedIndex < rnd.storageRaftLog.committedIndex || state.CommittedIndex > rnd.storageRaftLog.lastIndex() {
@@ -181,60 +278,4 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	rnd.votedFor = state.VotedFor
 	rnd.storageRaftLog.committedIndex = state.CommittedIndex
 	rnd.term = state.Term
-}
-
-// (etcd raft.raft.nodes)
-func (rnd *raftNode) allNodes() []uint64 {
-	allNodes := make([]uint64, 0, len(rnd.allProgresses))
-	for id := range rnd.allProgresses {
-		allNodes = append(allNodes, id)
-	}
-	sort.Sort(uint64Slice(allNodes))
-	return allNodes
-}
-
-// (etcd raft.raft.resetRandomizedElectionTimeout)
-func (rnd *raftNode) randomizeElectionTickTimeout() {
-	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
-}
-
-// (etcd raft.raft.quorum)
-func (rnd *raftNode) quorum() int {
-	return len(rnd.allProgresses)/2 + 1
-}
-
-// checkQuorumActive returns true if the quorum of the cluster
-// is active in the view of the local raft state machine.
-//
-// (etcd raft.raft.checkQuorumActive)
-func (rnd *raftNode) checkQuorumActive() bool {
-	activeN := 0
-	for id := range rnd.allProgresses {
-		if id == rnd.id {
-			activeN++ // self is always active
-			continue
-		}
-
-		if rnd.allProgresses[id].RecentActive {
-			activeN++
-		}
-
-		// and resets the RecentActive
-		rnd.allProgresses[id].RecentActive = false
-	}
-
-	return activeN >= rnd.quorum()
-}
-
-// (etcd raft.raft.abortLeaderTransfer)
-func (rnd *raftNode) stopLeaderTransfer() {
-	rnd.leaderTransfereeID = NoneNodeID
-}
-
-// promotable return true if the local state machine can be promoted to leader.
-//
-// (etcd raft.raft.promotable)
-func (rnd *raftNode) promotable() bool {
-	_, ok := rnd.allProgresses[rnd.id]
-	return ok
 }

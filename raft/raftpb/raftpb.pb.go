@@ -37,6 +37,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 const _ = proto.ProtoPackageIsVersion1
 
+// (etcd raftpb.EntryType)
 type ENTRY_TYPE int32
 
 const (
@@ -58,6 +59,7 @@ func (x ENTRY_TYPE) String() string {
 }
 func (ENTRY_TYPE) EnumDescriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{0} }
 
+// (etcd raftpb.ConfChangeType)
 type CONFIG_CHANGE_TYPE int32
 
 const (
@@ -82,6 +84,7 @@ func (x CONFIG_CHANGE_TYPE) String() string {
 }
 func (CONFIG_CHANGE_TYPE) EnumDescriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{1} }
 
+// (etcd raftpb.MessageType)
 type MESSAGE_TYPE int32
 
 const (
@@ -123,7 +126,7 @@ const (
 	// raftpb.MsgApp, but includes raftpb.Message.Commit information for
 	// followers.
 	//
-	//   idx1 = Leader.FollowerProgress.Match
+	//   idx1 = Leader.Follower.Progress.Match
 	//   idx2 = Leader.raftLog.CommittedIndex
 	//   Leader.LEADER_HEARTBEAT_REQUEST.CurrentCommittedIndex = min(idx1, idx2)
 	//
@@ -222,7 +225,7 @@ const (
 	MESSAGE_TYPE_PROPOSAL MESSAGE_TYPE = 7
 	// LEADER_APPEND_REQUEST message is only sent by Leader.
 	//
-	//   newLogIndex   = Leader.FollowerProgress.Next
+	//   newLogIndex   = Leader.Follower.Progress.Next
 	//   prevLogIndex  = newLogsIndex - 1
 	//   prevLogTerm   = Leader.raftLog.term(prevLogIndex)
 	//   entries       = Leader.raftLog.entries(newLogIndex, Leader.maxMsgSize)
@@ -248,7 +251,7 @@ const (
 	//         Follower.APPEND_RESPONSE.Reject   = false
 	//
 	//      AND THEN
-	//         Leader updates Leader.FollowerProgress
+	//         Leader updates Leader.Follower.Progress
 	//
 	//      ELSE IF
 	//         Leader.LEADER_APPEND_REQUEST.LogIndex >= Follower.raftLog.CommittedIndex
@@ -274,10 +277,10 @@ const (
 	//         Follower.APPEND_RESPONSE.RejectHint = Follower.raftLog.lastIndex()
 	//
 	//         THEN
-	//            Leader gets this Rejection and updates its FollowerProgress with:
+	//            Leader gets this Rejection and updates its Follower.Progress with:
 	//               idx1 = Follower.APPEND_RESPONSE.LogIndex
 	//               idx2 = Follower.APPEND_RESPONSE.RejectHint + 1
-	//               Leader.FollowerProgress.Next = min(idx1, idx2)
+	//               Leader.Follower.Progress.Next = min(idx1, idx2)
 	//
 	//   (etcd: raft.*raft.handleAppendEntries)
 	//
@@ -332,18 +335,18 @@ const (
 	// LEADER_SNAPSHOT_REQUEST is only sent by Leader.
 	// It is triggered when the Leader tries to replicate its log (sendAppend) but:
 	//
-	//   i) term, err = Leader.raftLog.term(Leader.FollowerProgress.Next - 1)
+	//   i) term, err = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
 	//      err == ErrCompacted
 	//
 	//   OR
 	//
-	//   ii) entries, err = Leader.raftLog.entries(Leader.FollowerProgress.Next, Leader.maxMsgSize)
+	//   ii) entries, err = Leader.raftLog.entries(Leader.Follower.Progress.Next, Leader.maxMsgSize)
 	//       err != nil
 	//
 	//   THEN
 	//      snap = Leader.raftLog.snapshot()
 	//      Leader.LEADER_SNAPSHOT_REQUEST.Snapshot = snap
-	//      Leader.FollowerProgress.becomeSnapshot(snap.Index)
+	//      Leader.Follower.Progress.becomeSnapshot(snap.Index)
 	//
 	//
 	// (etcd: raft.raftpb.MsgSnap)
@@ -457,6 +460,7 @@ func (x MESSAGE_TYPE) String() string {
 }
 func (MESSAGE_TYPE) EnumDescriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{2} }
 
+// (etcd raftpb.Entry)
 type Entry struct {
 	Type  ENTRY_TYPE `protobuf:"varint,1,opt,name=Type,json=type,proto3,enum=raftpb.ENTRY_TYPE" json:"Type,omitempty"`
 	Index uint64     `protobuf:"varint,2,opt,name=Index,json=index,proto3" json:"Index,omitempty"`
@@ -469,6 +473,7 @@ func (m *Entry) String() string            { return proto.CompactTextString(m) }
 func (*Entry) ProtoMessage()               {}
 func (*Entry) Descriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{0} }
 
+// (etcd raftpb.ConfState)
 type ConfigState struct {
 	IDs []uint64 `protobuf:"varint,1,rep,name=IDs,json=iDs" json:"IDs,omitempty"`
 }
@@ -478,6 +483,7 @@ func (m *ConfigState) String() string            { return proto.CompactTextStrin
 func (*ConfigState) ProtoMessage()               {}
 func (*ConfigState) Descriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{1} }
 
+// (etcd raftpb.SnapshotMetadata)
 type SnapshotMetadata struct {
 	ConfigState ConfigState `protobuf:"bytes,1,opt,name=ConfigState,json=configState" json:"ConfigState"`
 	Index       uint64      `protobuf:"varint,2,opt,name=Index,json=index,proto3" json:"Index,omitempty"`
@@ -516,6 +522,7 @@ func (m *HardState) String() string            { return proto.CompactTextString(
 func (*HardState) ProtoMessage()               {}
 func (*HardState) Descriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{4} }
 
+// (etcd raftpb.ConfChange)
 type ConfigChange struct {
 	Type   CONFIG_CHANGE_TYPE `protobuf:"varint,1,opt,name=Type,json=type,proto3,enum=raftpb.CONFIG_CHANGE_TYPE" json:"Type,omitempty"`
 	ID     uint64             `protobuf:"varint,2,opt,name=ID,json=iD,proto3" json:"ID,omitempty"`
@@ -529,6 +536,8 @@ func (*ConfigChange) ProtoMessage()               {}
 func (*ConfigChange) Descriptor() ([]byte, []int) { return fileDescriptorRaftpb, []int{5} }
 
 // Message contains messages between nodes.
+//
+// (etcd raftpb.Message)
 type Message struct {
 	// Type defines the type of Message.
 	Type MESSAGE_TYPE `protobuf:"varint,1,opt,name=Type,json=type,proto3,enum=raftpb.MESSAGE_TYPE" json:"Type,omitempty"`
@@ -614,8 +623,8 @@ type Message struct {
 	//
 	//   ii) AppendEntries with:
 	//
-	//      Leader.Message.LogIndex = Leader.FollowerProgress.Next - 1
-	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.FollowerProgress.Next - 1)
+	//      Leader.Message.LogIndex = Leader.Follower.Progress.Next - 1
+	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
 	//
 	//   to tell its Follower where those new entries start.
 	//   (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
@@ -648,11 +657,11 @@ type Message struct {
 	//
 	//   AppendEntries with:
 	//
-	//      Leader.Message.LogIndex = Leader.FollowerProgress.Next - 1
-	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.FollowerProgress.Next - 1)
+	//      Leader.Message.LogIndex = Leader.Follower.Progress.Next - 1
+	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
 	//
 	//   to tell followers where new log entries start.
-	//   New log entries start from Leader.FollowerProgress.Next.
+	//   New log entries start from Leader.Follower.Progress.Next.
 	//   (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
 	//
 	//
@@ -689,14 +698,14 @@ type Message struct {
 	//      i)  Follower.raftLog.CommittedIndex > Leader.Message.LogIndex
 	//
 	//      to tell Follower is ahead of that message, so Follower ignores
-	//      this Message, and Leader can update Leader.FollowerProgress.Next.
+	//      this Message, and Leader can update Leader.Follower.Progress.Next.
 	//
 	//      It will respond with:
 	//         - To: Leader
 	//         - Type: raftpb.MsgAppResp
 	//         - LogIndex: Follower.raftLog.CommittedIndex
 	//
-	//      (etcd: raft.*raft.handleAppendEntries, raft.*FollowerProgress.maybeUpdate)
+	//      (etcd: raft.*raft.handleAppendEntries, raft.*Follower.Progress.maybeUpdate)
 	//
 	//      OR
 	//
@@ -769,7 +778,7 @@ type Message struct {
 	//
 	//   idx1 = Follower.Message.LogIndex
 	//   idx2 = Follower.Message.RejectHintFollowerLastIndex
-	//   Leader.FollowerProgress.Next = min(idx1, idx2)
+	//   Leader.Follower.Progress.Next = min(idx1, idx2)
 	//
 	//   (etcd: raft.stepLeader with raftpb.MsgAppResp)
 	//
