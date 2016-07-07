@@ -1,9 +1,8 @@
-// Package raft implements the Raft consensus algorithm
-// (https://github.com/ongardie/dissertation).
-//
-// Reference implementation is https://github.com/coreos/etcd/tree/master/raft.
+// Package raft implements the Raft consensus algorithm https://github.com/ongardie/dissertation.
 //
 // The main goal is to decouple the core algorithms from transportation and storage layer.
 // Simple interface makes Raft more portable for different use cases.
+//
+// Reference implementation: https://github.com/coreos/etcd/tree/master/raft
 //
 package raft

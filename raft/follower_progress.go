@@ -38,12 +38,12 @@ type FollowerProgress struct {
 	// (etcd raft.Progress.Paused)
 	Paused bool
 
-	// Active is true if this follower is recently active,
+	// RecentActive is true if this follower is recently active,
 	// such as receiving any message from this follower.
 	// It can be reset to false after election timeout.
 	//
 	// (etcd raft.Progress.RecentActive)
-	Active bool
+	RecentActive bool
 
 	// inflights represents the status of buffered messages
 	// to this follower. When it's full, no more messages should
@@ -55,7 +55,7 @@ func (fpr *FollowerProgress) resetState(state raftpb.FOLLOWER_PROGRESS_STATE) {
 	fpr.State = state
 	fpr.PendingSnapshotIndex = 0
 	fpr.Paused = false
-	fpr.Active = false
+	fpr.RecentActive = false
 }
 
 func (fpr *FollowerProgress) becomeProbe() {

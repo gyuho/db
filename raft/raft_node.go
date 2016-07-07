@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -10,99 +9,9 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// NoLeaderNodeID is a placeholder node ID, only used when
-// there is no leader in the cluster.
-const NoLeaderNodeID uint64 = 0
-
-// Config contains the parameters to start a Raft node.
-type Config struct {
-	// Logger implements system logging for Raft.
-	Logger Logger
-
-	// ID is the id of the Raft node, and 0 when there's no leader.
-	// (etcd raft.Config.ID)
-	ID uint64
-
-	// ElectionTickNum is the number of ticks between elections.
-	// If a follower does not receive any message from a valid leader
-	// before ElectionTickNum has elapsed, it becomes a candidate to
-	// start an election. ElectionTickNum must be greater than HeartbeatTimeoutTickNum,
-	// ideally ElectionTickNum = 10 * HeartbeatTimeoutTickNum.
-	// etcd often sets ElectionTickNum as 1 millisecond per tick.
-	// (etcd raft.Config.ElectionTick)
-	ElectionTickNum int
-
-	// HeartbeatTimeoutTickNum is the number of ticks between heartbeats by a leader.
-	// Raft leader must send heartbeat messages to its followers to maintain
-	// its leadership.
-	// (etcd raft.Config.HeartbeatTick)
-	HeartbeatTimeoutTickNum int
-
-	// LeaderCheckQuorum is true, then a leader checks if quorum is active,
-	// for an election timeout. If not, the leader steps down.
-	LeaderCheckQuorum bool
-
-	// StorageStable implements storage for Raft logs, where a node stores its
-	// entries and states, reads the persisted data when needed.
-	// Raft node needs to read the previous state and configuration
-	// when restarting.
-	// (etcd raft.Storage)
-	StorageStable StorageStable
-
-	// allPeerIDs contains the IDs of all peers and the node itself.
-	// It should only be set when starting a new Raft cluster.
-	// (etcd raft.Config.peers)
-	allPeerIDs []uint64
-
-	// ---------------------------
-	// APPLICATION SPECIFIC CONFIG
-	// ---------------------------
-	//
-
-	// MaxEntryNumPerMsg is the maximum number of entries for each
-	// append message. If 0, it only appends one entry per message.
-	// (etcd raft.Config.MaxSizePerMsg)
-	MaxEntryNumPerMsg uint64
-
-	// MaxInflightMsgNum is the maximum number of in-flight append messages
-	// during optimistic replication phase. Transportation layer usually
-	// has its own sending buffer over TCP/UDP. MaxInflighMsgNum is to
-	// avoid overflowing that sending buffer.
-	// (etcd raft.Config.MaxInflightMsgs)
-	MaxInflightMsgNum int
-
-	// LastAppliedIndex is the last applied index of Raft entries.
-	// It is only set when restarting a Raft node, so that Raft
-	// does not return any entries smaller than or equal to LastAppliedIndex.
-	// If LastAppliedIndex is not set when a node restarts, it will return
-	// previously applied entries. This is application-specific configuration.
-	// (etcd raft.Config.Applied)
-	LastAppliedIndex uint64
-}
-
-func (c *Config) validate() error {
-	if c.StorageStable == nil {
-		return errors.New("raft storage cannot be nil")
-	}
-
-	if c.ID == NoLeaderNodeID {
-		return errors.New("cannot use 0 for node ID")
-	}
-
-	if c.HeartbeatTimeoutTickNum <= 0 {
-		return errors.New("heartbeat tick must be greater than 0")
-	}
-
-	if c.ElectionTickNum <= c.HeartbeatTimeoutTickNum {
-		return errors.New("election tick must be greater than heartbeat tick")
-	}
-
-	if c.MaxInflightMsgNum <= 0 {
-		return errors.New("max number of inflight messages must be greater than 0")
-	}
-
-	return nil
-}
+// NoneNodeID is a placeholder node ID, only used when there is no leader in the cluster,
+// or to reset leader transfer.
+const NoneNodeID uint64 = 0
 
 // raftNode represents Raft-algorithm-specific node.
 //
@@ -167,9 +76,9 @@ type raftNode struct {
 	// in preference to the unapplied configuration.
 	pendingConfigExist bool
 
-	// leaderIDTransferee is the ID of the leader transfer target
+	// leaderTransfereeID is the ID of the leader transfer target
 	// when it's not zero (Raft 3.10).
-	leaderIDTransferee uint64
+	leaderTransfereeID uint64
 }
 
 // newRaftNode creates a new raftNode with the given Config.
@@ -186,7 +95,7 @@ func newRaftNode(c *Config) *raftNode {
 		id:    c.ID,
 		state: raftpb.NODE_STATE_FOLLOWER, // 0
 
-		leaderID:       NoLeaderNodeID,
+		leaderID:       NoneNodeID,
 		allProgresses:  make(map[uint64]*FollowerProgress),
 		storageRaftLog: newStorageRaftLog(c.StorageStable),
 
@@ -262,14 +171,7 @@ applied   index = %d
 	return rnd
 }
 
-func (rnd *raftNode) quorum() int {
-	return len(rnd.allProgresses)/2 + 1
-}
-
-func (rnd *raftNode) hasLeader() bool {
-	return rnd.leaderID != NoLeaderNodeID
-}
-
+// (etcd raft.raft.loadState)
 func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	if state.CommittedIndex < rnd.storageRaftLog.committedIndex || state.CommittedIndex > rnd.storageRaftLog.lastIndex() {
 		raftLogger.Panicf("HardState of %x has committed index %d out of range [%d, %d]",
@@ -292,33 +194,47 @@ func (rnd *raftNode) allNodes() []uint64 {
 }
 
 // (etcd raft.raft.resetRandomizedElectionTimeout)
-func (rnd *raftNode) RandomizeElectionTickTimeout() {
+func (rnd *raftNode) randomizeElectionTickTimeout() {
 	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
 }
 
-// sendToMailbox sends a message, given that the requested message
-// has already set msg.To for its receiver.
-//
-// (etcd raft.raft.send)
-func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
-	msg.From = rnd.id
-
-	// proposal must go through consensus, which means
-	// proposal is to be forwarded to the leader,
-	// and replicated back to followers.
-	// so it should be treated as local message
-	// by setting msg.LogTerm as 0
-	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL {
-		msg.LogTerm = rnd.term
-	}
-
-	rnd.mailbox = append(rnd.mailbox, msg)
+// (etcd raft.raft.quorum)
+func (rnd *raftNode) quorum() int {
+	return len(rnd.allProgresses)/2 + 1
 }
 
-// Peer contains peer ID and context data.
+// checkQuorumActive returns true if the quorum of the cluster
+// is active in the view of the local raft state machine.
 //
-// (etcd raft.Peer)
-type Peer struct {
-	ID   uint64
-	Data []byte
+// (etcd raft.raft.checkQuorumActive)
+func (rnd *raftNode) checkQuorumActive() bool {
+	activeN := 0
+	for id := range rnd.allProgresses {
+		if id == rnd.id {
+			activeN++ // self is always active
+			continue
+		}
+
+		if rnd.allProgresses[id].RecentActive {
+			activeN++
+		}
+
+		// and resets the RecentActive
+		rnd.allProgresses[id].RecentActive = false
+	}
+
+	return activeN >= rnd.quorum()
+}
+
+// (etcd raft.raft.abortLeaderTransfer)
+func (rnd *raftNode) stopLeaderTransfer() {
+	rnd.leaderTransfereeID = NoneNodeID
+}
+
+// promotable return true if the local state machine can be promoted to leader.
+//
+// (etcd raft.raft.promotable)
+func (rnd *raftNode) promotable() bool {
+	_, ok := rnd.allProgresses[rnd.id]
+	return ok
 }
