@@ -186,6 +186,7 @@ func (sr *storageRaftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftp
 		return nil, nil
 	}
 
+	// entries is slice, so it's reference(pointer)
 	var entries []raftpb.Entry
 
 	// For example,
@@ -276,6 +277,8 @@ func (sr *storageRaftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftp
 		// stableEntriesN >= expectedN
 		// ➝ need to check limits
 
+		// entries is slice, so it's reference(pointer)
+		// we need to be careful to not manipulate this
 		entries = stableEntries
 	}
 
@@ -312,7 +315,7 @@ func (sr *storageRaftLog) slice(startIndex, endIndex, limitSize uint64) ([]raftp
 		if len(entries) > 0 { // there are entries from stable storage
 			// (X)
 			// entries = append(entries, unstableEntries...)
-			// ??? race condition in etcd integration test!
+			// this triggers race condition in etcd integration test!
 
 			// entries = append([]raftpb.Entry{}, entries...)
 			//

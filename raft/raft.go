@@ -159,9 +159,9 @@ type raftNode struct {
 	votedFor  uint64          // (etcd raft.raft.Vote)
 	votedFrom map[uint64]bool // (etcd raft.raft.votes)
 
-	// messageMailbox contains a slice of messages to be filtered, processed
+	// mailbox contains a slice of messages to be filtered and processed
 	// by each step method.
-	messageMailbox []raftpb.Message
+	mailbox []raftpb.Message
 
 	// pendingConfigExist is true, then new configuration will be ignored,
 	// in preference to the unapplied configuration.
@@ -295,9 +295,11 @@ func (rnd *raftNode) RandomizeElectionTickTimeout() {
 	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
 }
 
-// sendMessageToMailbox sends a message, given that the requested message
+// sendToMailbox sends a message, given that the requested message
 // has already set msg.To for its receiver.
-func (rnd *raftNode) sendMessageToMailbox(msg raftpb.Message) {
+//
+// (etcd raft.raft.send)
+func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	msg.From = rnd.id
 
 	// proposal must go through consensus, which means
@@ -309,7 +311,7 @@ func (rnd *raftNode) sendMessageToMailbox(msg raftpb.Message) {
 		msg.LogTerm = rnd.term
 	}
 
-	rnd.messageMailbox = append(rnd.messageMailbox, msg)
+	rnd.mailbox = append(rnd.mailbox, msg)
 }
 
 func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
