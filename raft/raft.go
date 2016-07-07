@@ -208,6 +208,7 @@ func newRaftNode(c *Config) *raftNode {
 	if !raftpb.IsEmptyHardState(hardState) {
 		rnd.loadHardState(hardState)
 	}
+
 	peerIDs := c.allPeerIDs
 	if len(configState.IDs) > 0 {
 		if len(peerIDs) > 0 {
@@ -312,10 +313,6 @@ func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	}
 
 	rnd.mailbox = append(rnd.mailbox, msg)
-}
-
-func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
-
 }
 
 // Peer contains peer ID and context data.
