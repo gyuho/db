@@ -3,7 +3,6 @@ package raft
 import (
 	"fmt"
 	"math/rand"
-	"sort"
 	"strings"
 
 	"github.com/gyuho/db/raft/raftpb"
@@ -171,16 +170,6 @@ applied   index = %d
 	return rnd
 }
 
-// (etcd raft.raft.nodes)
-func (rnd *raftNode) allNodeIDs() []uint64 {
-	allNodeIDs := make([]uint64, 0, len(rnd.allProgresses))
-	for id := range rnd.allProgresses {
-		allNodeIDs = append(allNodeIDs, id)
-	}
-	sort.Sort(uint64Slice(allNodeIDs))
-	return allNodeIDs
-}
-
 // (etcd raft.raft.quorum)
 func (rnd *raftNode) quorum() int {
 	return len(rnd.allProgresses)/2 + 1
@@ -278,4 +267,10 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	rnd.votedFor = state.VotedFor
 	rnd.storageRaftLog.committedIndex = state.CommittedIndex
 	rnd.term = state.Term
+}
+
+// (etcd raft.raft.maybeCommit)
+func (rnd *raftNode) maybeCommit() bool {
+	// TODO
+	return true
 }

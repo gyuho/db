@@ -37,7 +37,7 @@ func (rnd *raftNode) leaderCheckQuorumActive() bool {
 // (etcd raft.raft.sendHeartbeat)
 func (rnd *raftNode) leaderSendHeartbeatTo(target uint64) {
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderSendHeartbeatTo must be called by the leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderSendHeartbeatTo must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
 	// committedIndex is min(to.matched, raftNode.committedIndex).
@@ -48,7 +48,7 @@ func (rnd *raftNode) leaderSendHeartbeatTo(target uint64) {
 		committedIndex  = minUint64(matched, commitInStorage)
 	)
 	rnd.sendToMailbox(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT_REQUEST,
+		Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT,
 		To:   target,
 		CurrentCommittedIndex: committedIndex,
 	})
@@ -59,7 +59,7 @@ func (rnd *raftNode) leaderSendHeartbeatTo(target uint64) {
 // (etcd raft.raft.bcastHeartbeat)
 func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderReplicateHeartbeatRequests must be called by the leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderReplicateHeartbeatRequests must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
 	for id := range rnd.allProgresses {
@@ -79,10 +79,10 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 // (etcd raft.raft.sendAppend)
 func (rnd *raftNode) leaderSendAppendOrSnapshot(target uint64) {
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderSendAppendOrSnapshot must be called by the leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderSendAppendOrSnapshot must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
-	// ...
+	// TODO
 }
 
 // leaderReplicateAppendRequests replicates append requests to its followers.
@@ -90,7 +90,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(target uint64) {
 // (etcd raft.raft.bcastAppend)
 func (rnd *raftNode) leaderReplicateAppendRequests() {
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderReplicateAppendRequests must be called by the leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderReplicateAppendRequests must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
 	for id := range rnd.allProgresses {
@@ -101,10 +101,26 @@ func (rnd *raftNode) leaderReplicateAppendRequests() {
 	}
 }
 
+// (etcd raft.raft.appendEntry)
+func (rnd *raftNode) leaderAppendEntries(entries ...raftpb.Entry) {
+	storageLastIndex := rnd.storageRaftLog.lastIndex()
+	for idx := range entries {
+		entries[idx].Index = storageLastIndex + 1 + uint64(idx)
+		entries[idx].Term = rnd.term
+	}
+	rnd.storageRaftLog.appendToStorageUnstable(entries...)
+
+	// ???
+	rnd.allProgresses[rnd.id].maybeUpdate(rnd.storageRaftLog.lastIndex())
+
+	// ???
+	rnd.maybeCommit()
+}
+
 // (etcd raft.raft.sendTimeoutNow)
 func (rnd *raftNode) leaderForceFollowerElectionTimeout(target uint64) {
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderForceFollowerElectionTimeout must be called by the leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderForceFollowerElectionTimeout must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
 	rnd.sendToMailbox(raftpb.Message{

@@ -49,6 +49,7 @@ type Progress struct {
 	inflights *inflights
 }
 
+// (etcd raft.Progress.resetState)
 func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
 	pr.State = state
 	pr.PendingSnapshotIndex = 0
@@ -56,6 +57,7 @@ func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
 	pr.RecentActive = false
 }
 
+// (etcd raft.Progress.becomeProbe)
 func (pr *Progress) becomeProbe() {
 	if pr.State == raftpb.PROGRESS_STATE_SNAPSHOT { // snapshot was sent
 		pIdx := pr.PendingSnapshotIndex
@@ -67,19 +69,23 @@ func (pr *Progress) becomeProbe() {
 	pr.NextIndex = pr.MatchIndex + 1 // probe next index
 }
 
+// (etcd raft.Progress.becomeReplicate)
 func (pr *Progress) becomeReplicate() {
 	pr.resetState(raftpb.PROGRESS_STATE_REPLICATE)
 	pr.NextIndex = pr.MatchIndex + 1 // probe next index
 }
 
+// (etcd raft.Progress.pause)
 func (pr *Progress) pause() {
 	pr.Paused = true
 }
 
+// (etcd raft.Progress.resume)
 func (pr *Progress) resume() {
 	pr.Paused = false
 }
 
+// (etcd raft.Progress.isPaused)
 func (pr *Progress) isPaused() bool {
 	switch pr.State {
 	case raftpb.PROGRESS_STATE_PROBE:
@@ -94,11 +100,13 @@ func (pr *Progress) isPaused() bool {
 	}
 }
 
+// (etcd raft.Progress.becomeSnapshot)
 func (pr *Progress) becomeSnapshot(snapshotIndex uint64) {
 	pr.resetState(raftpb.PROGRESS_STATE_SNAPSHOT)
 	pr.PendingSnapshotIndex = snapshotIndex
 }
 
+// (etcd raft.Progress.optimisticUpdate)
 func (pr *Progress) optimisticUpdate(msgLogIndex uint64) {
 	pr.NextIndex = msgLogIndex + 1
 }
@@ -150,12 +158,14 @@ func (pr *Progress) maybeDecrease(rejectLogIndex, rejectHint uint64) bool {
 	return true
 }
 
-// needSnapshotAbort returns true if it needs to stop sending snapshot to the
-// follower.
+// needSnapshotAbort returns true if it needs to stop sending snapshot to the follower.
+//
+// (etcd raft.Progress.needSnapshotAbort)
 func (pr *Progress) needSnapshotAbort() bool {
 	return pr.State == raftpb.PROGRESS_STATE_SNAPSHOT && pr.MatchIndex >= pr.PendingSnapshotIndex
 }
 
+// (etcd raft.Progress.snapshotFailure)
 func (pr *Progress) snapshotFailed() {
 	pr.PendingSnapshotIndex = 0 // reset because it failed
 }
