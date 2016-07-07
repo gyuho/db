@@ -11,14 +11,12 @@ type Progress struct {
 	// State is either PROBE, REPLICATE, SNAPSHOT.
 	State raftpb.PROGRESS_STATE
 
-	// MatchIndex is the highest known matched entry index
-	// of this follower.
+	// MatchIndex is the highest known matched entry index of this follower.
 	//
 	// (etcd raft.Progress.Match)
 	MatchIndex uint64
 
-	// NextIndex is the starting index of entries
-	// for next replication.
+	// NextIndex is the starting index of entries for next replication.
 	//
 	// (etcd raft.Progress.Next)
 	NextIndex uint64
@@ -38,12 +36,12 @@ type Progress struct {
 	// (etcd raft.Progress.Paused)
 	Paused bool
 
-	// Active is true if this follower is recently active,
+	// RecentActive is true if this follower is recently active,
 	// such as receiving any message from this follower.
 	// It can be reset to false after election timeout.
 	//
 	// (etcd raft.Progress.RecentActive)
-	Active bool
+	RecentActive bool
 
 	// inflights represents the status of buffered messages
 	// to this follower. When it's full, no more messages should
@@ -51,13 +49,15 @@ type Progress struct {
 	inflights *inflights
 }
 
+// (etcd raft.Progress.resetState)
 func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
 	pr.State = state
 	pr.PendingSnapshotIndex = 0
 	pr.Paused = false
-	pr.Active = false
+	pr.RecentActive = false
 }
 
+// (etcd raft.Progress.becomeProbe)
 func (pr *Progress) becomeProbe() {
 	if pr.State == raftpb.PROGRESS_STATE_SNAPSHOT { // snapshot was sent
 		pIdx := pr.PendingSnapshotIndex
@@ -69,19 +69,23 @@ func (pr *Progress) becomeProbe() {
 	pr.NextIndex = pr.MatchIndex + 1 // probe next index
 }
 
+// (etcd raft.Progress.becomeReplicate)
 func (pr *Progress) becomeReplicate() {
 	pr.resetState(raftpb.PROGRESS_STATE_REPLICATE)
 	pr.NextIndex = pr.MatchIndex + 1 // probe next index
 }
 
+// (etcd raft.Progress.pause)
 func (pr *Progress) pause() {
 	pr.Paused = true
 }
 
+// (etcd raft.Progress.resume)
 func (pr *Progress) resume() {
 	pr.Paused = false
 }
 
+// (etcd raft.Progress.isPaused)
 func (pr *Progress) isPaused() bool {
 	switch pr.State {
 	case raftpb.PROGRESS_STATE_PROBE:
@@ -91,15 +95,18 @@ func (pr *Progress) isPaused() bool {
 	case raftpb.PROGRESS_STATE_SNAPSHOT:
 		return true
 	default:
-		panic("unexpected pr.State")
+		raftLogger.Panicf("unexpected Progress.State %q", pr.State)
+		return true
 	}
 }
 
+// (etcd raft.Progress.becomeSnapshot)
 func (pr *Progress) becomeSnapshot(snapshotIndex uint64) {
 	pr.resetState(raftpb.PROGRESS_STATE_SNAPSHOT)
 	pr.PendingSnapshotIndex = snapshotIndex
 }
 
+// (etcd raft.Progress.optimisticUpdate)
 func (pr *Progress) optimisticUpdate(msgLogIndex uint64) {
 	pr.NextIndex = msgLogIndex + 1
 }
@@ -151,12 +158,14 @@ func (pr *Progress) maybeDecrease(rejectLogIndex, rejectHint uint64) bool {
 	return true
 }
 
-// needSnapshotAbort returns true if it needs to stop sending snapshot to the
-// follower.
+// needSnapshotAbort returns true if it needs to stop sending snapshot to the follower.
+//
+// (etcd raft.Progress.needSnapshotAbort)
 func (pr *Progress) needSnapshotAbort() bool {
 	return pr.State == raftpb.PROGRESS_STATE_SNAPSHOT && pr.MatchIndex >= pr.PendingSnapshotIndex
 }
 
+// (etcd raft.Progress.snapshotFailure)
 func (pr *Progress) snapshotFailed() {
 	pr.PendingSnapshotIndex = 0 // reset because it failed
 }

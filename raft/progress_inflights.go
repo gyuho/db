@@ -35,6 +35,7 @@ type inflights struct {
 	bufferCount int // (etcd raft.inflights.count)
 }
 
+// (etcd raft.inflights.newInflights)
 func newInflights(size int) *inflights {
 	return &inflights{
 		buffer:      make([]uint64, size),
@@ -43,16 +44,21 @@ func newInflights(size int) *inflights {
 	}
 }
 
-func (ins *inflights) size() int { return len(ins.buffer) }
+func (ins *inflights) size() int {
+	return len(ins.buffer)
+}
 
+// (etcd raft.inflights.full)
 func (ins *inflights) full() bool {
 	return len(ins.buffer) == ins.bufferCount
 }
 
 // inflight must be incremental.
+//
+// (etcd raft.inflights.add)
 func (ins *inflights) add(inflight uint64) {
 	if ins.full() {
-		panic("cannot add into a full inflights")
+		raftLogger.Panicf("cannot add inflight '%d'' into a full inflights", inflight)
 	}
 
 	next := ins.bufferStart + ins.bufferCount
@@ -63,12 +69,16 @@ func (ins *inflights) add(inflight uint64) {
 }
 
 // freeAll frees all inflights.
+//
+// (etcd raft.inflights.reset)
 func (ins *inflights) freeAll() {
 	ins.bufferStart = 0
 	ins.bufferCount = 0
 }
 
 // freeTo frees inflight messages where index <= 'to'.
+//
+// (etcd raft.inflights.freeTo)
 func (ins *inflights) freeTo(to uint64) {
 	if ins.bufferCount == 0 || ins.buffer[ins.bufferStart] > to {
 		return
@@ -93,6 +103,7 @@ func (ins *inflights) freeTo(to uint64) {
 	ins.bufferStart = start
 }
 
+// (etcd raft.inflights.freeFirstOne)
 func (ins *inflights) freeFirstOne() {
 	ins.freeTo(ins.buffer[ins.bufferStart])
 }

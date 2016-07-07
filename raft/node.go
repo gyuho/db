@@ -256,7 +256,7 @@ func (nd *node) ReportUnreachable(targetID uint64) {
 func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 	select {
 	case nd.receiveCh <- raftpb.Message{
-		Type:   raftpb.MESSAGE_TYPE_INTERNAL_SNAPSHOT_RESPONSE,
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT,
 		From:   targetID,
 		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED,
 	}:
@@ -266,7 +266,7 @@ func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 
 func (nd *node) RequestLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_LEADER_CURRENT_COMMITTED_INDEX_REQUEST,
+		Type:    raftpb.MESSAGE_TYPE_REQUEST_CURRENT_COMMITTED_INDEX,
 		From:    fromID,
 		Entries: []raftpb.Entry{{Data: data}},
 	})

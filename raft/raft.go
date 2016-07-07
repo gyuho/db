@@ -1,109 +1,16 @@
 package raft
 
 import (
-	"errors"
+	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// NoLeaderNodeID is a placeholder node ID, only used when
-// there is no leader in the cluster.
-const NoLeaderNodeID uint64 = 0
-
-// Config contains the parameters to start a Raft node.
-type Config struct {
-	// Logger implements system logging for Raft.
-	Logger Logger
-
-	// ID is the id of the Raft node, and 0 when there's no leader.
-	// (etcd raft.Config.ID)
-	ID uint64
-
-	// allNodeIDs contains the IDs of all peers and the node itself.
-	// It should only be set when starting a new Raft cluster.
-	// (etcd raft.Config.peers)
-	allNodeIDs []uint64
-
-	// StorageStable implements storage for Raft logs, where a node stores its
-	// entries and states, reads the persisted data when needed.
-	// Raft node needs to read the previous state and configuration
-	// when restarting.
-	// (etcd raft.Storage)
-	StorageStable StorageStable
-
-	// ElectionTick is the number of ticks between elections.
-	// If a follower does not receive any message from a valid leader
-	// before ElectionTick has elapsed, it becomes a candidate to
-	// start an election. ElectionTick must be greater than HeartbeatTick,
-	// ideally ElectionTick = 10 * HeartbeatTick.
-	// etcd often sets ElectionTick as 1 millisecond per tick.
-	// (etcd raft.Config.ElectionTick)
-	ElectionTick int
-
-	// HeartbeatTick is the number of ticks between heartbeats by a leader.
-	// Raft leader must send heartbeat messages to its followers to maintain
-	// its leadership.
-	// (etcd raft.Config.HeartbeatTick)
-	HeartbeatTick int
-
-	// LeaderCheckQuorum is true, then a leader checks if quorum is active,
-	// for an election timeout. If not, the leader steps down.
-	LeaderCheckQuorum bool
-
-	// ---------------------------
-	// APPLICATION SPECIFIC CONFIG
-	// ---------------------------
-	//
-
-	// LastAppliedIndex is the last applied index of Raft entries.
-	// It is only set when restarting a Raft node, so that Raft
-	// does not return any entries smaller than or equal to LastAppliedIndex.
-	// If LastAppliedIndex is not set when a node restarts, it will return
-	// previously applied entries. This is application-specific configuration.
-	// (etcd raft.Config.Applied)
-	LastAppliedIndex uint64
-
-	// MaxEntryPerMsg is the maximum number of entries for each
-	// append message. If 0, it only appends one entry per message.
-	// (etcd raft.Config.MaxSizePerMsg)
-	MaxEntryPerMsg uint64
-
-	// MaxInflightMsgs is the maximum number of in-flight append messages
-	// during optimistic replication phase. Transportation layer usually
-	// has its own sending buffer over TCP/UDP. MaxInflighMsgNum is to
-	// avoid overflowing that sending buffer.
-	// (etcd raft.Config.MaxInflightMsgs)
-	MaxInflightMsgs int
-}
-
-func (c *Config) validate() error {
-	if c.ID == NoLeaderNodeID {
-		return errors.New("cannot use 0 for node ID")
-	}
-
-	if c.Logger == nil {
-		return errors.New("logger cannot be nil")
-	}
-
-	if c.StorageStable == nil {
-		return errors.New("raft storage cannot be nil")
-	}
-
-	if c.HeartbeatTick <= 0 {
-		return errors.New("heartbeat tick must be greater than 0")
-	}
-
-	if c.ElectionTick <= c.HeartbeatTick {
-		return errors.New("election tick must be greater than heartbeat tick")
-	}
-
-	if c.MaxInflightMsgs <= 0 {
-		return errors.New("max number of inflight messages must be greater than 0")
-	}
-
-	return nil
-}
+// NoneNodeID is a placeholder node ID, only used when there is no leader in the cluster,
+// or to reset leader transfer.
+const NoneNodeID uint64 = 0
 
 // raftNode represents Raft-algorithm-specific node.
 //
@@ -112,54 +19,258 @@ type raftNode struct {
 	id    uint64
 	state raftpb.NODE_STATE
 
-	term      uint64          // (etcd raft.raft.Term)
-	votedFor  uint64          // (etcd raft.raft.Vote)
-	votedFrom map[uint64]bool // (etcd raft.raft.votes)
+	leaderID      uint64               // (etcd raft.raft.lead)
+	allProgresses map[uint64]*Progress // (etcd raft.raft.prs)
 
-	leaderID     uint64               // (etcd raft.raft.lead)
-	idToProgress map[uint64]*Progress // (etcd raft.raft.prs)
+	storageRaftLog *storageRaftLog
 
-	heartbeatTick        int // for leader
-	heartbeatTickElapsed int // for leader
+	rand *rand.Rand
 
-	raftLogStorage *raftLogStorage
-	msgs           []raftpb.Message
+	// electionTimeoutTickNum is the number of ticks for election to time out.
+	//
+	// (etcd raft.raft.electionTimeout)
+	electionTimeoutTickNum int
 
-	electionTick        int
-	electionTickElapsed int
+	// electionTimeoutElapsedTickNum is the number of ticks elapsed
+	// since the tick reached the last election timeout.
+	//
+	// (etcd raft.raft.electionElapsed)
+	electionTimeoutElapsedTickNum int
 
-	// electionTickRandomized is the random number between
-	// [electionTick, 2 * electionTick - 1], and gets reset
+	// randomizedElectionTimeoutTickNum is the random number between
+	// [electionTimeoutTickNum, 2 * electionTimeoutTickNum - 1], and gets reset
 	// when raftNode state changes to follower or to candidate.
-	electionTickRandomized int
-	rand                   *rand.Rand
+	//
+	// (etcd raft.raft.randomizedElectionTimeoutTickNum)
+	randomizedElectionTimeoutTickNum int
+
+	// heartbeatTimeoutTickNum is the number of ticks for leader to send heartbeat to its followers.
+	//
+	// (etcd raft.raft.heartbeatTimeout)
+	heartbeatTimeoutTickNum int
+
+	// heartbeatTimeoutElapsedTickNum is the number of ticks elapsed
+	// since the tick reached the last heartbeat timeout.
+	//
+	// (etcd raft.raft.heartbeatElapsed)
+	heartbeatTimeoutElapsedTickNum int
 
 	tickFunc func()
 	stepFunc func(r *raftNode, msg raftpb.Message)
 
+	maxEntryNumPerMsg uint64
+	maxInflightMsgNum int
+
 	leaderCheckQuorum bool
 
-	maxEntryPerMsg  uint64
-	maxInflightMsgs int
+	term      uint64          // (etcd raft.raft.Term)
+	votedFor  uint64          // (etcd raft.raft.Vote)
+	votedFrom map[uint64]bool // (etcd raft.raft.votes)
+
+	// mailbox contains a slice of messages to be filtered and processed
+	// by each step method.
+	mailbox []raftpb.Message
 
 	// pendingConfigExist is true, then new configuration will be ignored,
 	// in preference to the unapplied configuration.
 	pendingConfigExist bool
 
-	// leaderIDTransferee is the ID of the leader transfer target
+	// leaderTransfereeID is the ID of the leader transfer target
 	// when it's not zero (Raft 3.10).
-	leaderIDTransferee uint64
+	leaderTransfereeID uint64
 }
 
+// newRaftNode creates a new raftNode with the given Config.
 func newRaftNode(c *Config) *raftNode {
-	raftLogger.SetLogger(c.Logger)
-	return nil
+	if err := c.validate(); err != nil {
+		raftLogger.Panicf("invalid raft.Config %+v (%v)", c, err)
+	}
+
+	if c.Logger != nil { // set the Logger
+		raftLogger.SetLogger(c.Logger)
+	}
+
+	rnd := &raftNode{
+		id:    c.ID,
+		state: raftpb.NODE_STATE_FOLLOWER, // 0
+
+		leaderID:       NoneNodeID,
+		allProgresses:  make(map[uint64]*Progress),
+		storageRaftLog: newStorageRaftLog(c.StorageStable),
+
+		rand: rand.New(rand.NewSource(int64(c.ID))),
+
+		electionTimeoutTickNum:  c.ElectionTickNum,
+		heartbeatTimeoutTickNum: c.HeartbeatTimeoutTickNum,
+
+		maxEntryNumPerMsg: c.MaxEntryNumPerMsg,
+		maxInflightMsgNum: c.MaxInflightMsgNum,
+
+		leaderCheckQuorum: c.LeaderCheckQuorum,
+	}
+
+	hardState, configState, err := c.StorageStable.GetState()
+	if err != nil {
+		raftLogger.Panicf("newRaftNode c.StorageStable.GetState error (%v)", err)
+	}
+	if !raftpb.IsEmptyHardState(hardState) {
+		rnd.loadHardState(hardState)
+	}
+
+	peerIDs := c.allPeerIDs
+	if len(configState.IDs) > 0 {
+		if len(peerIDs) > 0 {
+			raftLogger.Panicf("cannot specify peer IDs both in Config.allPeerIDs and configState.IDs")
+		}
+		// overwrite peerIDs
+		peerIDs = configState.IDs
+	}
+	for _, id := range peerIDs {
+		rnd.allProgresses[id] = &Progress{
+			NextIndex: 1,
+			inflights: newInflights(rnd.maxInflightMsgNum),
+		}
+	}
+
+	if c.LastAppliedIndex > 0 {
+		rnd.storageRaftLog.appliedTo(c.LastAppliedIndex)
+	}
+
+	rnd.becomeFollower(rnd.term, rnd.leaderID)
+
+	var nodeSlice []string
+	for _, id := range rnd.allNodeIDs() {
+		nodeSlice = append(nodeSlice, fmt.Sprintf("%x", id))
+	}
+
+	raftLogger.Infof(`
+
+newRaftNode
+
+    state = %q
+       id = %x
+all nodes = %q
+
+first index = %d
+last  index = %d
+
+     term = %d
+last term = %d
+
+committed index = %d
+applied   index = %d
+
+
+`, rnd.state, rnd.id, strings.Join(nodeSlice, ", "),
+		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.lastIndex(),
+		rnd.term, rnd.storageRaftLog.lastTerm(),
+		rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.appliedIndex,
+	)
+
+	return rnd
 }
 
-// Peer contains peer ID and context data.
-//
-// (etcd raft.Peer)
-type Peer struct {
-	ID   uint64
-	Data []byte
+// (etcd raft.raft.quorum)
+func (rnd *raftNode) quorum() int {
+	return len(rnd.allProgresses)/2 + 1
+}
+
+// (etcd raft.raft.resetRandomizedElectionTimeout)
+func (rnd *raftNode) randomizeElectionTickTimeout() {
+	// [electiontimeout, 2 * electiontimeout - 1].
+	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
+}
+
+// (etcd raft.raft.pastElectionTimeout)
+func (rnd *raftNode) pastElectionTimeout() bool {
+	return rnd.electionTimeoutElapsedTickNum >= rnd.randomizedElectionTimeoutTickNum
+}
+
+// (etcd raft.raft.abortLeaderTransfer)
+func (rnd *raftNode) stopLeaderTransfer() {
+	rnd.leaderTransfereeID = NoneNodeID
+}
+
+// (etcd raft.raft.resetPendingConf)
+func (rnd *raftNode) resetPendingConfigExist() {
+	rnd.pendingConfigExist = false
+}
+
+// (etcd raft.raft.reset)
+func (rnd *raftNode) resetWithTerm(term uint64) {
+	if rnd.term != term {
+		rnd.term = term
+		rnd.votedFor = NoneNodeID
+	}
+	rnd.leaderID = NoneNodeID
+	rnd.votedFrom = make(map[uint64]bool)
+
+	rnd.electionTimeoutElapsedTickNum = 0
+	rnd.heartbeatTimeoutElapsedTickNum = 0
+	rnd.randomizeElectionTickTimeout()
+
+	rnd.stopLeaderTransfer()
+	rnd.pendingConfigExist = false
+
+	for id := range rnd.allProgresses {
+		rnd.allProgresses[id] = &Progress{
+			// NextIndex is the starting index of entries for next replication.
+			NextIndex: rnd.storageRaftLog.lastIndex() + 1,
+			inflights: newInflights(rnd.maxInflightMsgNum),
+		}
+
+		if id == rnd.id {
+			// MatchIndex is the highest known matched entry index of this node.
+			rnd.allProgresses[id].MatchIndex = rnd.storageRaftLog.lastIndex()
+		}
+	}
+}
+
+// (etcd raft.raft.setProgress)
+func (rnd *raftNode) updateProgress(id, matchIndex, nextIndex uint64) {
+	rnd.allProgresses[id] = &Progress{
+		MatchIndex: matchIndex,
+		NextIndex:  nextIndex,
+		inflights:  newInflights(rnd.maxInflightMsgNum),
+	}
+}
+
+// (etcd raft.raft.delProgress)
+func (rnd *raftNode) deleteProgress(id uint64) {
+	delete(rnd.allProgresses, id)
+}
+
+// (etcd raft.raft.softState)
+func (rnd *raftNode) softState() *raftpb.SoftState {
+	return &raftpb.SoftState{
+		NodeState: rnd.state,
+		LeaderID:  rnd.leaderID,
+	}
+}
+
+// (etcd raft.raft.hardState)
+func (rnd *raftNode) hardState() raftpb.HardState {
+	return raftpb.HardState{
+		VotedFor:       rnd.votedFor,
+		CommittedIndex: rnd.storageRaftLog.committedIndex,
+		Term:           rnd.term,
+	}
+}
+
+// (etcd raft.raft.loadState)
+func (rnd *raftNode) loadHardState(state raftpb.HardState) {
+	if state.CommittedIndex < rnd.storageRaftLog.committedIndex || state.CommittedIndex > rnd.storageRaftLog.lastIndex() {
+		raftLogger.Panicf("HardState of %x has committed index %d out of range [%d, %d]",
+			rnd.id, state.CommittedIndex, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.lastIndex())
+	}
+
+	rnd.votedFor = state.VotedFor
+	rnd.storageRaftLog.committedIndex = state.CommittedIndex
+	rnd.term = state.Term
+}
+
+// (etcd raft.raft.maybeCommit)
+func (rnd *raftNode) maybeCommit() bool {
+	// TODO
+	return true
 }
