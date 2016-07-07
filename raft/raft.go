@@ -111,8 +111,8 @@ type raftNode struct {
 	id    uint64
 	state raftpb.NODE_STATE
 
-	leaderID      uint64               // (etcd raft.raft.lead)
-	idsToProgress map[uint64]*Progress // (etcd raft.raft.prs)
+	leaderID      uint64                       // (etcd raft.raft.lead)
+	allProgresses map[uint64]*FollowerProgress // (etcd raft.raft.prs)
 
 	storageRaftLog *storageRaftLog
 
@@ -187,7 +187,7 @@ func newRaftNode(c *Config) *raftNode {
 		state: raftpb.NODE_STATE_FOLLOWER, // 0
 
 		leaderID:       NoLeaderNodeID,
-		idsToProgress:  make(map[uint64]*Progress),
+		allProgresses:  make(map[uint64]*FollowerProgress),
 		storageRaftLog: newStorageRaftLog(c.StorageStable),
 
 		rand: rand.New(rand.NewSource(int64(c.ID))),
@@ -218,7 +218,7 @@ func newRaftNode(c *Config) *raftNode {
 		peerIDs = configState.IDs
 	}
 	for _, id := range peerIDs {
-		rnd.idsToProgress[id] = &Progress{
+		rnd.allProgresses[id] = &FollowerProgress{
 			NextIndex: 1,
 			inflights: newInflights(rnd.maxInflightMsgNum),
 		}
@@ -263,7 +263,7 @@ applied   index = %d
 }
 
 func (rnd *raftNode) quorum() int {
-	return len(rnd.idsToProgress)/2 + 1
+	return len(rnd.allProgresses)/2 + 1
 }
 
 func (rnd *raftNode) hasLeader() bool {
@@ -283,8 +283,8 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 
 // (etcd raft.raft.nodes)
 func (rnd *raftNode) allNodes() []uint64 {
-	allNodes := make([]uint64, 0, len(rnd.idsToProgress))
-	for id := range rnd.idsToProgress {
+	allNodes := make([]uint64, 0, len(rnd.allProgresses))
+	for id := range rnd.allProgresses {
 		allNodes = append(allNodes, id)
 	}
 	sort.Sort(uint64Slice(allNodes))

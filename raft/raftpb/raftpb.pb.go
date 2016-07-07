@@ -102,7 +102,7 @@ const (
 	// raftpb.MsgApp, but includes raftpb.Message.Commit information for
 	// followers.
 	//
-	//   idx1 = Leader.Follower.Progress.Match
+	//   idx1 = Leader.FollowerProgress.Match
 	//   idx2 = Leader.raftLog.CommittedIndex
 	//   Leader.LEADER_HEARTBEAT_REQUEST.CurrentCommittedIndex = min(idx1, idx2)
 	//
@@ -201,7 +201,7 @@ const (
 	MESSAGE_TYPE_PROPOSAL MESSAGE_TYPE = 7
 	// LEADER_APPEND_REQUEST message is only sent by Leader.
 	//
-	//   newLogIndex   = Leader.Follower.Progress.Next
+	//   newLogIndex   = Leader.FollowerProgress.Next
 	//   prevLogIndex  = newLogsIndex - 1
 	//   prevLogTerm   = Leader.raftLog.term(prevLogIndex)
 	//   entries       = Leader.raftLog.entries(newLogIndex, Leader.maxMsgSize)
@@ -227,7 +227,7 @@ const (
 	//         Follower.APPEND_RESPONSE.Reject   = false
 	//
 	//      AND THEN
-	//         Leader updates Leader.Follower.Progress
+	//         Leader updates Leader.FollowerProgress
 	//
 	//      ELSE IF
 	//         Leader.LEADER_APPEND_REQUEST.LogIndex >= Follower.raftLog.CommittedIndex
@@ -253,10 +253,10 @@ const (
 	//         Follower.APPEND_RESPONSE.RejectHint = Follower.raftLog.lastIndex()
 	//
 	//         THEN
-	//            Leader gets this Rejection and updates its Progress with:
+	//            Leader gets this Rejection and updates its FollowerProgress with:
 	//               idx1 = Follower.APPEND_RESPONSE.LogIndex
 	//               idx2 = Follower.APPEND_RESPONSE.RejectHint + 1
-	//               Leader.Follower.Progress.Next = min(idx1, idx2)
+	//               Leader.FollowerProgress.Next = min(idx1, idx2)
 	//
 	//   (etcd: raft.*raft.handleAppendEntries)
 	//
@@ -311,18 +311,18 @@ const (
 	// LEADER_SNAPSHOT_REQUEST is only sent by Leader.
 	// It is triggered when the Leader tries to replicate its log (sendAppend) but:
 	//
-	//   i) term, err = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
+	//   i) term, err = Leader.raftLog.term(Leader.FollowerProgress.Next - 1)
 	//      err == ErrCompacted
 	//
 	//   OR
 	//
-	//   ii) entries, err = Leader.raftLog.entries(Leader.Follower.Progress.Next, Leader.maxMsgSize)
+	//   ii) entries, err = Leader.raftLog.entries(Leader.FollowerProgress.Next, Leader.maxMsgSize)
 	//       err != nil
 	//
 	//   THEN
 	//      snap = Leader.raftLog.snapshot()
 	//      Leader.LEADER_SNAPSHOT_REQUEST.Snapshot = snap
-	//      Leader.Follower.Progress.becomeSnapshot(snap.Index)
+	//      Leader.FollowerProgress.becomeSnapshot(snap.Index)
 	//
 	//
 	// (etcd: raft.raftpb.MsgSnap)
@@ -593,8 +593,8 @@ type Message struct {
 	//
 	//   ii) AppendEntries with:
 	//
-	//      Leader.Message.LogIndex = Leader.Follower.Progress.Next - 1
-	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
+	//      Leader.Message.LogIndex = Leader.FollowerProgress.Next - 1
+	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.FollowerProgress.Next - 1)
 	//
 	//   to tell its Follower where those new entries start.
 	//   (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
@@ -627,11 +627,11 @@ type Message struct {
 	//
 	//   AppendEntries with:
 	//
-	//      Leader.Message.LogIndex = Leader.Follower.Progress.Next - 1
-	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
+	//      Leader.Message.LogIndex = Leader.FollowerProgress.Next - 1
+	//      Leader.Message.LogTerm  = Leader.raftLog.term(Leader.FollowerProgress.Next - 1)
 	//
 	//   to tell followers where new log entries start.
-	//   New log entries start from Leader.Follower.Progress.Next.
+	//   New log entries start from Leader.FollowerProgress.Next.
 	//   (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
 	//
 	//
@@ -668,14 +668,14 @@ type Message struct {
 	//      i)  Follower.raftLog.CommittedIndex > Leader.Message.LogIndex
 	//
 	//      to tell Follower is ahead of that message, so Follower ignores
-	//      this Message, and Leader can update Leader.Follower.Progress.Next.
+	//      this Message, and Leader can update Leader.FollowerProgress.Next.
 	//
 	//      It will respond with:
 	//         - To: Leader
 	//         - Type: raftpb.MsgAppResp
 	//         - LogIndex: Follower.raftLog.CommittedIndex
 	//
-	//      (etcd: raft.*raft.handleAppendEntries, raft.*Progress.maybeUpdate)
+	//      (etcd: raft.*raft.handleAppendEntries, raft.*FollowerProgress.maybeUpdate)
 	//
 	//      OR
 	//
@@ -748,7 +748,7 @@ type Message struct {
 	//
 	//   idx1 = Follower.Message.LogIndex
 	//   idx2 = Follower.Message.RejectHintFollowerLastIndex
-	//   Leader.Follower.Progress.Next = min(idx1, idx2)
+	//   Leader.FollowerProgress.Next = min(idx1, idx2)
 	//
 	//   (etcd: raft.stepLeader with raftpb.MsgAppResp)
 	//
