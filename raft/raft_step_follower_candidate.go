@@ -29,6 +29,15 @@ func (rnd *raftNode) tickFuncFollowerElectionTimeout() {
 	}
 }
 
+// (etcd raft.raft.handleHeartbeat)
+func (rnd *raftNode) respondToLeaderHeartbeat(msg raftpb.Message) {
+	rnd.storageRaftLog.commitTo(msg.CurrentCommittedIndex)
+	rnd.sendToMailbox(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT,
+		To:   msg.From,
+	})
+}
+
 // (etcd raft.raft.poll)
 func (rnd *raftNode) candidateReceivedVoteFrom(fromID uint64, voted bool) int {
 	if voted {
@@ -82,6 +91,16 @@ func (rnd *raftNode) followerStartCampaign() {
 	}
 }
 
+// (etcd raft.raft.becomeFollower)
+func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
+
+}
+
+// (etcd raft.raft.becomeCandidate)
+func (rnd *raftNode) becomeCandidate() {
+
+}
+
 // (etcd raft.raft.handleSnapshot with raftpb.MsgSnap)
 func (rnd *raftNode) handleSnapshotFromLeader(msg raftpb.Message) {
 	if rnd.id == rnd.leaderID {
@@ -95,15 +114,5 @@ func (rnd *raftNode) restoreFromSnapshot(snap raftpb.Snapshot) {
 	if rnd.id == rnd.leaderID {
 		raftLogger.Panicf("restoreFromSnapshot must be called by follower [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
-
-}
-
-// (etcd raft.raft.becomeFollower)
-func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
-
-}
-
-// (etcd raft.raft.becomeCandidate)
-func (rnd *raftNode) becomeCandidate() {
 
 }
