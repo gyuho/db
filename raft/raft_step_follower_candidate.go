@@ -102,17 +102,41 @@ func (rnd *raftNode) becomeCandidate() {
 }
 
 // (etcd raft.raft.handleSnapshot with raftpb.MsgSnap)
-func (rnd *raftNode) handleSnapshotFromLeader(msg raftpb.Message) {
+func (rnd *raftNode) restoreSnapshotFromLeader(msg raftpb.Message) {
 	if rnd.id == rnd.leaderID {
-		raftLogger.Panicf("handleSnapshotFromLeader must be called by follower [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("restoreSnapshotFromLeader must be called by follower [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
+	snapMetaIndex, snapMetaTerm := msg.Snapshot.Metadata.Index, msg.Snapshot.Metadata.Term
+
+	raftLogger.Infof("%x [committed index=%d] is restoring snapshot from leader %x [index=%d | term=%d]",
+		rnd.id, rnd.storageRaftLog.committedIndex, rnd.leaderID, snapMetaIndex, snapMetaTerm,
+	)
+
+	if rnd.restoreSnapshot(msg.Snapshot) {
+		raftLogger.Infof("%x [committed index=%d] restored snapshot from leader %x [index=%d | term=%d]",
+			rnd.id, rnd.storageRaftLog.committedIndex, rnd.leaderID, snapMetaIndex, snapMetaTerm,
+		)
+		rnd.sendToMailbox(raftpb.Message{
+			Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT,
+			To:       msg.From,
+			LogIndex: rnd.storageRaftLog.lastIndex(),
+		})
+		return
+	}
+
+	raftLogger.Infof("%x [committed index=%d] ignored snapshot from leader %x [index=%d | term=%d]",
+		rnd.id, rnd.storageRaftLog.committedIndex, rnd.leaderID, snapMetaIndex, snapMetaTerm,
+	)
+	rnd.sendToMailbox(raftpb.Message{
+		Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT,
+		To:       msg.From,
+		LogIndex: rnd.storageRaftLog.committedIndex,
+	})
 }
 
 // (etcd raft.raft.restore)
-func (rnd *raftNode) restoreFromSnapshot(snap raftpb.Snapshot) {
-	if rnd.id == rnd.leaderID {
-		raftLogger.Panicf("restoreFromSnapshot must be called by follower [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
-	}
+func (rnd *raftNode) restoreSnapshot(snap raftpb.Snapshot) bool {
 
+	return true
 }
