@@ -32,6 +32,38 @@ func (rnd *raftNode) leaderCheckQuorumActive() bool {
 	return activeN >= rnd.quorum()
 }
 
+// (etcd raft.raft.tickHeartbeat)
+func (rnd *raftNode) triggerLeaderToSendHeartbeat() {
+	rnd.heartbeatTimeoutElapsedTickNum++
+	rnd.electionTimeoutElapsedTickNum++
+
+	if rnd.electionTimeoutElapsedTickNum >= rnd.electionTimeoutTickNum {
+		rnd.electionTimeoutElapsedTickNum = 0
+		if rnd.leaderCheckQuorum {
+			rnd.Step(raftpb.Message{
+				Type: raftpb.MESSAGE_TYPE_INTERNAL_CHECK_QUORUM,
+				From: rnd.id,
+			})
+		}
+
+		if rnd.state == raftpb.NODE_STATE_LEADER && rnd.leaderTransfereeID != NoneNodeID {
+			rnd.stopLeaderTransfer()
+		}
+	}
+
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		return
+	}
+
+	if rnd.heartbeatTimeoutElapsedTickNum >= rnd.heartbeatTimeoutTickNum {
+		rnd.heartbeatTimeoutElapsedTickNum = 0
+		rnd.Step(raftpb.Message{
+			Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_SEND_HEARTBEAT,
+			From: rnd.id,
+		})
+	}
+}
+
 // leaderSendHeartbeatTo sends an empty append RPC as a heartbeat to its followers.
 //
 // (etcd raft.raft.sendHeartbeat)
