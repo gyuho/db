@@ -32,8 +32,17 @@ func (rnd *raftNode) leaderCheckQuorumActive() bool {
 	return activeN >= rnd.quorum()
 }
 
+// tickFuncLeaderHeartbeatTimeout triggers an internal message to leader,
+// so that leader can send out heartbeats to its followers. And if the
+// election times out and 'checkQuorum' is true, it sends 'checkQuorum'
+// message to its followers.
+//
 // (etcd raft.raft.tickHeartbeat)
-func (rnd *raftNode) triggerLeaderToSendHeartbeat() {
+func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
+	if rnd.id != rnd.leaderID {
+		raftLogger.Panicf("tickFuncLeaderHeartbeatTimeout must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+	}
+
 	rnd.heartbeatTimeoutElapsedTickNum++
 	rnd.electionTimeoutElapsedTickNum++
 
