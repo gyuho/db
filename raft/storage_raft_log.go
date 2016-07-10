@@ -387,7 +387,7 @@ func (sr *storageRaftLog) snapshot() (raftpb.Snapshot, error) {
 //
 // (etcd raft.raftLog.restore)
 func (sr *storageRaftLog) restoreSnapshot(snap raftpb.Snapshot) {
-	raftLogger.Infof("log %v is restroing the incoming snapshot [snapshot index=%d | snapshot term=%d]", sr, snap.Metadata.Index, snap.Metadata.Term)
+	raftLogger.Infof("log %v is restoring the given snapshot [snapshot index=%d | snapshot term=%d]", sr, snap.Metadata.Index, snap.Metadata.Term)
 	sr.committedIndex = snap.Metadata.Index
 	sr.storageUnstable.restoreSnapshot(snap)
 }
