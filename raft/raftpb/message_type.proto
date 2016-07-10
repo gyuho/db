@@ -11,7 +11,7 @@ option (gogoproto.goproto_getters_all) = false;
 
 // (etcd raftpb.MessageType)
 enum MESSAGE_TYPE {
-	// INTERNAL_CAMPAIGN_START message is used locally by Candidate/Follower
+	// INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN message is used locally by Candidate/Follower
 	// to start an election after election timeout.
 	//
 	// Every server in Raft starts as a follower, and when it has not received
@@ -24,18 +24,18 @@ enum MESSAGE_TYPE {
 	// It is an internal(local) message that is never sent to other peers over the network.
 	//
 	// (etcd: raft.raftpb.MsgHup)
-	INTERNAL_CAMPAIGN_START = 0;
+	INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN = 0;
 
-	// INTERNAL_LEADER_SEND_HEARTBEAT message is used locally by Leader,
+	// INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT message is used locally by Leader,
 	// to signal the leader to send a LEADER_HEARTBEAT to its followers.
 	// It is triggered periodically after heartbeat timeouts.
 	//
 	// It is an internal(local) message that is never sent to other peers over the network.
 	//
 	// (etcd: raft.raftpb.MsgBeat)
-	INTERNAL_LEADER_SEND_HEARTBEAT = 1;
+	INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT = 1;
 
-	// INTERNAL_CHECK_QUORUM message is used locally by Leader,
+	// INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM message is used locally by Leader,
 	// to check if quorum of cluster (including itself) is active.
 	// And if not, the leader steps down to a follower.
 	//
@@ -44,10 +44,10 @@ enum MESSAGE_TYPE {
 	// It is an internal(local) message that is never sent to other peers over the network.
 	//
 	// (etcd: raft.raftpb.MsgCheckQuorum)
-	INTERNAL_CHECK_QUORUM = 2;
+	INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM = 2;
 
 	// LEADER_HEARTBEAT message is heartbeat from the Leader.
-	// It is triggered by INTERNAL_LEADER_SEND_HEARTBEAT message, after every heartbeat
+	// It is triggered by INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT message, after every heartbeat
 	// timeout, and is sent to leader's followers. It is same as an empty
 	// raftpb.MsgApp, but includes raftpb.Message.Commit information for
 	// followers.
@@ -111,48 +111,48 @@ enum MESSAGE_TYPE {
 	// (etcd: raft.raftpb.MsgVoteResp)
 	RESPONSE_TO_CANDIDATE_REQUEST_VOTE = 6;
 
-	// PROPOSAL message is used to forward client requests to its
-	// leader, because client requests in Raft are processed through the
-	// leader. First option is for the server to reject the request and
-	// return the endpoint of the leader to the client. Or the server can proxy
-	// the client's requests to the leader without rejection, so that clients
-	// can talk to any node in the cluster.
+	// PROPOSAL_TO_LEADER message is used to forward client requests to its leader,
+	// because client requests in Raft are processed through the leader.
+	// First option is for the server to reject the request and return the 
+	// endpoint of the leader to the client. Or the server can proxy the client's
+	// requests to the leader without rejection, so that clients can talk to any
+	// node in the cluster.
 	// (Raft 6.2 Routing requests to the leader)
 	//
-	// For Leader/Candidate, it is an internal(local) message that is never
-	// sent to other peers over the network. For Follower, it is forwarded
-	// to Leader over the network.
+	// For Leader/Candidate, it is an internal(local) message that is never sent
+	// to other peers over the network. For Follower, it is forwarded to Leader
+	// over the network.
 	//
 	// It is triggered whenever local node.Propose, only contains:
 	//
-	//   Leader/Candidate/Follower.PROPOSAL.Entries = Entries
+	//   Leader/Candidate/Follower.PROPOSAL_TO_LEADER.Entries = Entries
 	//
 	//
-	// Leader receives Leader.PROPOSAL:
+	// Leader receives Leader.PROPOSAL_TO_LEADER:
 	//
-	//   Leader.appendEntry(Leader.PROPOSAL.Entries)
+	//   Leader.appendEntry(Leader.PROPOSAL_TO_LEADER.Entries)
 	//   Leader.bcastAppend() to followers
 	//
 	//
-	// Candidate receives Candidate.PROPOSAL:
+	// Candidate receives Candidate.PROPOSAL_TO_LEADER:
 	//
-	//   Ignore Candidate.PROPOSAL
+	//   Ignore Candidate.PROPOSAL_TO_LEADER
 	//   because it means that there is no leader
 	//
 	//
-	// Follower receives Follower.PROPOSAL:
+	// Follower receives Follower.PROPOSAL_TO_LEADER:
 	//
-	//   i) Ignore Follower.PROPOSAL
+	//   i) Ignore Follower.PROPOSAL_TO_LEADER
 	//      if there is no known leader
 	//
-	//   ii) Send Follower.PROPOSAL to its Leader
+	//   ii) Send Follower.PROPOSAL_TO_LEADER to its Leader
 	//
-	//       Follower.PROPOSAL.To = Leader
-	//       Follower.PROPOSAL.Entries = Entries
+	//       Follower.PROPOSAL_TO_LEADER.To = Leader
+	//       Follower.PROPOSAL_TO_LEADER.Entries = Entries
 	//
 	//
 	// (etcd: raft.raftpb.MsgProp)
-	PROPOSAL = 7;
+	PROPOSAL_TO_LEADER = 7;
 
 	// LEADER_REQUEST_APPEND message is only sent by Leader.
 	//
@@ -314,7 +314,7 @@ enum MESSAGE_TYPE {
 	// (etcd: raft.raftpb.MsgTimeoutNow)
 	FORCE_ELECTION_TIMEOUT = 14;
 
-	// REQUEST_CURRENT_COMMITTED_INDEX is used to serve clients' read-only queries without
+	// READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST is used to serve clients' read-only queries without
 	// going through Raft, but still with 'quorum-get' on. It bypasses the Raft log, but
 	// still preserves the linearizability of reads, with lower costs.
 	//
@@ -346,11 +346,11 @@ enum MESSAGE_TYPE {
 	//
 	// (Raft 6.4 Processing read-only queries more efficiently, page 72)
 	// (etcd: raft.raftpb.MsgReadIndex)
-	REQUEST_CURRENT_COMMITTED_INDEX = 15;
+	READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST = 15;
 
-	// RESPONSE_TO_REQUEST_CURRENT_COMMITTED_INDEX is response to REQUEST_CURRENT_COMMITTED_INDEX.
+	// RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST is response to READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST.
 	//
 	// (Raft 6.4 Processing read-only queries more efficiently, page 72)
 	// (etcd: raft.raftpb.MsgReadIndexResp)
-	RESPONSE_TO_REQUEST_CURRENT_COMMITTED_INDEX = 16;
+	RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST = 16;
 }

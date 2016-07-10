@@ -54,7 +54,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 		rnd.electionTimeoutElapsedTickNum = 0
 		if rnd.leaderCheckQuorum {
 			rnd.Step(raftpb.Message{
-				Type: raftpb.MESSAGE_TYPE_INTERNAL_CHECK_QUORUM,
+				Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM,
 				From: rnd.id,
 			})
 		}
@@ -71,7 +71,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 	if rnd.heartbeatTimeoutElapsedTickNum >= rnd.heartbeatTimeoutTickNum {
 		rnd.heartbeatTimeoutElapsedTickNum = 0
 		rnd.Step(raftpb.Message{
-			Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_SEND_HEARTBEAT,
+			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT,
 			From: rnd.id,
 		})
 	}
@@ -265,7 +265,18 @@ func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 
 // (etcd raft.raft.stepLeader)
 func stepLeader(rnd *raftNode, msg raftpb.Message) {
+	switch msg.Type {
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT:
 
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM:
+
+	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER:
+
+	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
+
+	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST:
+
+	}
 }
 
 // (etcd raft.raft.becomeLeader)

@@ -14,7 +14,7 @@ func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	// and replicated back to followers.
 	// so it should be treated as local message
 	// by setting msg.LogTerm as 0
-	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL {
+	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
 		msg.LogTerm = rnd.term
 	}
 

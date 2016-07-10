@@ -23,7 +23,7 @@ func (rnd *raftNode) tickFuncFollowerElectionTimeout() {
 	if rnd.promotableToLeader() && rnd.pastElectionTimeout() {
 		rnd.electionTimeoutElapsedTickNum = 0
 		rnd.Step(raftpb.Message{
-			Type: raftpb.MESSAGE_TYPE_INTERNAL_CAMPAIGN_START,
+			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN,
 			From: rnd.id,
 		})
 	}

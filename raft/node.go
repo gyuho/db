@@ -159,7 +159,7 @@ func (nd *node) Tick() {
 
 func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
 	chToReceive := nd.receiveCh
-	if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL {
+	if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
 		chToReceive = nd.proposeCh
 	}
 
@@ -183,12 +183,12 @@ func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
 }
 
 func (nd *node) Campaign(ctx context.Context) error {
-	return nd.step(ctx, raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_CAMPAIGN_START})
+	return nd.step(ctx, raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN})
 }
 
 func (nd *node) Propose(ctx context.Context, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_PROPOSAL,
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
 		Entries: []raftpb.Entry{{Data: data}},
 	})
 }
@@ -199,7 +199,7 @@ func (nd *node) ProposeConfigChange(ctx context.Context, cc raftpb.ConfigChange)
 		return err
 	}
 	return nd.Step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_PROPOSAL,
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
 		Entries: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Data: data}},
 	})
 }
@@ -266,7 +266,7 @@ func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 
 func (nd *node) RequestLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_REQUEST_CURRENT_COMMITTED_INDEX,
+		Type:    raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST,
 		From:    fromID,
 		Entries: []raftpb.Entry{{Data: data}},
 	})
