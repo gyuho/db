@@ -238,7 +238,7 @@ func (rnd *raftNode) leaderReplicateAppendRequests() {
 }
 
 // (etcd raft.raft.appendEntry)
-func (rnd *raftNode) leaderAppendEntries(entries ...raftpb.Entry) {
+func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 	storageLastIndex := rnd.storageRaftLog.lastIndex()
 	for idx := range entries {
 		entries[idx].Index = storageLastIndex + 1 + uint64(idx)
@@ -246,11 +246,9 @@ func (rnd *raftNode) leaderAppendEntries(entries ...raftpb.Entry) {
 	}
 	rnd.storageRaftLog.appendToStorageUnstable(entries...)
 
-	// ???
 	rnd.allProgresses[rnd.id].maybeUpdate(rnd.storageRaftLog.lastIndex())
 
-	// ???
-	rnd.maybeCommit()
+	rnd.leaderMaybeCommit()
 }
 
 // (etcd raft.raft.sendTimeoutNow)
