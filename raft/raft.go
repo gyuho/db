@@ -201,6 +201,7 @@ func (rnd *raftNode) resetWithTerm(term uint64) {
 		rnd.term = term
 		rnd.votedFor = NoNodeID
 	}
+
 	rnd.leaderID = NoNodeID
 	rnd.votedFrom = make(map[uint64]bool)
 
@@ -209,6 +210,7 @@ func (rnd *raftNode) resetWithTerm(term uint64) {
 	rnd.randomizeElectionTickTimeout()
 
 	rnd.stopLeaderTransfer()
+
 	rnd.pendingConfigExist = false
 
 	for id := range rnd.allProgresses {

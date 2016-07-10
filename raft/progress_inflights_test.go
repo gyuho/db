@@ -91,7 +91,7 @@ func Test_inflights_freeTo(t *testing.T) {
 		//                                       ↓---------------------
 		buffer: []uint64{0, 100, 200, 300, 400, 500, 600, 700, 800, 900},
 
-		bufferStart: 5, // after freeTo
+		bufferStart: 5, // after freeTo 400
 		bufferCount: 5,
 	}
 	if !reflect.DeepEqual(ins, want1) {
@@ -105,7 +105,7 @@ func Test_inflights_freeTo(t *testing.T) {
 		//                                                           ↓
 		buffer: []uint64{0, 100, 200, 300, 400, 500, 600, 700, 800, 900},
 
-		bufferStart: 9, // after freeTo
+		bufferStart: 9, // after freeTo 800
 		bufferCount: 1,
 	}
 	if !reflect.DeepEqual(ins, want2) {

@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"math"
 	"sort"
 
 	"github.com/gyuho/db/raft/raftpb"
@@ -116,8 +117,7 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 	}
 }
 
-// leaderMaybeCommit tries to commit with the mid index of
-// its progresses' match indexes.
+// leaderMaybeCommit tries to commit with the mid index of its progresses' match indexes.
 //
 // (etcd raft.raft.maybeCommit)
 func (rnd *raftNode) leaderMaybeCommit() bool {
@@ -159,6 +159,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 
 	if errTerm == nil || errEntries == nil {
 		msg.Type = raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER
+
 		msg.LogIndex = followerProgress.NextIndex - 1
 		msg.LogTerm = term
 		msg.Entries = entries
@@ -167,9 +168,9 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 			switch followerProgress.State {
 			case raftpb.PROGRESS_STATE_PROBE:
 				followerProgress.pause()
-
-				// when 'leaderReplicateHeartbeatRequests', resume again
-				// rnd.allProgresses[id].resume() // pr.Paused = false
+				//
+				// 'leaderReplicateHeartbeatRequests' will resume again
+				// rnd.allProgresses[id].resume()
 
 			case raftpb.PROGRESS_STATE_REPLICATE:
 				followerProgress.optimisticUpdate(entries[len(entries)-1].Index)
@@ -246,8 +247,10 @@ func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 	}
 	rnd.storageRaftLog.appendToStorageUnstable(entries...)
 
-	rnd.allProgresses[rnd.id].maybeUpdate(rnd.storageRaftLog.lastIndex())
+	rnd.allProgresses[rnd.id].maybeUpdateAndResume(rnd.storageRaftLog.lastIndex())
 
+	// leaderMaybeCommit tries to commit with the mid index of
+	// its progresses' match indexes.
 	rnd.leaderMaybeCommit()
 }
 
@@ -267,18 +270,18 @@ func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	// leader to take action, or receive response
 	switch msg.Type {
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT:
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT: // pb.MsgBeat
 		rnd.leaderReplicateHeartbeatRequests()
 		return
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM:
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM: // pb.MsgCheckQuorum
 		if !rnd.leaderCheckQuorumActive() {
 			raftLogger.Warningf("leader %x is stepping down to follower since quorum of cluster is not active", rnd.id)
 			rnd.becomeFollower(rnd.term, NoNodeID) // becomeFollower(term, leader)
 		}
 		return
 
-	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER:
+	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
 		if len(msg.Entries) == 0 {
 			raftLogger.Panicf("leader %x got empty proposal", rnd.id)
 		}
@@ -310,7 +313,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		rnd.leaderReplicateAppendRequests()
 		return
 
-	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
+	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
 		raftLogger.Infof(`
 
 	leader %x [last log term=%d | last log index=%d | voted for %x]
@@ -328,7 +331,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		})
 		return
 
-	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX:
+	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndex
 		logIndex := uint64(0)
 		if rnd.leaderCheckQuorum {
 			logIndex = rnd.storageRaftLog.committedIndex
@@ -339,20 +342,151 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			Entries:  msg.Entries, // ???
 		})
 		return
+	}
 
-	//
-	//
-	//
+	followerProgress, ok := rnd.allProgresses[msg.From]
+	if !ok {
+		raftLogger.Infof("leader %x has no progress of follower %x", rnd.id, msg.From)
+		return
+	}
 
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT:
+	switch msg.Type {
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT: // pb.MsgHeartbeatResp
+		followerProgress.RecentActive = true
 
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER:
+		// ???
+		if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE && followerProgress.inflights.full() {
+			raftLogger.Infof("leader %x frees the first inflight message of follower %x", rnd.id, msg.From)
+			followerProgress.inflights.freeFirstOne()
+		}
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER:
+		if rnd.storageRaftLog.lastIndex() > followerProgress.MatchIndex {
+			rnd.leaderSendAppendOrSnapshot(msg.From)
+		}
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER:
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER: // pb.MsgAppResp
+		followerProgress.RecentActive = true
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRANSFER_LEADER:
+		switch msg.Reject {
+		case false:
+			wasPaused := followerProgress.isPaused()
+			if followerProgress.maybeUpdateAndResume(msg.LogIndex) {
+				switch followerProgress.State {
+				case raftpb.PROGRESS_STATE_PROBE:
+					followerProgress.becomeReplicate()
+
+				case raftpb.PROGRESS_STATE_REPLICATE:
+					// succeed, so free up to entries <= msg.LogIndex
+					followerProgress.inflights.freeTo(msg.LogIndex)
+
+				case raftpb.PROGRESS_STATE_SNAPSHOT:
+					if followerProgress.needSnapshotAbort() { // pr.MatchIndex >= pr.PendingSnapshotIndex
+						followerProgress.becomeProbe()
+						raftLogger.Infof("leader %x is stopping snapshot to follower %x, and resetting progress to %s", rnd.id, msg.From, followerProgress)
+					}
+				}
+
+				// leaderMaybeCommit tries to commit with the mid index of its progresses' match indexes.
+				if rnd.leaderMaybeCommit() {
+					rnd.leaderReplicateAppendRequests()
+				} else if wasPaused { // now resumed, so send now
+					rnd.leaderSendAppendOrSnapshot(msg.From)
+				}
+
+				if rnd.leaderTransfereeID == msg.From && rnd.storageRaftLog.lastIndex() == followerProgress.MatchIndex {
+					raftLogger.Infof("leader %x is force-election-timing out follower %x for leadership transfer", rnd.id, msg.From)
+					rnd.leaderForceFollowerElectionTimeout(msg.From)
+				}
+			}
+
+		case true:
+			raftLogger.Infof(`
+
+	leader %x [last log index=%d]
+	received rejection to MsgAppend
+	from follower %x [requested log index=%d | follower reject hint last log index=%d]
+
+`, rnd.id, rnd.storageRaftLog.lastIndex(), msg.From, msg.LogIndex, msg.RejectHintFollowerLogLastIndex)
+
+			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {
+				raftLogger.Infof("leader %x has decreased the progress of follower %x to %s", rnd.id, msg.From, followerProgress)
+				if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
+					followerProgress.becomeProbe()
+				}
+				rnd.leaderSendAppendOrSnapshot(msg.From) // retry
+			}
+		}
+
+	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER: // pb.MsgSnapStatus
+		if followerProgress.State != raftpb.PROGRESS_STATE_SNAPSHOT {
+			return
+		}
+
+		switch msg.Reject {
+		case false:
+			followerProgress.becomeProbe()
+			followerProgress.pause()
+			raftLogger.Infof("leader %x sent snapshot and received response from follower %x %s", rnd.id, msg.From, followerProgress)
+			//
+			// 'leaderReplicateHeartbeatRequests' will resume again
+			// rnd.allProgresses[id].resume()
+
+		case true:
+			followerProgress.snapshotFailed()
+			followerProgress.becomeProbe()
+			followerProgress.pause()
+			raftLogger.Infof("leader %x sent snapshot but got rejected from follower %x %s", rnd.id, msg.From, followerProgress)
+			//
+			// 'leaderReplicateHeartbeatRequests' will resume again
+			// rnd.allProgresses[id].resume()
+		}
+
+	case raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER: // pb.MsgUnreachable
+		if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
+			followerProgress.becomeProbe()
+		}
+		raftLogger.Infof(`
+
+	leader %x cannot connect to follower %x
+
+	leader failed to send message:
+	%s
+
+`, rnd.id, msg.From, raftpb.DescribeMessage(msg))
+
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRANSFER_LEADER: // pb.MsgTransferLeader
+		lastLeaderTransfereeID := rnd.leaderTransfereeID
+		leaderTransfereeID := msg.From
+
+		if rnd.id == leaderTransfereeID {
+			raftLogger.Infof("leader %x is already a leader, so ignores leadership transfer request", rnd.id)
+			return
+		}
+
+		if lastLeaderTransfereeID != NoNodeID {
+			if lastLeaderTransfereeID == leaderTransfereeID {
+				raftLogger.Infof("leader %x is already transferring its leadership to follower %x (ignores this request)", rnd.id, leaderTransfereeID)
+				return
+			}
+			rnd.stopLeaderTransfer()
+			raftLogger.Infof(`
+
+	leader %x has just cancelled leadership transfer to follower %x
+	(got a new leadership transfer request to follower %x)
+
+`, rnd.id, lastLeaderTransfereeID, leaderTransfereeID)
+		}
+
+		rnd.leaderTransfereeID = leaderTransfereeID
+		rnd.electionTimeoutElapsedTickNum = 0
+		raftLogger.Infof("leader %x is starting to transfer its leadership to follower %x", rnd.id, rnd.leaderTransfereeID)
+
+		if rnd.storageRaftLog.lastIndex() == followerProgress.MatchIndex {
+			raftLogger.Infof("leader %x is force-election-timing out follower, leader-transferee %x, which already has up-to-date log", rnd.id, leaderTransfereeID)
+			rnd.leaderForceFollowerElectionTimeout(leaderTransfereeID)
+		} else {
+			rnd.leaderSendAppendOrSnapshot(leaderTransfereeID)
+		}
 	}
 }
 
@@ -361,5 +495,32 @@ func (rnd *raftNode) becomeLeader() {
 	if rnd.state == raftpb.NODE_STATE_FOLLOWER {
 		raftLogger.Panicf("follower %x cannot be leader without going through candidate state", rnd.id)
 	}
+
+	rnd.resetWithTerm(rnd.term)
+	rnd.leaderID = rnd.id
+	rnd.state = raftpb.NODE_STATE_LEADER
+
 	rnd.stepFunc = stepLeader
+	rnd.tickFunc = rnd.tickFuncLeaderHeartbeatTimeout
+
+	// get all uncommitted entries
+	entries, err := rnd.storageRaftLog.entries(rnd.storageRaftLog.committedIndex+1, math.MaxUint64)
+	if err != nil {
+		raftLogger.Panicf("candidate %x returned unexpected error (%v) while getting uncommitted entries", rnd.id, err)
+	}
+
+	for i := range entries {
+		if entries[i].Type != raftpb.ENTRY_TYPE_CONFIG_CHANGE {
+			continue
+		}
+		if rnd.pendingConfigExist {
+			raftLogger.Panicf("candidate %x has uncommitted duplicate configuration change entry (%+v)", rnd.id, entries[i])
+		}
+		rnd.pendingConfigExist = true
+	}
+
+	// ???
+	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
+
+	raftLogger.Infof("candidate %x has just become leader at term %d", rnd.id, rnd.term)
 }

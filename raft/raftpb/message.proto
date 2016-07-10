@@ -251,14 +251,14 @@ message Message {
 	// (etcd: raft.raftpb.Message.Reject, raftpb.MsgVoteResp)
 	bool Reject = 10;
 
-	// RejectHintFollowerLastIndex is used to tell Leader the correct last index of Follower.
+	// RejectHintFollowerLogLastIndex is used to tell Leader the correct last index of Follower.
 	//
 	// Follower sets:
 	//
 	//   Follower.Message.Type       = raftpb.MsgAppResp
 	//   Follower.Message.LogIndex   = Leader.Message.LogIndex
 	//   Follower.Message.Reject     = true
-	//   Follower.Message.RejectHintFollowerLastIndex = Follower.raftLog.lastIndex()
+	//   Follower.Message.RejectHintFollowerLogLastIndex = Follower.raftLog.lastIndex()
 	//
 	//   (etcd: raft.*raft.handleAppendEntries)
 	//
@@ -266,12 +266,12 @@ message Message {
 	// and decreases(updates):
 	//
 	//   idx1 = Follower.Message.LogIndex
-	//   idx2 = Follower.Message.RejectHintFollowerLastIndex
+	//   idx2 = Follower.Message.RejectHintFollowerLogLastIndex
 	//   Leader.Follower.Progress.Next = min(idx1, idx2)
 	//
 	//   (etcd: raft.stepLeader with raftpb.MsgAppResp)
 	//
 	//
 	// (etcd: raft.raftpb.Message.RejectHint, raftpb.MsgAppResp)
-	uint64 RejectHintFollowerLastIndex = 11;
+	uint64 RejectHintFollowerLogLastIndex = 11;
 }

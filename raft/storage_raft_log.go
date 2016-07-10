@@ -490,8 +490,8 @@ func (sr *storageRaftLog) appliedTo(indexToApply uint64) {
 	sr.appliedIndex = indexToApply
 }
 
-// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
-// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
+// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex',
+// and the current term of 'indexToCommit' matches the 'termToCommit' without ErrCompacted.
 //
 // (etcd raft.raftLog.maybeCommit)
 func (sr *storageRaftLog) maybeCommit(indexToCommit, termToCommit uint64) bool {

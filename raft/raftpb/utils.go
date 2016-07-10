@@ -63,7 +63,7 @@ func DescribeEntry(e Entry) string {
 func DescribeMessage(msg Message) string {
 	buf := new(bytes.Buffer)
 	fmt.Fprintf(buf, "Message [type=%q | from=%X ➝ to=%X | current committed index=%d, sender current term=%d | log index=%d, log term=%d | reject=%v, reject hint follower last index=%d]",
-		msg.Type, msg.From, msg.To, msg.SenderCurrentCommittedIndex, msg.SenderCurrentTerm, msg.LogIndex, msg.LogTerm, msg.Reject, msg.RejectHintFollowerLastIndex)
+		msg.Type, msg.From, msg.To, msg.SenderCurrentCommittedIndex, msg.SenderCurrentTerm, msg.LogIndex, msg.LogTerm, msg.Reject, msg.RejectHintFollowerLogLastIndex)
 
 	if len(msg.Entries) > 0 {
 		buf.WriteString(", Entries: [")
