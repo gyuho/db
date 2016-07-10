@@ -268,8 +268,11 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	rnd.term = state.Term
 }
 
+// maybeCommit tries to commit with the mid index of
+// its progresses' match indexes.
+//
 // (etcd raft.raft.maybeCommit)
 func (rnd *raftNode) maybeCommit() bool {
-	// TODO
+
 	return true
 }

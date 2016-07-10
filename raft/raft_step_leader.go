@@ -1,6 +1,10 @@
 package raft
 
-import "github.com/gyuho/db/raft/raftpb"
+import (
+	"sort"
+
+	"github.com/gyuho/db/raft/raftpb"
+)
 
 // hasLeader returns true if there is a valid leader in the cluster.
 //
@@ -110,6 +114,23 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 		rnd.leaderSendHeartbeatTo(id)
 		rnd.allProgresses[id].resume() // pr.Paused = false
 	}
+}
+
+// leaderMaybeCommit tries to commit with the mid index of
+// its progresses' match indexes.
+//
+// (etcd raft.raft.maybeCommit)
+func (rnd *raftNode) leaderMaybeCommit() bool {
+	matchIndexSlice := make(uint64Slice, 0, len(rnd.allProgresses))
+	for id := range rnd.allProgresses {
+		matchIndexSlice = append(matchIndexSlice, rnd.allProgresses[id].MatchIndex)
+	}
+	sort.Sort(sort.Reverse(matchIndexSlice))
+	indexToCommit := matchIndexSlice[len(rnd.allProgresses)]
+
+	// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
+	// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
+	return rnd.storageRaftLog.maybeCommit(indexToCommit, rnd.term)
 }
 
 // leaderSendAppendOrSnapshot sends:
