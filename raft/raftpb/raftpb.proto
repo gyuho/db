@@ -117,7 +117,7 @@ enum MESSAGE_TYPE {
 	//
 	//   idx1 = Leader.Follower.Progress.Match
 	//   idx2 = Leader.raftLog.CommittedIndex
-	//   Leader.LEADER_HEARTBEAT.CurrentCommittedIndex = min(idx1, idx2)
+	//   Leader.LEADER_HEARTBEAT.SenderCurrentCommittedIndex = min(idx1, idx2)
 	//
 	// So that the followers can update their CommittedIndex.
 	//
@@ -225,10 +225,10 @@ enum MESSAGE_TYPE {
 	//   entries       = Leader.raftLog.entries(newLogIndex, Leader.maxMsgSize)
 	//   leaderCommit  = Leader.raftLog.CommittedIndex
 	//
-	//   Leader.LEADER_REQUEST_APPEND.CurrentCommittedIndex = leaderCommit
-	//   Leader.LEADER_REQUEST_APPEND.LogIndex              = prevLogIndex
-	//   Leader.LEADER_REQUEST_APPEND.LogTerm               = prevLogTerm
-	//   Leader.LEADER_REQUEST_APPEND.Entries               = entries
+	//   Leader.LEADER_REQUEST_APPEND.SenderCurrentCommittedIndex = leaderCommit
+	//   Leader.LEADER_REQUEST_APPEND.LogIndex                    = prevLogIndex
+	//   Leader.LEADER_REQUEST_APPEND.LogTerm                     = prevLogTerm
+	//   Leader.LEADER_REQUEST_APPEND.Entries                     = entries
 	//
 	// (etcd: raft.raftpb.MsgApp)
 	LEADER_REQUEST_APPEND = 8;
@@ -257,7 +257,7 @@ enum MESSAGE_TYPE {
 	//         term1 == term2
 	//
 	//         THEN
-	//            idx1 = Leader.LEADER_REQUEST_APPEND.CurrentCommittedIndex
+	//            idx1 = Leader.LEADER_REQUEST_APPEND.SenderCurrentCommittedIndex
 	//            idx2 = Leader.LEADER_REQUEST_APPEND.LogIndex + len(new entries)
 	//            Follower.raftLog.commitTo(min(idx1, idx2))
 	//
@@ -388,9 +388,9 @@ enum MESSAGE_TYPE {
 	//
 	// To bypass the Raft log with linearizable reads:
 	//
-	//   1. If Leader has not yet committed an entry from CurrentTerm, it waits until it has done so.
+	//   1. If Leader has not yet committed an entry from SenderCurrentTerm, it waits until it has done so.
 	//
-	//   2. Leader saves its CurrentCommittedIndex in a local variable 'readIndex', which is used
+	//   2. Leader saves its SenderCurrentCommittedIndex in a local variable 'readIndex', which is used
 	//      as a lower bound for the version of the state that read-only queries operate against.
 	//
 	//   3. Leader must ensure that it hasn't been superseded by a newer Leader,
@@ -433,20 +433,20 @@ message Message {
 	// (etcd: raft.raftpb.Message.To)
 	uint64 To   = 3;
 
-	// CurrentCommittedIndex is the index of highest log entry that is known to be
+	// SenderCurrentCommittedIndex is the index of highest log entry that is known to be
 	// committed (initialized to 0, increasing monotonically). It is the
 	// highest log position that is known to be in stable storage on a
 	// quorum of nodes in the cluster.
 	//
 	//
-	// Leader updates CurrentCommittedIndex when sending out AppendEntries:
+	// Leader updates SenderCurrentCommittedIndex when sending out AppendEntries:
 	//
-	//   Leader.Message.CurrentCommittedIndex = Leader.raftLog.committed
+	//   Leader.Message.SenderCurrentCommittedIndex = Leader.raftLog.committed
 	//
 	// (etcd: raft.*raft.sendAppend with raftpb.MsgApp)
 	//
 	//
-	// Follower receives/reads Leader.CurrentCommittedIndex in AppendEntries
+	// Follower receives/reads Leader.SenderCurrentCommittedIndex in AppendEntries
 	// and AppendEntries is only successful when:
 	//
 	//   i) Follower.raftLog.CommittedIndex > Leader.Message.LogIndex
@@ -463,7 +463,7 @@ message Message {
 	//
 	//   Then overwrite with Leader's log.
 	//
-	//   idx1 = Leader.Message.CurrentCommittedIndex
+	//   idx1 = Leader.Message.SenderCurrentCommittedIndex
 	//   idx2 = Leader.Message.LogIndex + len(Leader.Message.Entries)
 	//   Follower.raftLog.commitTo(min(idx1, idx2))
 	//
@@ -471,28 +471,29 @@ message Message {
 	//
 	//
 	// (etcd: raft.raftpb.Message.Commit)
-	uint64 CurrentCommittedIndex = 4;
+	uint64 SenderCurrentCommittedIndex = 4;
 
-	// CurrentTerm is the latest term that server has seen,
+	// SenderCurrentTerm is the latest term that the sender server has seen,
 	// initialized to 0 on first boot, increasing monotonically.
-	// CurrentTerm is 0 for local messages.
 	//
-	// CurrentTerm gets updated whenever node sends out messages.
+	// SenderCurrentTerm is 0 for local messages.
 	//
-	// If a node receives a message with higher CurrentTerm,
+	// SenderCurrentTerm gets updated whenever node sends out messages.
+	//
+	// If a node receives a message with higher SenderCurrentTerm,
 	// it reverts back to Follower.
 	// (etcd: raft.Step)
 	//
-	// If a node receives a message with lower CurrentTerm,
+	// If a node receives a message with lower SenderCurrentTerm,
 	// it ignores that message.
 	// (etcd: raft.Step)
 	//
-	// Candidate starts an election by increasing CurrentTerm by 1.
+	// Candidate starts an election by increasing SenderCurrentTerm by 1.
 	//
-	// Follower overwrites its CurrentTerm with leader's CurrentTerm.
+	// Follower overwrites its SenderCurrentTerm with leader's SenderCurrentTerm.
 	//
 	// (etcd: raft.raftpb.Message.Term)
-	uint64 CurrentTerm = 5;
+	uint64 SenderCurrentTerm = 5;
 
 	// LogIndex is the index of log entry immediately preceding the new ones.
 	//

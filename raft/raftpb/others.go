@@ -62,8 +62,8 @@ func DescribeEntry(e Entry) string {
 // (etcd raft.DescribeMessage)
 func DescribeMessage(msg Message) string {
 	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, "Message [type=%q | from=%X ➝ to=%X | current committed index=%d, current term=%d | log index=%d, log term=%d | reject=%v, reject hint follower last index=%d]",
-		msg.Type, msg.From, msg.To, msg.CurrentCommittedIndex, msg.CurrentTerm, msg.LogIndex, msg.LogTerm, msg.Reject, msg.RejectHintFollowerLastIndex)
+	fmt.Fprintf(buf, "Message [type=%q | from=%X ➝ to=%X | current committed index=%d, sender current term=%d | log index=%d, log term=%d | reject=%v, reject hint follower last index=%d]",
+		msg.Type, msg.From, msg.To, msg.SenderCurrentCommittedIndex, msg.SenderCurrentTerm, msg.LogIndex, msg.LogTerm, msg.Reject, msg.RejectHintFollowerLastIndex)
 
 	if len(msg.Entries) > 0 {
 		buf.WriteString(", Entries: [")

@@ -55,7 +55,7 @@ func (rnd *raftNode) candidateReceivedVoteFrom(fromID uint64, voted bool) int {
 
 // (etcd raft.raft.handleHeartbeat)
 func (rnd *raftNode) followerRespondToLeaderHeartbeat(msg raftpb.Message) {
-	rnd.storageRaftLog.commitTo(msg.CurrentCommittedIndex)
+	rnd.storageRaftLog.commitTo(msg.SenderCurrentCommittedIndex)
 	rnd.sendToMailbox(raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT,
 		To:   msg.From,
@@ -63,7 +63,7 @@ func (rnd *raftNode) followerRespondToLeaderHeartbeat(msg raftpb.Message) {
 }
 
 // (etcd raft.raft.campaign)
-func (rnd *raftNode) followerStartCampaign() {
+func (rnd *raftNode) followerBecomeCandidateAndStartCampaign() {
 	rnd.becomeCandidate()
 
 	// vote for itself, and then if voted from quorum, become leader
@@ -79,7 +79,7 @@ func (rnd *raftNode) followerStartCampaign() {
 		}
 
 		raftLogger.Infof(
-			"follower %x [last log index=%d | last log term=%d] is sending vote requests to %x at term %d",
+			"candidate %x [last log index=%d | last log term=%d] is sending vote requests to %x at term %d",
 			rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), id, rnd.term,
 		)
 		rnd.sendToMailbox(raftpb.Message{
@@ -136,9 +136,11 @@ func (rnd *raftNode) followerRestoreSnapshot(snap raftpb.Snapshot) bool {
 
 	if rnd.storageRaftLog.matchTerm(snap.Metadata.Index, snap.Metadata.Term) {
 		raftLogger.Infof(`
-follower %x [committed index=%d | last index=%d | last term=%d]
-fast-forwarded commit from
-leader snapshot [index=%d | term=%d]
+
+	follower %x [committed index=%d | last index=%d | last term=%d]
+	fast-forwarded commit
+	from leader snapshot [index=%d | term=%d]
+
 `, rnd.id, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(),
 			snap.Metadata.Index, snap.Metadata.Term,
 		)
@@ -147,12 +149,15 @@ leader snapshot [index=%d | term=%d]
 	}
 
 	raftLogger.Infof(`
-follower %x [committed index=%d | last index=%d | last term=%d]
-is restoring snapshot its state from
-leader snapshot [index=%d | term=%d]
+
+	follower %x [committed index=%d | last index=%d | last term=%d]
+	is restoring snapshot its state
+	from leader snapshot [index=%d | term=%d]
+
 `, rnd.id, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(),
 		snap.Metadata.Index, snap.Metadata.Term,
 	)
+
 	rnd.storageRaftLog.restoreIncomingSnapshot(snap)
 
 	raftLogger.Infof("follower %x is now initializing its progresses of peers", rnd.id)

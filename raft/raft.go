@@ -145,21 +145,20 @@ func newRaftNode(c *Config) *raftNode {
 
 	raftLogger.Infof(`
 
-newRaftNode
+	newRaftNode
 
-    state = %q
-       id = %x
-all nodes = %q
+		state = %q
+		   id = %x
+	all nodes = %q
 
-first index = %d
-last  index = %d
+	first index = %d
+	last  index = %d
 
-     term = %d
-last term = %d
+		 term = %d
+	last term = %d
 
-committed index = %d
-applied   index = %d
-
+	committed index = %d
+	applied   index = %d
 
 `, rnd.state, rnd.id, strings.Join(nodeSlice, ", "),
 		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.lastIndex(),

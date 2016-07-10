@@ -76,7 +76,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 // leaderSendHeartbeatTo sends an empty append RPC as a heartbeat to its followers.
 //
 // (etcd raft.raft.sendHeartbeat)
-func (rnd *raftNode) leaderSendHeartbeatTo(target uint64) {
+func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
 	if rnd.id != rnd.leaderID {
 		raftLogger.Panicf("leaderSendHeartbeatTo must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
@@ -84,14 +84,14 @@ func (rnd *raftNode) leaderSendHeartbeatTo(target uint64) {
 	// committedIndex is min(to.matched, raftNode.committedIndex).
 	//
 	var (
-		matched         = rnd.allProgresses[target].MatchIndex
+		matched         = rnd.allProgresses[targetID].MatchIndex
 		commitInStorage = rnd.storageRaftLog.committedIndex
 		committedIndex  = minUint64(matched, commitInStorage)
 	)
 	rnd.sendToMailbox(raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT,
-		To:   target,
-		CurrentCommittedIndex: committedIndex,
+		To:   targetID,
+		SenderCurrentCommittedIndex: committedIndex,
 	})
 }
 
@@ -118,12 +118,84 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 //   ii) LEADER_SNAPSHOT_REQUEST
 //
 // (etcd raft.raft.sendAppend)
-func (rnd *raftNode) leaderSendAppendOrSnapshot(target uint64) {
+func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 	if rnd.id != rnd.leaderID {
 		raftLogger.Panicf("leaderSendAppendOrSnapshot must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
-	// TODO
+	followerProgress := rnd.allProgresses[targetID]
+	if followerProgress.isPaused() {
+		raftLogger.Infof("leader %x skips sending heartbeat to paused follower %x", rnd.id, targetID)
+		return
+	}
+
+	msg := raftpb.Message{
+		To: targetID,
+	}
+
+	term, errTerm := rnd.storageRaftLog.term(followerProgress.NextIndex - 1) // term of leader
+	entries, errEntries := rnd.storageRaftLog.entries(followerProgress.NextIndex, rnd.maxEntryNumPerMsg)
+
+	if errTerm == nil || errEntries == nil {
+		msg.Type = raftpb.MESSAGE_TYPE_LEADER_REQUEST_APPEND
+		msg.LogIndex = followerProgress.NextIndex - 1
+		msg.LogTerm = term
+		msg.Entries = entries
+		msg.SenderCurrentCommittedIndex = rnd.storageRaftLog.committedIndex
+		if len(entries) > 0 {
+			switch followerProgress.State {
+			case raftpb.PROGRESS_STATE_PROBE:
+				followerProgress.pause()
+
+				// when 'leaderReplicateHeartbeatRequests', resume again
+				// rnd.allProgresses[id].resume() // pr.Paused = false
+
+			case raftpb.PROGRESS_STATE_REPLICATE:
+				followerProgress.optimisticUpdate(entries[len(entries)-1].Index)
+				followerProgress.inflights.add(entries[len(entries)-1].Index)
+
+			default:
+				raftLogger.Panicf("leader %x cannot send appends to follower %x of unhandled state %s", rnd.id, targetID, followerProgress)
+			}
+		}
+
+	} else { // error if entries had been compacted in leader's logs
+		msg.Type = raftpb.MESSAGE_TYPE_LEADER_REQUEST_SNAPSHOT
+
+		raftLogger.Infof("leader %x now needs to send snapshot to follower %x [term error=%q | entries error=%q]", rnd.id, targetID, errTerm, errEntries)
+		if !followerProgress.RecentActive {
+			raftLogger.Infof("leader %x cancels snapshotting to follower %x [recent active=%v]", rnd.id, targetID, followerProgress.RecentActive)
+			return
+		}
+
+		snapshot, err := rnd.storageRaftLog.snapshot()
+		if err != nil {
+			if err == ErrSnapshotTemporarilyUnavailable {
+				raftLogger.Infof("leader %x failed to send snapshot to follower %x (%v)", rnd.id, targetID, err)
+				return
+			}
+			raftLogger.Panicf("leader %x failed to send snapshot to follower %x (%v)", rnd.id, targetID, err)
+		}
+
+		if raftpb.IsEmptySnapshot(snapshot) {
+			raftLogger.Panicf("leader %x returned empty snapshot", rnd.id)
+		}
+
+		msg.Snapshot = snapshot
+
+		followerProgress.becomeSnapshot(snapshot.Metadata.Index)
+		raftLogger.Infof(`
+
+	leader %x [committed index=%d | first index=%d]
+	stopped sending appends and is now sending snapshot [index=%d | term=%d]
+	to follower %x %s
+
+`, rnd.id, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.firstIndex(),
+			snapshot.Metadata.Index, snapshot.Metadata.Term,
+			targetID, followerProgress,
+		)
+	}
+	rnd.sendToMailbox(msg)
 }
 
 // leaderReplicateAppendRequests replicates append requests to its followers.
@@ -159,14 +231,14 @@ func (rnd *raftNode) leaderAppendEntries(entries ...raftpb.Entry) {
 }
 
 // (etcd raft.raft.sendTimeoutNow)
-func (rnd *raftNode) leaderForceFollowerElectionTimeout(target uint64) {
+func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 	if rnd.id != rnd.leaderID {
 		raftLogger.Panicf("leaderForceFollowerElectionTimeout must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
 	}
 
 	rnd.sendToMailbox(raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT,
-		To:   target,
+		To:   targetID,
 	})
 }
 
