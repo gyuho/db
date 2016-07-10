@@ -158,7 +158,7 @@ func (rnd *raftNode) followerRestoreSnapshot(snap raftpb.Snapshot) bool {
 		snap.Metadata.Index, snap.Metadata.Term,
 	)
 
-	rnd.storageRaftLog.restoreIncomingSnapshot(snap)
+	rnd.storageRaftLog.restoreSnapshot(snap)
 
 	raftLogger.Infof("follower %x is now initializing its progresses of peers", rnd.id)
 	rnd.allProgresses = make(map[uint64]*Progress)

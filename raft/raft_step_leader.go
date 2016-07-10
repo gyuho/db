@@ -195,6 +195,8 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 			targetID, followerProgress,
 		)
 	}
+
+	raftLogger.Infof("leader %x is sending %q to follower %x in mailbox", rnd.id, msg.Type, msg.To)
 	rnd.sendToMailbox(msg)
 }
 
