@@ -158,7 +158,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 	entries, errEntries := rnd.storageRaftLog.entries(followerProgress.NextIndex, rnd.maxEntryNumPerMsg)
 
 	if errTerm == nil || errEntries == nil {
-		msg.Type = raftpb.MESSAGE_TYPE_LEADER_REQUEST_APPEND
+		msg.Type = raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER
 		msg.LogIndex = followerProgress.NextIndex - 1
 		msg.LogTerm = term
 		msg.Entries = entries
@@ -181,7 +181,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		}
 
 	} else { // error if entries had been compacted in leader's logs
-		msg.Type = raftpb.MESSAGE_TYPE_LEADER_REQUEST_SNAPSHOT
+		msg.Type = raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER
 
 		raftLogger.Infof("leader %x now needs to send snapshot to follower %x [term error=%q | entries error=%q]", rnd.id, targetID, errTerm, errEntries)
 		if !followerProgress.RecentActive {
@@ -265,6 +265,7 @@ func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 
 // (etcd raft.raft.stepLeader)
 func stepLeader(rnd *raftNode, msg raftpb.Message) {
+	// leader to take action, or receive response
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT:
 
@@ -274,7 +275,17 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
 
-	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST:
+	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX:
+
+	//
+	//
+	//
+
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT:
+
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER:
+
+	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER:
 
 	}
 }

@@ -108,7 +108,7 @@ func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 			rnd.id, rnd.storageRaftLog.committedIndex, rnd.leaderID, snapMetaIndex, snapMetaTerm,
 		)
 		rnd.sendToMailbox(raftpb.Message{
-			Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT,
+			Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
 			To:       msg.From,
 			LogIndex: rnd.storageRaftLog.lastIndex(),
 		})
@@ -119,7 +119,7 @@ func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 		rnd.id, rnd.storageRaftLog.committedIndex, rnd.leaderID, snapMetaIndex, snapMetaTerm,
 	)
 	rnd.sendToMailbox(raftpb.Message{
-		Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT,
+		Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
 		To:       msg.From,
 		LogIndex: rnd.storageRaftLog.committedIndex,
 	})

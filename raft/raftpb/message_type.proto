@@ -154,7 +154,7 @@ enum MESSAGE_TYPE {
 	// (etcd: raft.raftpb.MsgProp)
 	PROPOSAL_TO_LEADER = 7;
 
-	// LEADER_REQUEST_APPEND message is only sent by Leader.
+	// APPEND_FROM_LEADER message is only sent by Leader.
 	//
 	//   newLogIndex   = Leader.Follower.Progress.Next
 	//   prevLogIndex  = newLogsIndex - 1
@@ -162,72 +162,72 @@ enum MESSAGE_TYPE {
 	//   entries       = Leader.raftLog.entries(newLogIndex, Leader.maxMsgSize)
 	//   leaderCommit  = Leader.raftLog.CommittedIndex
 	//
-	//   Leader.LEADER_REQUEST_APPEND.SenderCurrentCommittedIndex = leaderCommit
-	//   Leader.LEADER_REQUEST_APPEND.LogIndex                    = prevLogIndex
-	//   Leader.LEADER_REQUEST_APPEND.LogTerm                     = prevLogTerm
-	//   Leader.LEADER_REQUEST_APPEND.Entries                     = entries
+	//   Leader.APPEND_FROM_LEADER.SenderCurrentCommittedIndex = leaderCommit
+	//   Leader.APPEND_FROM_LEADER.LogIndex                    = prevLogIndex
+	//   Leader.APPEND_FROM_LEADER.LogTerm                     = prevLogTerm
+	//   Leader.APPEND_FROM_LEADER.Entries                     = entries
 	//
 	// (etcd: raft.raftpb.MsgApp)
-	LEADER_REQUEST_APPEND = 8;
+	APPEND_FROM_LEADER = 8;
 
-	// RESPONSE_TO_LEADER_REQUEST_APPEND message is the response to Leader by Follower.
+	// RESPONSE_TO_APPEND_FROM_LEADER message is the response to Leader by Follower.
 	//
-	//   i) response to LEADER_REQUEST_APPEND:
+	//   i) response to APPEND_FROM_LEADER:
 	//
 	//      IF
-	//         Follower.raftLog.CommittedIndex > Leader.LEADER_REQUEST_APPEND.LogIndex
+	//         Follower.raftLog.CommittedIndex > Leader.APPEND_FROM_LEADER.LogIndex
 	//
 	//      THEN
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.To       = Leader
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.LogIndex = Follower.raftLog.CommittedIndex
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.Reject   = false
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.To       = Leader
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.LogIndex = Follower.raftLog.CommittedIndex
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.Reject   = false
 	//
 	//      AND THEN
 	//         Leader updates Leader.Follower.Progress
 	//
 	//      ELSE IF
-	//         Leader.LEADER_REQUEST_APPEND.LogIndex >= Follower.raftLog.CommittedIndex
+	//         Leader.APPEND_FROM_LEADER.LogIndex >= Follower.raftLog.CommittedIndex
 	//
 	//      AND IF
-	//         term1 = Leader.LEADER_REQUEST_APPEND.LogTerm
-	//         term2 = Follower.term(Leader.LEADER_REQUEST_APPEND.LogIndex)
+	//         term1 = Leader.APPEND_FROM_LEADER.LogTerm
+	//         term2 = Follower.term(Leader.APPEND_FROM_LEADER.LogIndex)
 	//         term1 == term2
 	//
 	//         THEN
-	//            idx1 = Leader.LEADER_REQUEST_APPEND.SenderCurrentCommittedIndex
-	//            idx2 = Leader.LEADER_REQUEST_APPEND.LogIndex + len(new entries)
+	//            idx1 = Leader.APPEND_FROM_LEADER.SenderCurrentCommittedIndex
+	//            idx2 = Leader.APPEND_FROM_LEADER.LogIndex + len(new entries)
 	//            Follower.raftLog.commitTo(min(idx1, idx2))
 	//
-	//            Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.To       = Leader
-	//            Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.LogIndex = idx2
-	//            Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.Reject   = false
+	//            Follower.RESPONSE_TO_APPEND_FROM_LEADER.To       = Leader
+	//            Follower.RESPONSE_TO_APPEND_FROM_LEADER.LogIndex = idx2
+	//            Follower.RESPONSE_TO_APPEND_FROM_LEADER.Reject   = false
 	//
 	//      ELSE
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.To         = Leader
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.LogIndex   = Leader.LEADER_REQUEST_APPEND.LogIndex
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.Reject     = true
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.RejectHint = Follower.raftLog.lastIndex()
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.To         = Leader
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.LogIndex   = Leader.APPEND_FROM_LEADER.LogIndex
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.Reject     = true
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.RejectHint = Follower.raftLog.lastIndex()
 	//
 	//         THEN
 	//            Leader gets this Rejection and updates its Follower.Progress with:
-	//               idx1 = Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.LogIndex
-	//               idx2 = Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.RejectHint + 1
+	//               idx1 = Follower.RESPONSE_TO_APPEND_FROM_LEADER.LogIndex
+	//               idx2 = Follower.RESPONSE_TO_APPEND_FROM_LEADER.RejectHint + 1
 	//               Leader.Follower.Progress.Next = min(idx1, idx2)
 	//
 	//   (etcd: raft.*raft.handleAppendEntries)
 	//
 	//
-	//   ii) response to LEADER_REQUEST_SNAPSHOT
+	//   ii) response to SNAPSHOT_FROM_LEADER
 	//
 	//      IF
 	//         idx1 = Follower.raftLog.CommittedIndex
-	//         idx2 = Leader.LEADER_REQUEST_SNAPSHOT.Index
+	//         idx2 = Leader.SNAPSHOT_FROM_LEADER.Index
 	//         idx1 >= idx2
 	//            THEN false
 	//
-	//         idx   = Leader.LEADER_REQUEST_SNAPSHOT.Index
-	//         term1 = Follower.raftLog.term(Leader.LEADER_REQUEST_SNAPSHOT.Index)
-	//         term2 = Leader.LEADER_REQUEST_SNAPSHOT.Term
+	//         idx   = Leader.SNAPSHOT_FROM_LEADER.Index
+	//         term1 = Follower.raftLog.term(Leader.SNAPSHOT_FROM_LEADER.Index)
+	//         term2 = Leader.SNAPSHOT_FROM_LEADER.Term
 	//         term1 == term2
 	//            THEN Follower.raftLog.commitTo(idx)
 	//            AND THEN false
@@ -236,14 +236,14 @@ enum MESSAGE_TYPE {
 	//         true
 	//
 	//      IF true, THEN successfully recovered the state machine from a snapshot
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.To       = Leader
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.LogIndex = Follower.raftLog.lastIndex()
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.Reject   = false
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.To       = Leader
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.LogIndex = Follower.raftLog.lastIndex()
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.Reject   = false
 	//
 	//      ELSE ignores snapshot
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.To       = Leader
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.LogIndex = Follower.raftLog.CommittedIndex
-	//         Follower.RESPONSE_TO_LEADER_REQUEST_APPEND.Reject   = false
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.To       = Leader
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.LogIndex = Follower.raftLog.CommittedIndex
+	//         Follower.RESPONSE_TO_APPEND_FROM_LEADER.Reject   = false
 	//
 	//   (etcd: raft.*raft.handleSnapshot)
 	//
@@ -251,7 +251,7 @@ enum MESSAGE_TYPE {
 	//   iii)
 	//      term1 = Follower.Term
 	//      term2 = Leader.LEADER_HEARTBEAT.LogTerm
-	//      term3 = Leader.LEADER_REQUEST_APPEND.LogTerm
+	//      term3 = Leader.APPEND_FROM_LEADER.LogTerm
 	//      term1 > term2 || term1 > term3
 	//
 	//         THEN
@@ -263,9 +263,9 @@ enum MESSAGE_TYPE {
 	//
 	//
 	// (etcd: raft.raftpb.MsgAppResp)
-	RESPONSE_TO_LEADER_REQUEST_APPEND = 9;
+	RESPONSE_TO_APPEND_FROM_LEADER = 9;
 
-	// LEADER_REQUEST_SNAPSHOT is only sent by Leader.
+	// SNAPSHOT_FROM_LEADER is only sent by Leader.
 	// It is triggered when the Leader tries to replicate its log (sendAppend) but:
 	//
 	//   i) term, err = Leader.raftLog.term(Leader.Follower.Progress.Next - 1)
@@ -278,19 +278,19 @@ enum MESSAGE_TYPE {
 	//
 	//   THEN
 	//      snap = Leader.raftLog.snapshot()
-	//      Leader.LEADER_REQUEST_SNAPSHOT.Snapshot = snap
+	//      Leader.SNAPSHOT_FROM_LEADER.Snapshot = snap
 	//      Leader.Follower.Progress.becomeSnapshot(snap.Index)
 	//
 	//
 	// (etcd: raft.raftpb.MsgSnap)
-	LEADER_REQUEST_SNAPSHOT = 10;
+	SNAPSHOT_FROM_LEADER = 10;
 
-	// INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT message is the response to LEADER_REQUEST_SNAPSHOT from Follower.
+	// INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER message is the response to SNAPSHOT_FROM_LEADER from Follower.
 	//
 	// It is an internal(local) message that is never sent to other peers over the network.
 	//
 	// (etcd: raft.raftpb.MsgSnapStatus)
-	INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT = 11;
+	INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER = 11;
 
 	// INTERNAL_UNREACHABLE_FOLLOWER message notifies Leader that Follower is not reachable.
 	//
@@ -314,7 +314,7 @@ enum MESSAGE_TYPE {
 	// (etcd: raft.raftpb.MsgTimeoutNow)
 	FORCE_ELECTION_TIMEOUT = 14;
 
-	// READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST is used to serve clients' read-only queries without
+	// READ_LEADER_CURRENT_COMMITTED_INDEX is used to serve clients' read-only queries without
 	// going through Raft, but still with 'quorum-get' on. It bypasses the Raft log, but
 	// still preserves the linearizability of reads, with lower costs.
 	//
@@ -346,11 +346,11 @@ enum MESSAGE_TYPE {
 	//
 	// (Raft 6.4 Processing read-only queries more efficiently, page 72)
 	// (etcd: raft.raftpb.MsgReadIndex)
-	READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST = 15;
+	READ_LEADER_CURRENT_COMMITTED_INDEX = 15;
 
-	// RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST is response to READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST.
+	// RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX is response to READ_LEADER_CURRENT_COMMITTED_INDEX.
 	//
 	// (Raft 6.4 Processing read-only queries more efficiently, page 72)
 	// (etcd: raft.raftpb.MsgReadIndexResp)
-	RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX_REQUEST = 16;
+	RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX = 16;
 }
