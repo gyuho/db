@@ -287,6 +287,9 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER:
 
+	case raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER:
+
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRANSFER_LEADER:
 	}
 }
 

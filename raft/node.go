@@ -246,7 +246,7 @@ func (nd *node) Advance() {
 func (nd *node) ReportUnreachable(targetID uint64) {
 	select {
 	case nd.receiveCh <- raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_UNREACHABLE_FOLLOWER,
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER,
 		From: targetID,
 	}:
 	case <-nd.doneCh:

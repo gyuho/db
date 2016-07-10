@@ -292,19 +292,19 @@ enum MESSAGE_TYPE {
 	// (etcd: raft.raftpb.MsgSnapStatus)
 	INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER = 11;
 
-	// INTERNAL_UNREACHABLE_FOLLOWER message notifies Leader that Follower is not reachable.
+	// INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER message notifies Leader that Follower is not reachable.
 	//
 	// It is an internal(local) message that is never sent to other peers over the network.
 	//
 	// (etcd: raft.raftpb.MsgUnreachable)
-	INTERNAL_UNREACHABLE_FOLLOWER = 12;
+	INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER = 12;
 
-	// INTERNAL_LEADER_TRANSFER message allows Leader to transfer its leadership to another.
+	// INTERNAL_TRANSFER_LEADER message allows Leader to transfer its leadership to another.
 	//
 	// It is an internal(local) message that is never sent to other peers over the network.
 	//
 	// (etcd: raft.raftpb.MsgTransferLeader)
-	INTERNAL_LEADER_TRANSFER = 13;
+	INTERNAL_TRANSFER_LEADER = 13;
 
 	// FORCE_ELECTION_TIMEOUT message makes Leader send time-out message to its peers,
 	// so that Follower can force election timeouts and start campaigning. Candidate
