@@ -176,8 +176,18 @@ func (rnd *raftNode) followerRestoreSnapshot(snap raftpb.Snapshot) bool {
 	return true
 }
 
+// (etcd raft.raft.stepFollower)
+func stepFollower(rnd *raftNode, msg raftpb.Message) {
+
+}
+
 // (etcd raft.raft.becomeFollower)
 func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
+
+}
+
+// (etcd raft.raft.stepCandidate)
+func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 
 }
 

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package raftpb;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+// (etcd raftpb.ConfState)
+message ConfigState {
+	repeated uint64 IDs = 1;
+}
+
+// (etcd raftpb.SnapshotMetadata)
+message SnapshotMetadata {
+	ConfigState ConfigState = 1 [(gogoproto.nullable) = false]; // generate without pointer
+
+	uint64 Index = 2;
+	uint64 Term  = 3;
+}
+
+// SNAPSHOT_STATUS represents the state of snapshot.
+enum SNAPSHOT_STATUS {
+	FINISHED = 0;
+	FAILED   = 1;
+}
+
+// Snapshot contains snapshot data and meta-data.
+// It is stored in stable storage before messages are sent.
+message Snapshot {
+	SnapshotMetadata Metadata = 1 [(gogoproto.nullable) = false]; // generate without pointer
+	bytes Data = 2;
+}

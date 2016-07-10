@@ -263,7 +263,15 @@ func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 	})
 }
 
+// (etcd raft.raft.stepLeader)
+func stepLeader(rnd *raftNode, msg raftpb.Message) {
+
+}
+
 // (etcd raft.raft.becomeLeader)
 func (rnd *raftNode) becomeLeader() {
-
+	if rnd.state == raftpb.NODE_STATE_FOLLOWER {
+		raftLogger.Panicf("follower %x cannot be leader without going through candidate state", rnd.id)
+	}
+	rnd.stepFunc = stepLeader
 }
