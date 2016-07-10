@@ -8,9 +8,9 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// NoneNodeID is a placeholder node ID, only used when there is no leader in the cluster,
+// NoNodeID is a placeholder node ID, only used when there is no leader in the cluster,
 // or to reset leader transfer.
-const NoneNodeID uint64 = 0
+const NoNodeID uint64 = 0
 
 // raftNode represents Raft-algorithm-specific node.
 //
@@ -94,7 +94,7 @@ func newRaftNode(c *Config) *raftNode {
 		id:    c.ID,
 		state: raftpb.NODE_STATE_FOLLOWER, // 0
 
-		leaderID:       NoneNodeID,
+		leaderID:       NoNodeID,
 		allProgresses:  make(map[uint64]*Progress),
 		storageRaftLog: newStorageRaftLog(c.StorageStable),
 
@@ -188,7 +188,7 @@ func (rnd *raftNode) pastElectionTimeout() bool {
 
 // (etcd raft.raft.abortLeaderTransfer)
 func (rnd *raftNode) stopLeaderTransfer() {
-	rnd.leaderTransfereeID = NoneNodeID
+	rnd.leaderTransfereeID = NoNodeID
 }
 
 // (etcd raft.raft.resetPendingConf)
@@ -200,9 +200,9 @@ func (rnd *raftNode) resetPendingConfigExist() {
 func (rnd *raftNode) resetWithTerm(term uint64) {
 	if rnd.term != term {
 		rnd.term = term
-		rnd.votedFor = NoneNodeID
+		rnd.votedFor = NoNodeID
 	}
-	rnd.leaderID = NoneNodeID
+	rnd.leaderID = NoNodeID
 	rnd.votedFrom = make(map[uint64]bool)
 
 	rnd.electionTimeoutElapsedTickNum = 0

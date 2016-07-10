@@ -6,7 +6,7 @@ import "github.com/gyuho/db/raft/raftpb"
 //
 // (etcd raft.raft.hasLeader)
 func (rnd *raftNode) hasLeader() bool {
-	return rnd.leaderID != NoneNodeID
+	return rnd.leaderID != NoNodeID
 }
 
 // leaderCheckQuorumActive returns true if the quorum of the cluster
@@ -55,7 +55,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 			})
 		}
 
-		if rnd.state == raftpb.NODE_STATE_LEADER && rnd.leaderTransfereeID != NoneNodeID {
+		if rnd.state == raftpb.NODE_STATE_LEADER && rnd.leaderTransfereeID != NoNodeID {
 			rnd.stopLeaderTransfer()
 		}
 	}
