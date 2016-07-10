@@ -267,12 +267,3 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	rnd.storageRaftLog.committedIndex = state.CommittedIndex
 	rnd.term = state.Term
 }
-
-// maybeCommit tries to commit with the mid index of
-// its progresses' match indexes.
-//
-// (etcd raft.raft.maybeCommit)
-func (rnd *raftNode) maybeCommit() bool {
-
-	return true
-}
