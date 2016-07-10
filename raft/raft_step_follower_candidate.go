@@ -130,7 +130,44 @@ func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 //
 // (etcd raft.raft.restore)
 func (rnd *raftNode) followerRestoreSnapshot(snap raftpb.Snapshot) bool {
-	// if rnd.storage
+	if rnd.storageRaftLog.committedIndex >= snap.Metadata.Index {
+		return false
+	}
+
+	if rnd.storageRaftLog.matchTerm(snap.Metadata.Index, snap.Metadata.Term) {
+		raftLogger.Infof(`
+follower %x [committed index=%d | last index=%d | last term=%d]
+fast-forwarded commit from
+leader snapshot [index=%d | term=%d]
+`, rnd.id, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(),
+			snap.Metadata.Index, snap.Metadata.Term,
+		)
+		rnd.storageRaftLog.commitTo(snap.Metadata.Index)
+		return false
+	}
+
+	raftLogger.Infof(`
+follower %x [committed index=%d | last index=%d | last term=%d]
+is restoring snapshot its state from
+leader snapshot [index=%d | term=%d]
+`, rnd.id, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(),
+		snap.Metadata.Index, snap.Metadata.Term,
+	)
+	rnd.storageRaftLog.restoreIncomingSnapshot(snap)
+
+	raftLogger.Infof("follower %x is now initializing its progresses of peers", rnd.id)
+	rnd.allProgresses = make(map[uint64]*Progress)
+	for _, id := range snap.Metadata.ConfigState.IDs {
+		matchIndex := uint64(0)
+		if id == rnd.id {
+			matchIndex = rnd.storageRaftLog.lastIndex()
+		}
+		nextIndex := rnd.storageRaftLog.lastIndex() + 1
+
+		rnd.updateProgress(id, matchIndex, nextIndex)
+		raftLogger.Infof("follower %x restored progress of %x %s", rnd.id, id, rnd.allProgresses[id])
+	}
+
 	return true
 }
 
