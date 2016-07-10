@@ -268,14 +268,77 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	// leader to take action, or receive response
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT:
+		rnd.leaderReplicateHeartbeatRequests()
+		return
 
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM:
+		if !rnd.leaderCheckQuorumActive() {
+			raftLogger.Warningf("leader %x is stepping down to follower since quorum of cluster is not active", rnd.id)
+			rnd.becomeFollower(rnd.term, NoNodeID) // becomeFollower(term, leader)
+		}
+		return
 
 	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER:
+		if len(msg.Entries) == 0 {
+			raftLogger.Panicf("leader %x got empty proposal", rnd.id)
+		}
+
+		if _, ok := rnd.allProgresses[rnd.id]; !ok {
+			// ???
+			// this node was removed from configuration while serving as leader
+			// drop any new proposals
+			raftLogger.Infof("leader %x was removed from configuration while serving as leader (dropping new proposals)", rnd.id)
+			return
+		}
+
+		if rnd.leaderTransfereeID != NoNodeID {
+			raftLogger.Infof("leader %x [term=%d] is in progress of transferring its leadership to %x (dropping new proposals)",
+				rnd.id, rnd.term, rnd.leaderTransfereeID)
+			return
+		}
+
+		for i := range msg.Entries {
+			if msg.Entries[i].Type == raftpb.ENTRY_TYPE_CONFIG_CHANGE {
+				if rnd.pendingConfigExist { // ???
+					msg.Entries[i] = raftpb.Entry{Type: raftpb.ENTRY_TYPE_NORMAL}
+				}
+				rnd.pendingConfigExist = true
+			}
+		}
+
+		rnd.leaderAppendEntriesToLeader(msg.Entries...)
+		rnd.leaderReplicateAppendRequests()
+		return
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
+		raftLogger.Infof(`
+
+	leader %x [last log term=%d | last log index=%d | voted for %x]
+	is rejecting to vote
+	for %x [message log index=%d | message log term=%d]
+
+`, rnd.id, rnd.storageRaftLog.lastTerm(), rnd.storageRaftLog.lastIndex(), rnd.votedFor,
+			msg.From, msg.LogIndex, msg.LogTerm,
+		)
+
+		rnd.sendToMailbox(raftpb.Message{
+			Type:   raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
+			To:     msg.From,
+			Reject: true,
+		})
+		return
 
 	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX:
+		logIndex := uint64(0)
+		if rnd.leaderCheckQuorum {
+			logIndex = rnd.storageRaftLog.committedIndex
+		}
+		rnd.sendToMailbox(raftpb.Message{
+			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX,
+			LogIndex: logIndex,
+			Entries:  msg.Entries, // ???
+		})
+		return
 
 	//
 	//
