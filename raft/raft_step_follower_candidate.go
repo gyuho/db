@@ -178,7 +178,24 @@ func (rnd *raftNode) followerRestoreSnapshot(snap raftpb.Snapshot) bool {
 
 // (etcd raft.raft.stepFollower)
 func stepFollower(rnd *raftNode, msg raftpb.Message) {
+	switch msg.Type {
+	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
 
+	case raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER: // pb.MsgApp
+
+	case raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT: // pb.MsgHeartbeat
+
+	case raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER: // pb.MsgSnap
+
+	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
+
+	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
+
+	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndex
+
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndexResp
+
+	}
 }
 
 // (etcd raft.raft.becomeFollower)
@@ -188,7 +205,22 @@ func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
 
 // (etcd raft.raft.stepCandidate)
 func stepCandidate(rnd *raftNode, msg raftpb.Message) {
+	switch msg.Type {
+	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
 
+	case raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER: // pb.MsgApp
+
+	case raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT: // pb.MsgHeartbeat
+
+	case raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER: // pb.MsgSnap
+
+	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
+
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE: // pb.MsgVoteResp
+
+	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
+
+	}
 }
 
 // (etcd raft.raft.becomeCandidate)
