@@ -238,20 +238,22 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		if (rnd.votedFor == NoNodeID || rnd.votedFor == msg.From) && rnd.storageRaftLog.isUpToDate(msg.LogIndex, msg.LogTerm) {
 			rnd.electionTimeoutElapsedTickNum = 0
 			rnd.votedFor = msg.From
+
+			raftLogger.Infof("follower %x [log index=%d | log term=%d] votes for %x [log index=%d | log term=%d] at term %d",
+				rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.LogIndex, msg.LogTerm, rnd.term)
 			rnd.sendToMailbox(raftpb.Message{
 				Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
 				To:   msg.From,
 			})
-			raftLogger.Infof("follower %x [log index=%d | log term=%d] voted for %x [log index=%d | log term=%d] at term %d",
-				rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.LogIndex, msg.LogTerm, rnd.term)
+
 		} else {
+			raftLogger.Infof("follower %x [log index=%d | log term=%d | voted for %x] rejects to vote for %x [log index=%d | log term=%d] at term %d",
+				rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.From, msg.LogIndex, msg.LogTerm, rnd.term)
 			rnd.sendToMailbox(raftpb.Message{
 				Type:   raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
 				To:     msg.From,
 				Reject: true,
 			})
-			raftLogger.Infof("follower %x [log index=%d | log term=%d] rejected to vote for %x [log index=%d | log term=%d] at term %d",
-				rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.LogIndex, msg.LogTerm, rnd.term)
 		}
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
@@ -293,24 +295,59 @@ func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
 func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
+		raftLogger.Infof("candidate %x, so there's no known leader (dropping proposal)", rnd.id)
+		return
 
 	case raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER: // pb.MsgApp
+		raftLogger.Infof("candidate %x is stepping down to follower, because it has received %q from leader %x", rnd.id, msg.Type, msg.From)
+		rnd.becomeFollower(rnd.term, msg.From)
+		rnd.followerHandleAppendFromLeader(msg)
 
 	case raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT: // pb.MsgHeartbeat
+		raftLogger.Infof("candidate %x is stepping down to follower, because it has received %q from leader %x", rnd.id, msg.Type, msg.From)
+		rnd.becomeFollower(rnd.term, msg.From)
+		rnd.followerRespondToLeaderHeartbeat(msg)
 
 	case raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER: // pb.MsgSnap
+		raftLogger.Infof("candidate %x is stepping down to follower, because it has received %q from leader %x", rnd.id, msg.Type, msg.From)
+		rnd.becomeFollower(rnd.term, msg.From)
+		rnd.followerRestoreSnapshotFromLeader(msg)
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
+		raftLogger.Infof("candidate %x [log index=%d | log term=%d | voted for %x] rejects to vote for %x [log index=%d | log term=%d] at term %d",
+			rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.From, msg.LogIndex, msg.LogTerm, rnd.term)
+		rnd.sendToMailbox(raftpb.Message{
+			Type:   raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
+			To:     msg.From,
+			Reject: true,
+		})
 
 	case raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE: // pb.MsgVoteResp
+		raftLogger.Infof("candidate %x [log index=%d | log term=%d | voted for %x | quorum=%d] has received vote from %x [log index=%d | log term=%d] at term %d",
+			rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, rnd.quorum(), msg.From, msg.LogIndex, msg.LogTerm, rnd.term)
+		grantedNum := rnd.candidateReceivedVoteFrom(msg.From, !msg.Reject)
+		rejectedNum := len(rnd.votedFrom) - grantedNum
+		raftLogger.Infof("candidate %x votes [granted num=%d | rejected num=% | quorum=%d]", rnd.id, grantedNum, rejectedNum, rnd.quorum())
+
+		switch rnd.quorum() {
+		case grantedNum:
+			rnd.becomeLeader()
+			rnd.leaderReplicateAppendRequests()
+
+		case rejectedNum:
+			rnd.becomeFollower(rnd.term, NoNodeID)
+		}
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
-
+		raftLogger.Infof("candidate %x ignores %q at term %d", rnd.id, msg.Type, rnd.term)
 	}
 }
 
 // (etcd raft.raft.becomeCandidate)
 func (rnd *raftNode) becomeCandidate() {
+	if rnd.state == raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("leader %x cannot transition to candidate", rnd.id)
+	}
 
 	rnd.state = raftpb.NODE_STATE_CANDIDATE
 	rnd.resetWithTerm(rnd.term + 1)
