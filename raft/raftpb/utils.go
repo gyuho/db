@@ -6,6 +6,8 @@ import (
 )
 
 // IsEmptySnapshot returns true if the given Snapshot is empty.
+//
+// (etcd raft.IsEmptySnap)
 func IsEmptySnapshot(snap Snapshot) bool {
 	return snap.Metadata.Index == 0
 }
@@ -15,8 +17,10 @@ func (s *SoftState) Equal(st *SoftState) bool {
 	return s.LeaderID == st.LeaderID && s.NodeState == st.NodeState
 }
 
-// CheckHardStateEqual returns true if two states are equal
-func CheckHardStateEqual(a, b HardState) bool {
+// Equal returns true if two states are equal.
+//
+// (etcd raft.isHardStateEqual)
+func (a HardState) Equal(b HardState) bool {
 	return a.CommittedIndex == b.CommittedIndex && a.Term == b.Term && a.VotedFor == b.VotedFor
 }
 
@@ -24,8 +28,10 @@ func CheckHardStateEqual(a, b HardState) bool {
 var EmptyHardState = HardState{}
 
 // IsEmptyHardState returns true if the given HardState is empty.
+//
+// (etcd raft.IsEmptyHardState)
 func IsEmptyHardState(st HardState) bool {
-	return CheckHardStateEqual(st, EmptyHardState)
+	return st.Equal(EmptyHardState)
 }
 
 // IsResponseMessage returns true if the message type is response.

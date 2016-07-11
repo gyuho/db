@@ -274,8 +274,8 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 			return
 		}
 
-		rnd.readState.Index = msg.LogIndex
-		rnd.readState.Data = msg.Entries[0].Data
+		rnd.leaderReadState.Index = msg.LogIndex
+		rnd.leaderReadState.Data = msg.Entries[0].Data
 	}
 }
 

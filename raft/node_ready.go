@@ -2,16 +2,6 @@ package raft
 
 import "github.com/gyuho/db/raft/raftpb"
 
-// LeaderReadState provides the state of read-only query.
-// The application must send raftpb.LEADER_CURRENT_COMMITTED_INDEX_REQUEST
-// first, before it reads LeaderReadState from NodeReady.
-//
-// (etcd raft.ReadState)
-type LeaderReadState struct {
-	Index uint64
-	Data  []byte
-}
-
 // NodeReady represents entries and messages that are ready to read,
 // ready to save to stable storage, ready to commit, ready to be
 // sent to other peers. NodeReady is point-in-time state of a Node.
@@ -77,4 +67,35 @@ func (nr NodeReady) ContainsUpdates() bool {
 		len(nr.EntriesToCommit) > 0 ||
 		len(nr.MessagesToSend) > 0 ||
 		nr.LeaderReadState.Index != 0
+}
+
+// (etcd raft.newReady)
+func newNodeReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState raftpb.HardState) NodeReady {
+	nodeReady := NodeReady{
+		EntriesToSave:   rnd.storageRaftLog.unstableEntries(),
+		EntriesToCommit: rnd.storageRaftLog.nextEntriesToApply(),
+		MessagesToSend:  rnd.mailbox,
+	}
+
+	if softState := rnd.softState(); !softState.Equal(prevSoftState) {
+		nodeReady.SoftState = softState
+	}
+
+	if hardState := rnd.hardState(); !hardState.Equal(prevHardState) {
+		nodeReady.HardStateToSave = hardState
+	}
+
+	if rnd.storageRaftLog.storageUnstable.snapshot != nil {
+		nodeReady.SnapshotToSave = *rnd.storageRaftLog.storageUnstable.snapshot
+	}
+
+	if rnd.leaderReadState.Index != uint64(0) {
+		copied := make([]byte, len(rnd.leaderReadState.Data))
+		copy(copied, rnd.leaderReadState.Data)
+
+		nodeReady.LeaderReadState.Index = rnd.leaderReadState.Index
+		nodeReady.LeaderReadState.Data = copied
+	}
+
+	return nodeReady
 }

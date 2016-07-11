@@ -120,6 +120,7 @@ type node struct {
 // processing buffered ticks when it becomes idle.
 const tickChBufferSize = 128
 
+// (etcd raft.newNode)
 func newNode() node {
 	return node{
 		tickCh: make(chan struct{}, tickChBufferSize),
@@ -140,12 +141,14 @@ func newNode() node {
 	}
 }
 
+// (etcd raft.node.Status)
 func (nd *node) GetNodeStatus() NodeStatus {
 	ch := make(chan NodeStatus)
 	nd.statusChCh <- ch
 	return <-ch
 }
 
+// (etcd raft.node.Tick)
 func (nd *node) Tick() {
 	select {
 	case nd.tickCh <- struct{}{}:
@@ -157,6 +160,7 @@ func (nd *node) Tick() {
 	}
 }
 
+// (etcd raft.node.step)
 func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
 	chToReceive := nd.receiveCh
 	if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
@@ -166,13 +170,16 @@ func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
 	select {
 	case chToReceive <- msg:
 		return nil
+
 	case <-ctx.Done():
 		return ctx.Err()
+
 	case <-nd.doneCh:
 		return ErrStopped
 	}
 }
 
+// (etcd raft.node.Step)
 func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
 	if raftpb.IsInternalMessage(msg.Type) {
 		// ignore unexpected local messages received over network
@@ -182,10 +189,14 @@ func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
 	return nd.step(ctx, msg)
 }
 
+// (etcd raft.node.Campaign)
 func (nd *node) Campaign(ctx context.Context) error {
-	return nd.step(ctx, raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN})
+	return nd.step(ctx, raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN,
+	})
 }
 
+// (etcd raft.node.Propose)
 func (nd *node) Propose(ctx context.Context, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
 		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
@@ -193,6 +204,7 @@ func (nd *node) Propose(ctx context.Context, data []byte) error {
 	})
 }
 
+// (etcd raft.node.ProposeConfChange)
 func (nd *node) ProposeConfigChange(ctx context.Context, cc raftpb.ConfigChange) error {
 	data, err := cc.Marshal()
 	if err != nil {
@@ -204,6 +216,7 @@ func (nd *node) ProposeConfigChange(ctx context.Context, cc raftpb.ConfigChange)
 	})
 }
 
+// (etcd raft.node.ApplyConfChange)
 func (nd *node) ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState {
 	select {
 	case nd.configChangeCh <- cc:
@@ -219,6 +232,7 @@ func (nd *node) ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState {
 	return &configState
 }
 
+// (etcd raft.node.Stop)
 func (nd *node) Stop() {
 	select {
 	case nd.stopCh <- struct{}{}:
@@ -232,10 +246,12 @@ func (nd *node) Stop() {
 	<-nd.doneCh
 }
 
+// (etcd raft.node.Ready)
 func (nd *node) NodeReady() <-chan NodeReady {
 	return nd.nodeReadyCh
 }
 
+// (etcd raft.node.Advance)
 func (nd *node) Advance() {
 	select {
 	case nd.advanceCh <- struct{}{}:
@@ -243,28 +259,31 @@ func (nd *node) Advance() {
 	}
 }
 
+// (etcd raft.node.ReportUnreachable)
 func (nd *node) ReportUnreachable(targetID uint64) {
 	select {
 	case nd.receiveCh <- raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER,
-		From: targetID,
-	}:
+		From: targetID}:
+
 	case <-nd.doneCh:
 	}
 }
 
+// (etcd raft.node.ReportSnapshot)
 func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 	select {
 	case nd.receiveCh <- raftpb.Message{
 		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
 		From:   targetID,
-		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED,
-	}:
+		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED}:
+
 	case <-nd.doneCh:
 	}
 }
 
-func (nd *node) RequestLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
+// (etcd raft.node.ReadIndex)
+func (nd *node) RequestReadLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
 		Type:    raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX,
 		From:    fromID,

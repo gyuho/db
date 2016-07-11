@@ -87,11 +87,15 @@ type raftNode struct {
 	leaderTransfereeID uint64
 
 	// (etcd raft.raft.readState)
-	readState ReadState
+	leaderReadState LeaderReadState
 }
 
-// ReadState provides states for read-only query.
-type ReadState struct {
+// LeaderReadState provides the state of read-only query.
+// The application must send raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX
+// first, before it reads LeaderReadState from NodeReady.
+//
+// (etcd raft.ReadState)
+type LeaderReadState struct {
 	Index uint64
 	Data  []byte
 }
@@ -124,7 +128,7 @@ func newRaftNode(c *Config) *raftNode {
 
 		leaderCheckQuorum: c.LeaderCheckQuorum,
 
-		readState: ReadState{Index: uint64(0), Data: nil},
+		leaderReadState: LeaderReadState{Index: uint64(0), Data: nil},
 	}
 
 	hardState, configState, err := c.StorageStable.GetState()
