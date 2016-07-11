@@ -290,3 +290,55 @@ func (nd *node) RequestReadLeaderCurrentCommittedIndex(ctx context.Context, from
 		Entries: []raftpb.Entry{{Data: data}},
 	})
 }
+
+// (etcd raft.node.run)
+func (nd *node) runWithRaftNode(rnd *raftNode) {
+	var (
+		leaderID      = NoNodeID
+		prevSoftState = rnd.softState()
+		prevHardState = raftpb.EmptyHardState
+
+		proposeCh chan raftpb.Message
+
+		advanceCh chan struct{}
+
+		nodeReady   NodeReady
+		nodeReadyCh chan NodeReady
+
+		hasPrevLastUnstableIndex bool
+		prevLastUnstableIndex    uint64
+		prevLastUnstableTerm     uint64
+		prevSnapshotIndex        uint64
+	)
+
+	for {
+		// Advance notifies the Node that the application has saved the progress
+		// up to the last NodeReady state. And it prepares the Node to return the
+		// next point-in-time state, NodeReady.
+		if advanceCh != nil {
+			nodeReadyCh = nil
+		} else {
+			nodeReady = newNodeReady(rnd, prevSoftState, prevHardState)
+			if nodeReady.ContainsUpdates() {
+				nodeReadyCh = nd.nodeReadyCh
+			} else {
+				nodeReadyCh = nil
+			}
+		}
+
+		if rnd.leaderID != leaderID {
+			if rnd.hasLeader() { // rnd.leaderID != NoNodeID
+				if leaderID == NoNodeID {
+					raftLogger.Infof("%x elected leader %x at term %d", rnd.id, rnd.leaderID, rnd.term)
+				} else {
+					raftLogger.Infof("%x changed its leader from %x to %x at term %d", rnd.id, leaderID, rnd.leaderID, rnd.term)
+				}
+				proposeCh = nd.proposeCh
+			} else {
+				raftLogger.Infof("%x lost leader %x at term %d", rnd.id, leaderID, rnd.term)
+				proposeCh = nil
+			}
+			leaderID = rnd.leaderID
+		}
+	}
+}
