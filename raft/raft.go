@@ -22,6 +22,7 @@ type raftNode struct {
 	leaderID      uint64               // (etcd raft.raft.lead)
 	allProgresses map[uint64]*Progress // (etcd raft.raft.prs)
 
+	// (etcd raft.raft.raftLog)
 	storageRaftLog *storageRaftLog
 
 	rand *rand.Rand
@@ -58,26 +59,41 @@ type raftNode struct {
 	tickFunc func()
 	stepFunc func(r *raftNode, msg raftpb.Message)
 
-	maxEntryNumPerMsg uint64
-	maxInflightMsgNum int
+	maxEntryNumPerMsg uint64 // (etcd raft.raft.maxMsgSize)
+	maxInflightMsgNum int    // (etcd raft.raft.maxInflight)
 
+	// (etcd raft.raft.checkQuorum)
 	leaderCheckQuorum bool
 
 	term      uint64          // (etcd raft.raft.Term)
 	votedFor  uint64          // (etcd raft.raft.Vote)
 	votedFrom map[uint64]bool // (etcd raft.raft.votes)
 
-	// mailbox contains a slice of messages to be filtered and processed
-	// by each step method.
+	// mailbox contains a slice of messages to be filtered and processed by each step method.
+	//
+	// (etcd raft.raft.msgs)
 	mailbox []raftpb.Message
 
 	// pendingConfigExist is true, then new configuration will be ignored,
 	// in preference to the unapplied configuration.
+	//
+	// (etcd raft.raft.pendingConf)
 	pendingConfigExist bool
 
 	// leaderTransfereeID is the ID of the leader transfer target
 	// when it's not zero (Raft 3.10).
+	//
+	// (etcd raft.raft.leadTransferee)
 	leaderTransfereeID uint64
+
+	// (etcd raft.raft.readState)
+	readState ReadState
+}
+
+// ReadState provides states for read-only query.
+type ReadState struct {
+	Index uint64
+	Data  []byte
 }
 
 // newRaftNode creates a new raftNode with the given Config.
@@ -107,6 +123,8 @@ func newRaftNode(c *Config) *raftNode {
 		maxInflightMsgNum: c.MaxInflightMsgNum,
 
 		leaderCheckQuorum: c.LeaderCheckQuorum,
+
+		readState: ReadState{Index: uint64(0), Data: nil},
 	}
 
 	hardState, configState, err := c.StorageStable.GetState()

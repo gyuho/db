@@ -434,10 +434,10 @@ func (sr *storageRaftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 
 	}
 }
 
-// isUpToDate returns true if the given (index, term) log is more
-// up-to-date than the last entry in the existing logs.
-// It returns true, first if the term is greater than the last term.
-// Second if the index is greater than the last index.
+// isUpToDate returns true if the given (index, term) log is more up-to-date
+// than the last entry in the existing logs. It returns true, first if the
+// term is greater than the last term. Second if the index is greater than
+// the last index.
 //
 // (etcd raft.raftLog.isUpToDate)
 func (sr *storageRaftLog) isUpToDate(index, term uint64) bool {
