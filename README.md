@@ -8,6 +8,3 @@
 
 Distributed database from scratch.
 
-- This is mostly cloned from etcd.
-- Main goal is to understand every single line of etcd.
-
