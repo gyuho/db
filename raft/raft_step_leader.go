@@ -122,6 +122,8 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 // it tries to commit with 5 because quorum of cluster shares that match index.
 //
 // A log entry is committed once the leader has replicated the entry on quorum of cluster.
+// It commits all preceding entries in the leader's log, including the ones from previous leaders
+// (Raft 3.5 p18).
 //
 // (etcd raft.raft.maybeCommit)
 func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
