@@ -262,12 +262,77 @@ func Test_Progress_maybeDecreaseAndResume(t *testing.T) {
 
 // (etcd raft.TestProgressIsPaused)
 func Test_Progress_isPaused(t *testing.T) {
+	tests := []struct {
+		pr      *Progress
+		wPaused bool
+	}{
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, Paused: false, inflights: newInflights(256)},
+			false, // case raftpb.PROGRESS_STATE_PROBE: return pr.Paused
+		},
 
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, Paused: true, inflights: newInflights(256)},
+			true, // case raftpb.PROGRESS_STATE_PROBE: return pr.Paused
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_REPLICATE, Paused: false, inflights: newInflights(256)},
+			false, // case raftpb.PROGRESS_STATE_REPLICATE: return pr.inflights.full(), len(ins.buffer) == ins.bufferCount
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_REPLICATE, Paused: true, inflights: newInflights(256)},
+			false, // case raftpb.PROGRESS_STATE_REPLICATE: return pr.inflights.full(), len(ins.buffer) == ins.bufferCount
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_SNAPSHOT, Paused: false, inflights: newInflights(256)},
+			true, // case raftpb.PROGRESS_STATE_SNAPSHOT: return true
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_SNAPSHOT, Paused: true, inflights: newInflights(256)},
+			true, // case raftpb.PROGRESS_STATE_SNAPSHOT: return true
+		},
+	}
+
+	for i, tt := range tests {
+		if paused := tt.pr.isPaused(); paused != tt.wPaused {
+			t.Fatalf("#%d: paused expected %v, got %v", i, tt.wPaused, paused)
+		}
+	}
 }
 
 // (etcd raft.TestProgressResume)
 func Test_Progress_resume(t *testing.T) {
+	pr := &Progress{MatchIndex: 0, NextIndex: 2, Paused: true}
 
+	// pr.NextIndex-1 == rejectedLogIndex
+	//
+	// pr.NextIndex = minUint64(rejectedLogIndex, rejectHintFollowerLogLastIndex+1)
+	//              = minUint64(1, 2) = 1
+	//
+	// pr.resume()
+	if ok := pr.maybeDecreaseAndResume(1, 1); !ok {
+		t.Fatalf("ok expected true, got %v", ok)
+	}
+	if pr.Paused {
+		t.Fatalf("after maybeDecreaseAndResume, it should have been resumed with paused false, got %v", pr.Paused)
+	}
+
+	pr.Paused = true
+
+	// pr.MatchIndex < newUpdateIndex
+	// pr.MatchIndex = newUpdateIndex
+	// upToDate = true
+	// pr.true
+	if ok := pr.maybeUpdateAndResume(2); !ok {
+		t.Fatalf("maybeUpdateAndResume expected true, got %v", ok)
+	}
+	if pr.Paused {
+		t.Fatalf("after maybeUpdateAndResume, it should have been resumed with paused false, got %v", pr.Paused)
+	}
 }
 
 // (etcd raft.TestProgressResumeByHeartbeat)
