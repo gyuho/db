@@ -98,21 +98,22 @@ type Node interface {
 
 // node implements Node interface.
 type node struct {
-	tickCh chan struct{}
+	tickCh chan struct{} // tickc chan struct{}
 
-	proposeCh chan raftpb.Message
-	receiveCh chan raftpb.Message
+	incomingProposalMessageCh chan raftpb.Message // propc chan pb.Message
+	incomingMessageCh         chan raftpb.Message // recvc chan pb.Message
 
-	configChangeCh chan raftpb.ConfigChange
-	configStateCh  chan raftpb.ConfigState
+	configChangeCh chan raftpb.ConfigChange // confc chan pb.ConfChange
+	configStateCh  chan raftpb.ConfigState  // confstatec chan pb.ConfState
 
-	nodeReadyCh chan NodeReady
-	advanceCh   chan struct{}
+	nodeReadyCh chan NodeReady // readyc chan Ready
+	advanceCh   chan struct{}  // advancec chan struct{}
 
-	stopCh chan struct{}
-	doneCh chan struct{} // <-nd.stopCh ➝ close(doneCh)
+	stopCh chan struct{} // stop chan struct{}
+	doneCh chan struct{} // done  chan struct{}
+	// <-nd.stopCh ➝ close(doneCh)
 
-	statusChCh chan chan NodeStatus
+	nodeStatusChCh chan chan NodeStatus // status chan chan Status
 }
 
 // tickChBufferSize buffers node.tickCh, so Raft node can buffer some ticks
@@ -120,12 +121,13 @@ type node struct {
 // processing buffered ticks when it becomes idle.
 const tickChBufferSize = 128
 
+// (etcd raft.newNode)
 func newNode() node {
 	return node{
 		tickCh: make(chan struct{}, tickChBufferSize),
 
-		proposeCh: make(chan raftpb.Message),
-		receiveCh: make(chan raftpb.Message),
+		incomingProposalMessageCh: make(chan raftpb.Message),
+		incomingMessageCh:         make(chan raftpb.Message),
 
 		configChangeCh: make(chan raftpb.ConfigChange),
 		configStateCh:  make(chan raftpb.ConfigState),
@@ -136,16 +138,18 @@ func newNode() node {
 		stopCh: make(chan struct{}),
 		doneCh: make(chan struct{}),
 
-		statusChCh: make(chan chan NodeStatus),
+		nodeStatusChCh: make(chan chan NodeStatus),
 	}
 }
 
+// (etcd raft.node.Status)
 func (nd *node) GetNodeStatus() NodeStatus {
 	ch := make(chan NodeStatus)
-	nd.statusChCh <- ch
+	nd.nodeStatusChCh <- ch
 	return <-ch
 }
 
+// (etcd raft.node.Tick)
 func (nd *node) Tick() {
 	select {
 	case nd.tickCh <- struct{}{}:
@@ -157,22 +161,26 @@ func (nd *node) Tick() {
 	}
 }
 
+// (etcd raft.node.step)
 func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
-	chToReceive := nd.receiveCh
-	if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL {
-		chToReceive = nd.proposeCh
+	chToReceive := nd.incomingMessageCh
+	if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
+		chToReceive = nd.incomingProposalMessageCh
 	}
 
 	select {
 	case chToReceive <- msg:
 		return nil
+
 	case <-ctx.Done():
 		return ctx.Err()
+
 	case <-nd.doneCh:
 		return ErrStopped
 	}
 }
 
+// (etcd raft.node.Step)
 func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
 	if raftpb.IsInternalMessage(msg.Type) {
 		// ignore unexpected local messages received over network
@@ -182,28 +190,34 @@ func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
 	return nd.step(ctx, msg)
 }
 
+// (etcd raft.node.Campaign)
 func (nd *node) Campaign(ctx context.Context) error {
-	return nd.step(ctx, raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_CAMPAIGN_START})
+	return nd.step(ctx, raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN,
+	})
 }
 
+// (etcd raft.node.Propose)
 func (nd *node) Propose(ctx context.Context, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_PROPOSAL,
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
 		Entries: []raftpb.Entry{{Data: data}},
 	})
 }
 
+// (etcd raft.node.ProposeConfChange)
 func (nd *node) ProposeConfigChange(ctx context.Context, cc raftpb.ConfigChange) error {
 	data, err := cc.Marshal()
 	if err != nil {
 		return err
 	}
 	return nd.Step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_PROPOSAL,
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
 		Entries: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Data: data}},
 	})
 }
 
+// (etcd raft.node.ApplyConfChange)
 func (nd *node) ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState {
 	select {
 	case nd.configChangeCh <- cc:
@@ -219,6 +233,7 @@ func (nd *node) ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState {
 	return &configState
 }
 
+// (etcd raft.node.Stop)
 func (nd *node) Stop() {
 	select {
 	case nd.stopCh <- struct{}{}:
@@ -232,10 +247,12 @@ func (nd *node) Stop() {
 	<-nd.doneCh
 }
 
+// (etcd raft.node.Ready)
 func (nd *node) NodeReady() <-chan NodeReady {
 	return nd.nodeReadyCh
 }
 
+// (etcd raft.node.Advance)
 func (nd *node) Advance() {
 	select {
 	case nd.advanceCh <- struct{}{}:
@@ -243,31 +260,186 @@ func (nd *node) Advance() {
 	}
 }
 
+// (etcd raft.node.ReportUnreachable)
 func (nd *node) ReportUnreachable(targetID uint64) {
 	select {
-	case nd.receiveCh <- raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_UNREACHABLE_FOLLOWER,
-		From: targetID,
-	}:
+	case nd.incomingMessageCh <- raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER,
+		From: targetID}:
+
 	case <-nd.doneCh:
 	}
 }
 
+// (etcd raft.node.ReportSnapshot)
 func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 	select {
-	case nd.receiveCh <- raftpb.Message{
-		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_REQUEST_SNAPSHOT,
+	case nd.incomingMessageCh <- raftpb.Message{
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
 		From:   targetID,
-		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED,
-	}:
+		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED}:
+
 	case <-nd.doneCh:
 	}
 }
 
-func (nd *node) RequestLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
+// (etcd raft.node.ReadIndex)
+func (nd *node) RequestReadLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
 	return nd.step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_REQUEST_CURRENT_COMMITTED_INDEX,
+		Type:    raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX,
 		From:    fromID,
 		Entries: []raftpb.Entry{{Data: data}},
 	})
+}
+
+// (etcd raft.node.run)
+func (nd *node) runWithRaftNode(rnd *raftNode) {
+	var (
+		leaderID = NoNodeID
+
+		prevSoftState = rnd.softState()
+		prevHardState = raftpb.EmptyHardState
+
+		incomingProposalMessageCh chan raftpb.Message
+
+		advanceCh chan struct{}
+
+		nodeReady   NodeReady
+		nodeReadyCh chan NodeReady
+
+		hasPrevLastUnstableIndex bool
+		prevLastUnstableIndex    uint64
+
+		prevLastUnstableTerm uint64
+
+		prevSnapshotIndex uint64
+	)
+
+	for {
+		// Advance notifies the Node that the application has saved the progress
+		// up to the last NodeReady state. And it prepares the Node to return the
+		// next point-in-time state, NodeReady.
+		if advanceCh != nil {
+			nodeReadyCh = nil
+		} else {
+			nodeReady = newNodeReady(rnd, prevSoftState, prevHardState)
+			if nodeReady.ContainsUpdates() {
+				nodeReadyCh = nd.nodeReadyCh
+			} else {
+				nodeReadyCh = nil
+			}
+		}
+
+		if rnd.leaderID != leaderID {
+			if rnd.hasLeader() { // rnd.leaderID != NoNodeID
+				if leaderID == NoNodeID {
+					raftLogger.Infof("%x elected leader %x at term %d", rnd.id, rnd.leaderID, rnd.term)
+				} else {
+					raftLogger.Infof("%x changed its leader from %x to %x at term %d", rnd.id, leaderID, rnd.leaderID, rnd.term)
+				}
+				incomingProposalMessageCh = nd.incomingProposalMessageCh
+			} else {
+				raftLogger.Infof("%x lost leader %x at term %d", rnd.id, leaderID, rnd.term)
+				incomingProposalMessageCh = nil
+			}
+			leaderID = rnd.leaderID
+		}
+
+		select {
+		case <-nd.tickCh: // case <-n.tickc:
+			rnd.tickFunc()
+
+		case msg := <-incomingProposalMessageCh: // case m := <-propc:
+			msg.From = rnd.id
+			rnd.Step(msg)
+
+		case msg := <-nd.incomingMessageCh: // case m := <-n.recvc:
+			if _, ok := rnd.allProgresses[msg.From]; ok || !raftpb.IsResponseMessage(msg.Type) { // ???
+				rnd.Step(msg)
+			}
+			// else, the message is from unknown node
+			// OR
+			// ???
+
+		case nodeReadyCh <- nodeReady: // case readyc <- rd:
+			// NodeReady returns a channel that receives point-in-time state of Node.
+			// Advance() method must be followed, after applying the state in NodeReady.
+
+			if nodeReady.SoftState != nil {
+				prevSoftState = nodeReady.SoftState
+			}
+
+			if len(nodeReady.EntriesToSave) > 0 {
+				hasPrevLastUnstableIndex = true
+				prevLastUnstableIndex = nodeReady.EntriesToSave[len(nodeReady.EntriesToSave)-1].Index
+				prevLastUnstableTerm = nodeReady.EntriesToSave[len(nodeReady.EntriesToSave)-1].Term
+			}
+
+			if !raftpb.IsEmptyHardState(nodeReady.HardStateToSave) {
+				prevHardState = nodeReady.HardStateToSave
+			}
+
+			if !raftpb.IsEmptySnapshot(nodeReady.SnapshotToSave) {
+				prevSnapshotIndex = nodeReady.SnapshotToSave.Metadata.Index
+			}
+
+			rnd.mailbox = nil
+			rnd.leaderReadState.Index = uint64(0)
+			rnd.leaderReadState.Data = nil
+			advanceCh = nd.advanceCh
+
+		case <-advanceCh: // case <-advancec:
+			if prevHardState.CommittedIndex != 0 {
+				rnd.storageRaftLog.appliedTo(prevHardState.CommittedIndex)
+			}
+
+			if hasPrevLastUnstableIndex {
+				rnd.storageRaftLog.persistedEntriesAt(prevLastUnstableIndex, prevLastUnstableTerm)
+				hasPrevLastUnstableIndex = false // reset
+			}
+
+			rnd.storageRaftLog.persistedSnapshotAt(prevSnapshotIndex)
+			advanceCh = nil // reset, waits for next ready
+
+		case nodeStatusCh := <-nd.nodeStatusChCh: // case c := <-n.status:
+			nodeStatusCh <- getNodeStatus(rnd)
+
+		case <-nd.stopCh: // case <-n.stop:
+			close(nd.doneCh)
+			return
+
+		case configChange := <-nd.configChangeCh: // case cc := <-n.confc:
+			if configChange.NodeID == NoNodeID {
+				rnd.resetPendingConfigExist()
+				select {
+				case nd.configStateCh <- raftpb.ConfigState{IDs: rnd.allNodeIDs()}:
+				case <-nd.doneCh:
+				}
+				break
+			}
+
+			switch configChange.Type {
+			case raftpb.CONFIG_CHANGE_TYPE_ADD_NODE:
+				rnd.addNode(configChange.NodeID)
+
+			case raftpb.CONFIG_CHANGE_TYPE_REMOVE_NODE:
+				if configChange.NodeID == rnd.id {
+					// block incominb proposal when local node is to be removed
+					incomingProposalMessageCh = nil
+				}
+				rnd.deleteNode(configChange.NodeID)
+
+			case raftpb.CONFIG_CHANGE_TYPE_UPDATE_NODE:
+				rnd.resetPendingConfigExist() // ???
+
+			default:
+				raftLogger.Panicf("%x has received unknown config change type %q", rnd.id, configChange.Type)
+			}
+
+			select {
+			case nd.configStateCh <- raftpb.ConfigState{IDs: rnd.allNodeIDs()}:
+			case <-nd.doneCh:
+			}
+		}
+	}
 }

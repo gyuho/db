@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package raftpb;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+// (etcd raftpb.ConfChangeType)
+enum CONFIG_CHANGE_TYPE {
+	ADD_NODE    = 0;
+	REMOVE_NODE = 1;
+	UPDATE_NODE = 2;
+}
+
+// (etcd raftpb.ConfChange)
+message ConfigChange {
+	CONFIG_CHANGE_TYPE Type = 1;
+
+	uint64 ID     = 2;
+	uint64 NodeID = 3;
+
+	bytes Data = 4;
+}

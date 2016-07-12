@@ -9,9 +9,9 @@ import (
 
 func Test_storageUnstable_maybeFirstIndex(t *testing.T) {
 	tests := []struct {
-		incomingSnapshot *raftpb.Snapshot
-		indexOffset      uint64
-		entries          []raftpb.Entry
+		snapshot    *raftpb.Snapshot
+		indexOffset uint64
+		entries     []raftpb.Entry
 
 		windex uint64
 		wok    bool
@@ -51,9 +51,9 @@ func Test_storageUnstable_maybeFirstIndex(t *testing.T) {
 
 	for i, tt := range tests {
 		su := storageUnstable{
-			incomingSnapshot: tt.incomingSnapshot,
-			indexOffset:      tt.indexOffset,
-			entries:          tt.entries,
+			snapshot:    tt.snapshot,
+			indexOffset: tt.indexOffset,
+			entries:     tt.entries,
 		}
 
 		index, ok := su.maybeFirstIndex()
@@ -70,9 +70,9 @@ func Test_storageUnstable_maybeFirstIndex(t *testing.T) {
 
 func Test_storageUnstable_maybeLastIndex(t *testing.T) {
 	tests := []struct {
-		incomingSnapshot *raftpb.Snapshot
-		indexOffset      uint64
-		entries          []raftpb.Entry
+		snapshot    *raftpb.Snapshot
+		indexOffset uint64
+		entries     []raftpb.Entry
 
 		windex uint64
 		wok    bool
@@ -112,9 +112,9 @@ func Test_storageUnstable_maybeLastIndex(t *testing.T) {
 
 	for i, tt := range tests {
 		su := storageUnstable{
-			incomingSnapshot: tt.incomingSnapshot,
-			indexOffset:      tt.indexOffset,
-			entries:          tt.entries,
+			snapshot:    tt.snapshot,
+			indexOffset: tt.indexOffset,
+			entries:     tt.entries,
 		}
 
 		index, ok := su.maybeLastIndex()
@@ -131,9 +131,9 @@ func Test_storageUnstable_maybeLastIndex(t *testing.T) {
 
 func Test_storageUnstable_maybeTerm(t *testing.T) {
 	tests := []struct {
-		incomingSnapshot *raftpb.Snapshot
-		indexOffset      uint64
-		entries          []raftpb.Entry
+		snapshot    *raftpb.Snapshot
+		indexOffset uint64
+		entries     []raftpb.Entry
 
 		index uint64
 
@@ -233,9 +233,9 @@ func Test_storageUnstable_maybeTerm(t *testing.T) {
 
 	for i, tt := range tests {
 		su := storageUnstable{
-			incomingSnapshot: tt.incomingSnapshot,
-			indexOffset:      tt.indexOffset,
-			entries:          tt.entries,
+			snapshot:    tt.snapshot,
+			indexOffset: tt.indexOffset,
+			entries:     tt.entries,
 		}
 
 		term, ok := su.maybeTerm(tt.index)
@@ -252,9 +252,9 @@ func Test_storageUnstable_maybeTerm(t *testing.T) {
 
 func Test_storageUnstable_persistedEntriesAt(t *testing.T) {
 	tests := []struct {
-		incomingSnapshot *raftpb.Snapshot
-		indexOffset      uint64
-		entries          []raftpb.Entry
+		snapshot    *raftpb.Snapshot
+		indexOffset uint64
+		entries     []raftpb.Entry
 
 		index, term uint64
 
@@ -384,9 +384,9 @@ func Test_storageUnstable_persistedEntriesAt(t *testing.T) {
 
 	for i, tt := range tests {
 		su := storageUnstable{
-			incomingSnapshot: tt.incomingSnapshot,
-			indexOffset:      tt.indexOffset,
-			entries:          tt.entries,
+			snapshot:    tt.snapshot,
+			indexOffset: tt.indexOffset,
+			entries:     tt.entries,
 		}
 
 		su.persistedEntriesAt(tt.index, tt.term)
@@ -401,34 +401,34 @@ func Test_storageUnstable_persistedEntriesAt(t *testing.T) {
 	}
 }
 
-func Test_storageUnstable_restoreIncomingSnapshot(t *testing.T) {
+func Test_storageUnstable_restoreSnapshot(t *testing.T) {
 	su := storageUnstable{
-		incomingSnapshot: &raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 1}},
-		indexOffset:      5,
-		entries:          []raftpb.Entry{{Index: 5, Term: 1}},
+		snapshot:    &raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 4, Term: 1}},
+		indexOffset: 5,
+		entries:     []raftpb.Entry{{Index: 5, Term: 1}},
 	}
-	incomingSnapshot := raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 10, Term: 3}}
+	snapshot := raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 10, Term: 3}}
 
-	su.restoreIncomingSnapshot(incomingSnapshot)
+	su.restoreSnapshot(snapshot)
 
-	if su.indexOffset != incomingSnapshot.Metadata.Index+1 {
-		t.Fatalf("index offset expected %d, got %d", incomingSnapshot.Metadata.Index+1, su.indexOffset)
+	if su.indexOffset != snapshot.Metadata.Index+1 {
+		t.Fatalf("index offset expected %d, got %d", snapshot.Metadata.Index+1, su.indexOffset)
 	}
 
 	if len(su.entries) != 0 { // must be nil
 		t.Fatalf("len(su.entries) expected 0, got %d", len(su.entries))
 	}
 
-	if !reflect.DeepEqual(su.incomingSnapshot, &incomingSnapshot) {
-		t.Fatalf("incomingSnapshot expected %+v, got %+v", incomingSnapshot, su.incomingSnapshot)
+	if !reflect.DeepEqual(su.snapshot, &snapshot) {
+		t.Fatalf("snapshot expected %+v, got %+v", snapshot, su.snapshot)
 	}
 }
 
 func Test_storageUnstable_truncateAndAppend(t *testing.T) {
 	tests := []struct {
-		incomingSnapshot *raftpb.Snapshot
-		indexOffset      uint64
-		entries          []raftpb.Entry
+		snapshot    *raftpb.Snapshot
+		indexOffset uint64
+		entries     []raftpb.Entry
 
 		entriesToAppend []raftpb.Entry
 
@@ -486,9 +486,9 @@ func Test_storageUnstable_truncateAndAppend(t *testing.T) {
 
 	for i, tt := range tests {
 		su := storageUnstable{
-			incomingSnapshot: tt.incomingSnapshot,
-			indexOffset:      tt.indexOffset,
-			entries:          tt.entries,
+			snapshot:    tt.snapshot,
+			indexOffset: tt.indexOffset,
+			entries:     tt.entries,
 		}
 
 		su.truncateAndAppend(tt.entriesToAppend...)

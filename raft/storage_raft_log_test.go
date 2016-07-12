@@ -1153,7 +1153,7 @@ func Test_storageRaftLog_term(t *testing.T) { // (etcd raft TestTerm)
 	}
 }
 
-func Test_storageRaftLog_term_restoreIncomingSnapshot(t *testing.T) { // (etcd raft TestTermWithUnstableSnapshot)
+func Test_storageRaftLog_term_restoreSnapshot(t *testing.T) { // (etcd raft TestTermWithUnstableSnapshot)
 	var (
 		snapshotIndex         uint64 = 100
 		unstableSnapshotIndex        = snapshotIndex + 5
@@ -1162,7 +1162,7 @@ func Test_storageRaftLog_term_restoreIncomingSnapshot(t *testing.T) { // (etcd r
 	ms.ApplySnapshot(raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: snapshotIndex, Term: 1}})
 
 	rg := newStorageRaftLog(ms)
-	rg.restoreIncomingSnapshot(raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: unstableSnapshotIndex, Term: 1}})
+	rg.restoreSnapshot(raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: unstableSnapshotIndex, Term: 1}})
 	// dummyIndex (first entry index) is now 105
 
 	tests := []struct {

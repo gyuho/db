@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package raftpb;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+// (etcd raftpb.EntryType)
+enum ENTRY_TYPE {
+	NORMAL        = 0;
+	CONFIG_CHANGE = 1;
+}
+
+// (etcd raftpb.Entry)
+message Entry {
+	ENTRY_TYPE Type = 1;
+
+	uint64 Index = 2;
+	uint64 Term  = 3;
+
+	bytes Data = 4;
+}

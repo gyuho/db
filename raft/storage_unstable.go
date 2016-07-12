@@ -9,7 +9,7 @@ import (
 //
 // (etcd raft.unstable)
 type storageUnstable struct {
-	incomingSnapshot *raftpb.Snapshot
+	snapshot *raftpb.Snapshot
 
 	// indexOffset may be smaller than the actual higest log
 	// position in Storage, which means the next write to storage
@@ -25,13 +25,13 @@ type storageUnstable struct {
 //
 // (etcd raft.unstable.maybeFirstIndex)
 func (su *storageUnstable) maybeFirstIndex() (uint64, bool) {
-	if su.incomingSnapshot != nil {
+	if su.snapshot != nil {
 		// "+ 1" because first entry is for compacted entry
 		// kept for matching purposes.
 		//
 		// StorageStable.snapshotEntries[idx]'s raft log index == idx + snapshot.Metadata.Index
 		// And StorageStable.snapshotEntries[0] is a dummy entry.
-		return su.incomingSnapshot.Metadata.Index + 1, true
+		return su.snapshot.Metadata.Index + 1, true
 	}
 	return 0, false
 }
@@ -46,8 +46,8 @@ func (su *storageUnstable) maybeLastIndex() (uint64, bool) {
 		// OR
 		return su.indexOffset + uint64(len(su.entries)) - 1, true
 
-	case su.incomingSnapshot != nil: // no unstable entries
-		return su.incomingSnapshot.Metadata.Index, true
+	case su.snapshot != nil: // no unstable entries
+		return su.snapshot.Metadata.Index, true
 
 	default:
 		return 0, false
@@ -59,11 +59,11 @@ func (su *storageUnstable) maybeLastIndex() (uint64, bool) {
 // (etcd raft.unstable.maybeTerm)
 func (su *storageUnstable) maybeTerm(idx uint64) (uint64, bool) {
 	if idx < su.indexOffset {
-		if su.incomingSnapshot == nil {
+		if su.snapshot == nil {
 			return 0, false
 		}
-		if su.incomingSnapshot.Metadata.Index == idx { // no matching unstable entries
-			return su.incomingSnapshot.Metadata.Term, true
+		if su.snapshot.Metadata.Index == idx { // no matching unstable entries
+			return su.snapshot.Metadata.Term, true
 		}
 		return 0, false
 	}
@@ -106,22 +106,22 @@ func (su *storageUnstable) persistedEntriesAt(index, term uint64) {
 	}
 }
 
-// persistedSnapshotAt updates snapshot metadata after processing the incoming snapshot.
+// persistedSnapshotAt updates snapshot metadata after processing the snapshot.
 //
 // (etcd raft.unstable.stableSnapTo)
 func (su *storageUnstable) persistedSnapshotAt(index uint64) {
-	if su.incomingSnapshot != nil && su.incomingSnapshot.Metadata.Index == index {
-		su.incomingSnapshot = nil
+	if su.snapshot != nil && su.snapshot.Metadata.Index == index {
+		su.snapshot = nil
 	}
 }
 
-// restoreIncomingSnapshot sets unstable storage with incoming snapshot.
+// restoreSnapshot sets unstable storage with snapshot.
 //
 // (etcd raft.unstable.restore)
-func (su *storageUnstable) restoreIncomingSnapshot(snap raftpb.Snapshot) {
+func (su *storageUnstable) restoreSnapshot(snap raftpb.Snapshot) {
 	su.indexOffset = snap.Metadata.Index + 1
 	su.entries = nil
-	su.incomingSnapshot = &snap
+	su.snapshot = &snap
 }
 
 // truncateAndAppend appends new entries with truncation if needed.

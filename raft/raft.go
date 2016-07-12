@@ -8,9 +8,9 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// NoneNodeID is a placeholder node ID, only used when there is no leader in the cluster,
+// NoNodeID is a placeholder node ID, only used when there is no leader in the cluster,
 // or to reset leader transfer.
-const NoneNodeID uint64 = 0
+const NoNodeID uint64 = 0
 
 // raftNode represents Raft-algorithm-specific node.
 //
@@ -22,6 +22,7 @@ type raftNode struct {
 	leaderID      uint64               // (etcd raft.raft.lead)
 	allProgresses map[uint64]*Progress // (etcd raft.raft.prs)
 
+	// (etcd raft.raft.raftLog)
 	storageRaftLog *storageRaftLog
 
 	rand *rand.Rand
@@ -58,26 +59,45 @@ type raftNode struct {
 	tickFunc func()
 	stepFunc func(r *raftNode, msg raftpb.Message)
 
-	maxEntryNumPerMsg uint64
-	maxInflightMsgNum int
+	maxEntryNumPerMsg uint64 // (etcd raft.raft.maxMsgSize)
+	maxInflightMsgNum int    // (etcd raft.raft.maxInflight)
 
+	// (etcd raft.raft.checkQuorum)
 	leaderCheckQuorum bool
 
 	term      uint64          // (etcd raft.raft.Term)
 	votedFor  uint64          // (etcd raft.raft.Vote)
 	votedFrom map[uint64]bool // (etcd raft.raft.votes)
 
-	// mailbox contains a slice of messages to be filtered and processed
-	// by each step method.
+	// mailbox contains a slice of messages to be filtered and processed by each step method.
+	//
+	// (etcd raft.raft.msgs)
 	mailbox []raftpb.Message
 
 	// pendingConfigExist is true, then new configuration will be ignored,
 	// in preference to the unapplied configuration.
+	//
+	// (etcd raft.raft.pendingConf)
 	pendingConfigExist bool
 
 	// leaderTransfereeID is the ID of the leader transfer target
 	// when it's not zero (Raft 3.10).
+	//
+	// (etcd raft.raft.leadTransferee)
 	leaderTransfereeID uint64
+
+	// (etcd raft.raft.readState)
+	leaderReadState LeaderReadState
+}
+
+// LeaderReadState provides the state of read-only query.
+// The application must send raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX
+// first, before it reads LeaderReadState from NodeReady.
+//
+// (etcd raft.ReadState)
+type LeaderReadState struct {
+	Index uint64
+	Data  []byte
 }
 
 // newRaftNode creates a new raftNode with the given Config.
@@ -94,7 +114,7 @@ func newRaftNode(c *Config) *raftNode {
 		id:    c.ID,
 		state: raftpb.NODE_STATE_FOLLOWER, // 0
 
-		leaderID:       NoneNodeID,
+		leaderID:       NoNodeID,
 		allProgresses:  make(map[uint64]*Progress),
 		storageRaftLog: newStorageRaftLog(c.StorageStable),
 
@@ -107,6 +127,8 @@ func newRaftNode(c *Config) *raftNode {
 		maxInflightMsgNum: c.MaxInflightMsgNum,
 
 		leaderCheckQuorum: c.LeaderCheckQuorum,
+
+		leaderReadState: LeaderReadState{Index: uint64(0), Data: nil},
 	}
 
 	hardState, configState, err := c.StorageStable.GetState()
@@ -145,21 +167,20 @@ func newRaftNode(c *Config) *raftNode {
 
 	raftLogger.Infof(`
 
-newRaftNode
+	newRaftNode
 
-    state = %q
-       id = %x
-all nodes = %q
+		state = %q
+		   id = %x
+	all nodes = %q
 
-first index = %d
-last  index = %d
+	first index = %d
+	last  index = %d
 
-     term = %d
-last term = %d
+		 term = %d
+	last term = %d
 
-committed index = %d
-applied   index = %d
-
+	committed index = %d
+	applied   index = %d
 
 `, rnd.state, rnd.id, strings.Join(nodeSlice, ", "),
 		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.lastIndex(),
@@ -188,7 +209,7 @@ func (rnd *raftNode) pastElectionTimeout() bool {
 
 // (etcd raft.raft.abortLeaderTransfer)
 func (rnd *raftNode) stopLeaderTransfer() {
-	rnd.leaderTransfereeID = NoneNodeID
+	rnd.leaderTransfereeID = NoNodeID
 }
 
 // (etcd raft.raft.resetPendingConf)
@@ -200,9 +221,10 @@ func (rnd *raftNode) resetPendingConfigExist() {
 func (rnd *raftNode) resetWithTerm(term uint64) {
 	if rnd.term != term {
 		rnd.term = term
-		rnd.votedFor = NoneNodeID
+		rnd.votedFor = NoNodeID
 	}
-	rnd.leaderID = NoneNodeID
+
+	rnd.leaderID = NoNodeID
 	rnd.votedFrom = make(map[uint64]bool)
 
 	rnd.electionTimeoutElapsedTickNum = 0
@@ -210,6 +232,7 @@ func (rnd *raftNode) resetWithTerm(term uint64) {
 	rnd.randomizeElectionTickTimeout()
 
 	rnd.stopLeaderTransfer()
+
 	rnd.pendingConfigExist = false
 
 	for id := range rnd.allProgresses {
@@ -267,10 +290,4 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	rnd.votedFor = state.VotedFor
 	rnd.storageRaftLog.committedIndex = state.CommittedIndex
 	rnd.term = state.Term
-}
-
-// (etcd raft.raft.maybeCommit)
-func (rnd *raftNode) maybeCommit() bool {
-	// TODO
-	return true
 }

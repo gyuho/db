@@ -81,7 +81,7 @@ func (c *Config) validate() error {
 		return errors.New("raft storage cannot be nil")
 	}
 
-	if c.ID == NoneNodeID {
+	if c.ID == NoNodeID {
 		return errors.New("cannot use 0 for node ID")
 	}
 

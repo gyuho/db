@@ -54,7 +54,12 @@ func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
 	pr.State = state
 	pr.PendingSnapshotIndex = 0
 	pr.Paused = false
-	pr.RecentActive = false
+
+	// https://github.com/coreos/etcd/pull/5921
+	// this only changes when leader receives a message from follower,
+	// which indicates that the follower is active in leader's viewpoint
+	//
+	// pr.RecentActive = false
 }
 
 // (etcd raft.Progress.becomeProbe)
@@ -111,11 +116,12 @@ func (pr *Progress) optimisticUpdate(msgLogIndex uint64) {
 	pr.NextIndex = msgLogIndex + 1
 }
 
-// maybeUpdate returns false if the given index comes from an
-// outdated message.
+// maybeUpdateAndResume returns false if the given index comes from an outdated message.
+// Otherwise, it updates match, next index and returns true.
+// It only resumes if the message log index is greater than current match index.
 //
 // (etcd raft.Progress.maybeUpdate)
-func (pr *Progress) maybeUpdate(msgLogIndex uint64) bool {
+func (pr *Progress) maybeUpdateAndResume(msgLogIndex uint64) bool {
 	upToDate := false
 	if pr.MatchIndex < msgLogIndex { // update MatchIndex
 		pr.MatchIndex = msgLogIndex
@@ -130,14 +136,14 @@ func (pr *Progress) maybeUpdate(msgLogIndex uint64) bool {
 	return upToDate
 }
 
-// maybeDecrease returns true if the rejecting message's log index
+// maybeDecreaseAndResume returns true if the rejecting message's log index
 // comes from an outdated message. Otherwise, it decreases the next
 // index in the follower's progress, and returns true.
 //
 // (etcd raft.Progress.maybeDecrTo)
-func (pr *Progress) maybeDecrease(rejectLogIndex, rejectHint uint64) bool {
+func (pr *Progress) maybeDecreaseAndResume(rejectedLogIndex, rejectHintFollowerLogLastIndex uint64) bool {
 	if pr.State == raftpb.PROGRESS_STATE_REPLICATE {
-		if rejectLogIndex <= pr.MatchIndex {
+		if rejectedLogIndex <= pr.MatchIndex {
 			return false
 		}
 
@@ -145,11 +151,11 @@ func (pr *Progress) maybeDecrease(rejectLogIndex, rejectHint uint64) bool {
 		return true
 	}
 
-	if pr.NextIndex-1 != rejectLogIndex {
+	if pr.NextIndex-1 != rejectedLogIndex {
 		return false
 	}
 
-	pr.NextIndex = minUint64(rejectLogIndex, rejectHint+1)
+	pr.NextIndex = minUint64(rejectedLogIndex, rejectHintFollowerLogLastIndex+1)
 	if pr.NextIndex < 1 {
 		pr.NextIndex = 1
 	}

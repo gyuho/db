@@ -50,7 +50,7 @@ func newStorageRaftLog(storageStable StorageStable) *storageRaftLog {
 		raftLogger.Panicf("stable storage last index is not available (%v)", err)
 	}
 
-	sr.storageUnstable.incomingSnapshot = nil
+	sr.storageUnstable.snapshot = nil
 	sr.storageUnstable.indexOffset = lastIndex + 1
 	sr.storageUnstable.entries = nil
 
@@ -376,20 +376,20 @@ func (sr *storageRaftLog) allEntries() []raftpb.Entry {
 //
 // (etcd raft.raftLog.snapshot)
 func (sr *storageRaftLog) snapshot() (raftpb.Snapshot, error) {
-	if sr.storageUnstable.incomingSnapshot != nil { // try the unstable storage first
-		return *sr.storageUnstable.incomingSnapshot, nil
+	if sr.storageUnstable.snapshot != nil { // try the unstable storage first
+		return *sr.storageUnstable.snapshot, nil
 	}
 
 	return sr.storageStable.Snapshot()
 }
 
-// restoreIncomingSnapshot sets unstable storage with incoming snapshot.
+// restoreSnapshot sets unstable storage with incoming snapshot.
 //
 // (etcd raft.raftLog.restore)
-func (sr *storageRaftLog) restoreIncomingSnapshot(snap raftpb.Snapshot) {
-	raftLogger.Infof("log %v is restroing the incoming snapshot [snapshot index=%d | snapshot term=%d]", sr, snap.Metadata.Index, snap.Metadata.Term)
+func (sr *storageRaftLog) restoreSnapshot(snap raftpb.Snapshot) {
+	raftLogger.Infof("log %v is restoring the given snapshot [snapshot index=%d | snapshot term=%d]", sr, snap.Metadata.Index, snap.Metadata.Term)
 	sr.committedIndex = snap.Metadata.Index
-	sr.storageUnstable.restoreIncomingSnapshot(snap)
+	sr.storageUnstable.restoreSnapshot(snap)
 }
 
 // hasNextEntriesToApply returns true if there are entries
@@ -434,10 +434,10 @@ func (sr *storageRaftLog) zeroTermOnErrCompacted(term uint64, err error) uint64 
 	}
 }
 
-// isUpToDate returns true if the given (index, term) log is more
-// up-to-date than the last entry in the existing logs.
-// It returns true, first if the term is greater than the last term.
-// Second if the index is greater than the last index.
+// isUpToDate returns true if the given (index, term) log is more up-to-date
+// than the last entry in the existing logs. It returns true, first if the
+// term is greater than the last term. Second if the index is greater than
+// the last index.
 //
 // (etcd raft.raftLog.isUpToDate)
 func (sr *storageRaftLog) isUpToDate(index, term uint64) bool {
@@ -490,8 +490,8 @@ func (sr *storageRaftLog) appliedTo(indexToApply uint64) {
 	sr.appliedIndex = indexToApply
 }
 
-// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
-// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
+// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex',
+// and the current term of 'indexToCommit' matches the 'termToCommit' without ErrCompacted.
 //
 // (etcd raft.raftLog.maybeCommit)
 func (sr *storageRaftLog) maybeCommit(indexToCommit, termToCommit uint64) bool {
