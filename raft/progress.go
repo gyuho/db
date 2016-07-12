@@ -118,7 +118,7 @@ func (pr *Progress) optimisticUpdate(msgLogIndex uint64) {
 
 // maybeUpdateAndResume returns false if the update index comes from an outdated message.
 // Otherwise, it updates match, next index and returns true.
-// It only resumes if the message log index is greater than current match index.
+// It only resumes if update index is greater than current match index.
 //
 // (etcd raft.Progress.maybeUpdate)
 func (pr *Progress) maybeUpdateAndResume(newUpdateIndex uint64) bool {

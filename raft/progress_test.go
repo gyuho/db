@@ -72,6 +72,7 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 
 		wMatchIndex, wNextIndex uint64
 		wOk                     bool
+		wPaused                 bool
 	}{
 		{
 			&Progress{MatchIndex: 3, NextIndex: 5},
@@ -79,6 +80,7 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 
 			3, 5,
 			false,
+			false, // resumes if update index is greater than current match index.
 		},
 
 		{
@@ -87,6 +89,7 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 
 			3, 5,
 			false,
+			false, // resumes if update index is greater than current match index.
 		},
 
 		{
@@ -95,6 +98,7 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 
 			4, 5,
 			true,
+			false, // resumes if update index is greater than current match index.
 		},
 
 		{
@@ -103,6 +107,7 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 
 			5, 6,
 			true,
+			false, // resumes if update index is greater than current match index.
 		},
 
 		{
@@ -111,6 +116,7 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 
 			7, 8,
 			true,
+			false, // resumes if update index is greater than current match index.
 		},
 	}
 
@@ -129,12 +135,129 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 		if tt.pr.NextIndex != tt.wNextIndex {
 			t.Fatalf("#%d: progress next index expected %d, got %d", i, tt.wNextIndex, tt.pr.NextIndex)
 		}
+		if tt.pr.isPaused() != tt.wPaused {
+			t.Fatalf("#%d: paused expected %v, got %v", i, tt.wPaused, tt.pr.isPaused())
+		}
 	}
 }
 
 // (etcd raft.TestProgressMaybeDecr)
 func Test_Progress_maybeDecreaseAndResume(t *testing.T) {
+	tests := []struct {
+		pr                             *Progress
+		rejectedLogIndex               uint64
+		rejectHintFollowerLogLastIndex uint64
 
+		wMatchIndex, wNextIndex uint64
+		wOk                     bool
+	}{
+		{ // rejected is not greater than match index
+			&Progress{State: raftpb.PROGRESS_STATE_REPLICATE, MatchIndex: 5, NextIndex: 10},
+			4,
+			4,
+
+			5, 10,
+			false, // pr.State == raftpb.PROGRESS_STATE_REPLICATE, rejectedLogIndex <= pr.MatchIndex
+		},
+
+		{ // rejected is not greater than match index
+			&Progress{State: raftpb.PROGRESS_STATE_REPLICATE, MatchIndex: 5, NextIndex: 10},
+			5,
+			5,
+
+			5, 10,
+			false, // pr.State == raftpb.PROGRESS_STATE_REPLICATE, rejectedLogIndex <= pr.MatchIndex
+		},
+
+		{ // rejected is greater than match index, decrease the next index
+			&Progress{State: raftpb.PROGRESS_STATE_REPLICATE, MatchIndex: 5, NextIndex: 10},
+			9,
+			9,
+
+			5, 6,
+			true, // pr.State == raftpb.PROGRESS_STATE_REPLICATE, rejectedLogIndex > pr.MatchIndex, pr.NextIndex = pr.MatchIndex + 1
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, MatchIndex: 0, NextIndex: 0},
+			0,
+			0,
+
+			0, 0,
+			false, // if pr.NextIndex-1 != rejectedLogIndex { return false }
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, MatchIndex: 0, NextIndex: 10},
+			5,
+			5,
+
+			0, 10,
+			false, // if pr.NextIndex-1 != rejectedLogIndex { return false }
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, MatchIndex: 0, NextIndex: 2},
+			1,
+			1,
+
+			0, 1,
+			true, // pr.NextIndex-1 == rejectedLogIndex, pr.NextIndex = minUint64(rejectedLogIndex, rejectHintFollowerLogLastIndex+1)
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, MatchIndex: 0, NextIndex: 10},
+			9,
+			9,
+
+			0, 9,
+			true, // pr.NextIndex-1 == rejectedLogIndex, pr.NextIndex = minUint64(rejectedLogIndex, rejectHintFollowerLogLastIndex+1)
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, MatchIndex: 0, NextIndex: 1},
+			0,
+			0,
+
+			0, 1,
+			true, // pr.NextIndex-1 == rejectedLogIndex, pr.NextIndex = minUint64(rejectedLogIndex, rejectHintFollowerLogLastIndex+1)
+			// if pr.NextIndex < 1 { pr.NextIndex = 1 }
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, MatchIndex: 0, NextIndex: 10},
+			9,
+			2,
+
+			0, 3,
+			true, // pr.NextIndex-1 == rejectedLogIndex, pr.NextIndex = minUint64(rejectedLogIndex, rejectHintFollowerLogLastIndex+1)
+		},
+
+		{
+			&Progress{State: raftpb.PROGRESS_STATE_PROBE, MatchIndex: 0, NextIndex: 10},
+			9,
+			0,
+
+			0, 1,
+			true, // pr.NextIndex-1 == rejectedLogIndex, pr.NextIndex = minUint64(rejectedLogIndex, rejectHintFollowerLogLastIndex+1)
+			// if pr.NextIndex < 1 { pr.NextIndex = 1 }
+		},
+	}
+
+	for i, tt := range tests {
+		// maybeDecreaseAndResume returns true if the rejecting message's log index
+		// comes from an outdated message. Otherwise, it decreases the next
+		// index in the follower's progress, and returns true.
+		if ok := tt.pr.maybeDecreaseAndResume(tt.rejectedLogIndex, tt.rejectHintFollowerLogLastIndex); ok != tt.wOk {
+			t.Fatalf("#%d: maybeDecreaseAndResume ok expected %v, got %v", i, tt.wOk, ok)
+		}
+		if tt.pr.MatchIndex != tt.wMatchIndex {
+			t.Fatalf("#%d: progress match index expected %d, got %d", i, tt.wMatchIndex, tt.pr.MatchIndex)
+		}
+		if tt.pr.NextIndex != tt.wNextIndex {
+			t.Fatalf("#%d: progress next index expected %d, got %d", i, tt.wNextIndex, tt.pr.NextIndex)
+		}
+	}
 }
 
 // (etcd raft.TestProgressIsPaused)
