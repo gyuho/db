@@ -4,6 +4,6 @@
 // Simple interface makes Raft more portable for different use cases, easier to test,
 // and more determinstic.
 //
-// Reference implementation: https://github.com/coreos/etcd/tree/master/raft
+// Reference implementation is https://github.com/coreos/etcd/tree/master/raft.
 //
 package raft
