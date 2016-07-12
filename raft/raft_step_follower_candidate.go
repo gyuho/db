@@ -227,7 +227,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER: // pb.MsgSnap
 		rnd.electionTimeoutElapsedTickNum = 0
-		rnd.leaderID = msg.From // ??? why not in etcd
+		rnd.leaderID = msg.From
 		rnd.followerRestoreSnapshotFromLeader(msg)
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote

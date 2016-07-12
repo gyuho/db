@@ -117,10 +117,14 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 	}
 }
 
-// leaderMaybeCommit tries to commit with the mid index of its progresses' match indexes.
+// leaderMaybeCommitWithQuorumMatchIndex tries to commit with quorum
+// index of its progresses' match indexes. For example, if given [5, 5, 4],
+// it tries to commit with 5 because quorum of cluster shares that match index.
+//
+// A log entry is committed once the leader has replicated the entry on quorum of cluster.
 //
 // (etcd raft.raft.maybeCommit)
-func (rnd *raftNode) leaderMaybeCommit() bool {
+func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
 	matchIndexSlice := make(uint64Slice, 0, len(rnd.allProgresses))
 	for id := range rnd.allProgresses {
 		matchIndexSlice = append(matchIndexSlice, rnd.allProgresses[id].MatchIndex)
@@ -249,9 +253,10 @@ func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 
 	rnd.allProgresses[rnd.id].maybeUpdateAndResume(rnd.storageRaftLog.lastIndex())
 
-	// leaderMaybeCommit tries to commit with the mid index of
-	// its progresses' match indexes.
-	rnd.leaderMaybeCommit()
+	// leaderMaybeCommitWithQuorumMatchIndex tries to commit with quorum
+	// index of its progresses' match indexes. For example, if given [5, 5, 4],
+	// it tries to commit with 5 because quorum of cluster shares that match index.
+	rnd.leaderMaybeCommitWithQuorumMatchIndex()
 }
 
 // (etcd raft.raft.sendTimeoutNow)
@@ -339,7 +344,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		rnd.sendToMailbox(raftpb.Message{
 			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX,
 			LogIndex: logIndex,
-			Entries:  msg.Entries, // ???
+			Entries:  msg.Entries,
 		})
 		return
 	}
@@ -354,10 +359,12 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT: // pb.MsgHeartbeatResp
 		followerProgress.RecentActive = true
 
-		// ???
 		if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE && followerProgress.inflights.full() {
 			raftLogger.Infof("leader %x frees the first inflight message of follower %x", rnd.id, msg.From)
 			followerProgress.inflights.freeFirstOne()
+			//
+			// [10, 20, 30]
+			// even if we free the first one 10, when we process 30, it will process 10 ~ 30.
 		}
 
 		if rnd.storageRaftLog.lastIndex() > followerProgress.MatchIndex {
@@ -386,8 +393,10 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 					}
 				}
 
-				// leaderMaybeCommit tries to commit with the mid index of its progresses' match indexes.
-				if rnd.leaderMaybeCommit() {
+				// leaderMaybeCommitWithQuorumMatchIndex tries to commit with quorum
+				// index of its progresses' match indexes. For example, if given [5, 5, 4],
+				// it tries to commit with 5 because quorum of cluster shares that match index.
+				if rnd.leaderMaybeCommitWithQuorumMatchIndex() {
 					rnd.leaderReplicateAppendRequests()
 				} else if wasPaused { // now resumed, so send now
 					rnd.leaderSendAppendOrSnapshot(msg.From)
@@ -519,7 +528,8 @@ func (rnd *raftNode) becomeLeader() {
 		rnd.pendingConfigExist = true
 	}
 
-	// ???
+	// When it becomes leader, it needs to send empty append-entries RPC call (heartbeat) to its
+	// followers to establish its authority and prevent new elections (Raft 3.4 p16).
 	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
 
 	raftLogger.Infof("candidate %x has just become leader at term %d", rnd.id, rnd.term)
