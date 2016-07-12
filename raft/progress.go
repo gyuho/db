@@ -65,9 +65,9 @@ func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
 // (etcd raft.Progress.becomeProbe)
 func (pr *Progress) becomeProbe() {
 	if pr.State == raftpb.PROGRESS_STATE_SNAPSHOT { // snapshot was sent
-		pIdx := pr.PendingSnapshotIndex
+		lastPendingSnapshotIndex := pr.PendingSnapshotIndex
 		pr.resetState(raftpb.PROGRESS_STATE_PROBE)
-		pr.NextIndex = maxUint64(pr.MatchIndex+1, pIdx+1)
+		pr.NextIndex = maxUint64(pr.MatchIndex+1, lastPendingSnapshotIndex+1)
 		return
 	}
 	pr.resetState(raftpb.PROGRESS_STATE_PROBE)
