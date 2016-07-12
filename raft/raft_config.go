@@ -12,6 +12,12 @@ type Config struct {
 	// (etcd raft.Config.ID)
 	ID uint64
 
+	// allPeerIDs contains the IDs of all peers and the node itself.
+	// It should only be set when starting a new Raft cluster.
+	//
+	// (etcd raft.Config.peers)
+	allPeerIDs []uint64
+
 	// ElectionTickNum is the number of ticks between elections.
 	// If a follower does not receive any message from a valid leader
 	// before ElectionTickNum has elapsed, it becomes a candidate to
@@ -40,12 +46,6 @@ type Config struct {
 	//
 	// (etcd raft.Storage)
 	StorageStable StorageStable
-
-	// allPeerIDs contains the IDs of all peers and the node itself.
-	// It should only be set when starting a new Raft cluster.
-	//
-	// (etcd raft.Config.peers)
-	allPeerIDs []uint64
 
 	// ---------------------------
 	// APPLICATION SPECIFIC CONFIG

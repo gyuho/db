@@ -336,11 +336,72 @@ func Test_Progress_resume(t *testing.T) {
 }
 
 // (etcd raft.TestProgressResumeByHeartbeat)
-func Test_Progress_becomeLeader_resume_by_heartbeat(t *testing.T) {
+func Test_Progress_becomeLeader_resume_by_leaderReplicateHeartbeatRequests(t *testing.T) {
+	rnd := newRaftNode(&Config{
+		ID:         1,
+		allPeerIDs: []uint64{1, 2},
 
+		ElectionTickNum:         5,
+		HeartbeatTimeoutTickNum: 1,
+
+		LeaderCheckQuorum: false,
+
+		StorageStable: NewStorageStableInMemory(),
+
+		MaxEntryNumPerMsg: 0,
+		MaxInflightMsgNum: 256,
+
+		LastAppliedIndex: 0,
+	})
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	rnd.allProgresses[2].Paused = true
+
+	// this should resume follower 2
+	//
+	// stepLeader
+	// case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT: rnd.leaderReplicateHeartbeatRequests()
+	rnd.Step(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT,
+		From: 1,
+		To:   1,
+	})
+
+	if rnd.allProgresses[2].Paused {
+		t.Fatalf("paused expected false, got %v", rnd.allProgresses[2].Paused)
+	}
 }
 
 // (etcd raft.TestProgressPaused)
-func Test_Progress_becomeLeader_duplicate_MsgProp(t *testing.T) {
+func Test_Progress_send_to_paused_follower(t *testing.T) {
+	rnd := newRaftNode(&Config{
+		ID:         1,
+		allPeerIDs: []uint64{1, 2},
 
+		ElectionTickNum:         5,
+		HeartbeatTimeoutTickNum: 1,
+
+		LeaderCheckQuorum: false,
+
+		StorageStable: NewStorageStableInMemory(),
+
+		MaxEntryNumPerMsg: 0,
+		MaxInflightMsgNum: 256,
+
+		LastAppliedIndex: 0,
+	})
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	msg := raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}}
+	rnd.Step(msg) // followerProgress.pause()
+	rnd.Step(msg)
+	rnd.Step(msg)
+	rnd.Step(msg)
+	rnd.Step(msg)
+
+	if len(rnd.mailbox) != 1 {
+		t.Fatalf("len(rnd.mailbox) expected 1, got %+v", len(rnd.mailbox))
+	}
 }
