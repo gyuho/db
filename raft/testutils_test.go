@@ -89,6 +89,7 @@ func newFakeCluster(machines ...stateMachine) *fakeCluster {
 	}
 }
 
+// (etcd raft.idsBySize)
 func generateIDs(n int) []uint64 {
 	ids := make([]uint64, n)
 	for i := 0; i < n; i++ {
