@@ -1,6 +1,10 @@
 package raft
 
-import "github.com/gyuho/db/raft/raftpb"
+import (
+	"math/rand"
+
+	"github.com/gyuho/db/raft/raftpb"
+)
 
 // (etcd raft.stateMachine)
 type stateMachine interface {
@@ -18,6 +22,8 @@ type blackHole struct{}
 
 func (blackHole) Step(raftpb.Message) error          { return nil }
 func (blackHole) readResetMailbox() []raftpb.Message { return nil }
+
+var noOpBlackHole = &blackHole{}
 
 type connection struct {
 	from, to uint64
@@ -89,4 +95,40 @@ func generateIDs(n int) []uint64 {
 		ids[i] = 1 + uint64(i)
 	}
 	return ids
+}
+
+// (etcd raft.network.filter)
+func (fc *fakeCluster) filter(msgs ...raftpb.Message) []raftpb.Message {
+	var filtered []raftpb.Message
+	for _, msg := range msgs {
+		if fc.allIgnoredMessageType[msg.Type] {
+			continue
+		}
+
+		switch msg.Type {
+		case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN:
+			raftLogger.Panicf("%q never goes over network", msg.Type)
+
+		default:
+			percentage := fc.allDroppedConnection[connection{from: msg.From, to: msg.To}]
+			if rand.Float64() < percentage {
+				continue // skip append
+			}
+		}
+
+		filtered = append(filtered, msg)
+	}
+
+	return filtered
+}
+
+// (etcd raft.network.send)
+func (fc *fakeCluster) sendAndStepFirstMessage(msgs ...raftpb.Message) {
+	if len(msgs) > 0 {
+		firstMsg := msgs[0]
+		machine := fc.allStateMachines[firstMsg.To]
+		machine.Step(firstMsg)
+
+		msgs = append(msgs[1:], fc.filter(machine.readResetMailbox()...)...)
+	}
 }
