@@ -12,7 +12,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			raftLogger.Infof("%q %x is starting a new election(campaign) at term %d", rnd.state, rnd.id, rnd.term)
 			rnd.followerBecomeCandidateAndStartCampaign()
 		} else {
-			raftLogger.Infof("leader %x ignores %q", rnd.id, msg.Type)
+			raftLogger.Infof("%q %x ignores %q", rnd.state, rnd.id, msg.Type)
 		}
 		return nil
 	}
