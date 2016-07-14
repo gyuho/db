@@ -29,6 +29,8 @@ type connection struct {
 	from, to uint64
 }
 
+// fakeNetwork simulates network message passing for Raft tests.
+//
 // (etcd raft.network)
 type fakeNetwork struct {
 	allStateMachines         map[uint64]stateMachine
