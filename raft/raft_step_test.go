@@ -6,7 +6,7 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-func Test_Step_campaign(t *testing.T) {
+func Test_Step_campaign_candidate(t *testing.T) {
 	rnd := newRaftNode(&Config{
 		ID:         1,
 		allPeerIDs: []uint64{1, 2, 3},
