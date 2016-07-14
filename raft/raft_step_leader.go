@@ -353,7 +353,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
 		raftLogger.Infof(`
 
-	%q %x [last log term=%d | last log index=%d | voted for %x]
+	%q %x [log term=%d | log index=%d | voted for %x]
 	is rejecting to vote
 	for %x [message log index=%d | message log term=%d]
 
@@ -443,11 +443,11 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		case true:
 			raftLogger.Infof(`
 
-	%q %x [last log index=%d]
-	received rejection to %q
+	%q %x [log index=%d | log term=%d]
+	received rejection in %q
 	from follower %x [requested log index=%d | follower reject hint last log index=%d]
 
-`, rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), msg.Type,
+`, rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), msg.Type,
 				msg.From, msg.LogIndex, msg.RejectHintFollowerLogLastIndex)
 
 			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {

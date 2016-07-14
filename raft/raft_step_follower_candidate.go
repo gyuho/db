@@ -111,7 +111,7 @@ func (rnd *raftNode) followerHandleAppendFromLeader(msg raftpb.Message) {
 	}
 
 	raftLogger.Infof("%q %x [log index=%d | log term=%d] rejects appends from leader %x [log index=%d | log term=%d]",
-		rnd.state, rnd.id, msg.LogIndex, rnd.storageRaftLog.zeroTermOnErrCompacted(rnd.storageRaftLog.term(msg.LogIndex)), msg.From, msg.LogIndex, msg.LogTerm)
+		rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.zeroTermOnErrCompacted(rnd.storageRaftLog.term(msg.LogIndex)), msg.From, msg.LogIndex, msg.LogTerm)
 	rnd.sendToMailbox(raftpb.Message{
 		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
 		To:       msg.From,

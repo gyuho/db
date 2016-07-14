@@ -55,6 +55,7 @@ func Test_Step_leader_election(t *testing.T) {
 		{newFakeNetwork(nil, newTestRaftNodeWithTerms(1), newTestRaftNodeWithTerms(2), newTestRaftNodeWithTerms(1, 3), nil), raftpb.NODE_STATE_FOLLOWER},
 
 		// with higher terms including quorum, higest term in <quorum() nodes
+		// out-of-range index from leader
 		{newFakeNetwork(newTestRaftNodeWithTerms(1), nil, newTestRaftNodeWithTerms(2), newTestRaftNodeWithTerms(1), nil), raftpb.NODE_STATE_LEADER},
 	}
 
