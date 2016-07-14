@@ -17,6 +17,7 @@ type stateMachine interface {
 func (rnd *raftNode) readResetMailbox() []raftpb.Message {
 	msgs := rnd.mailbox
 	rnd.mailbox = make([]raftpb.Message, 0)
+
 	return msgs
 }
 
@@ -46,26 +47,25 @@ type fakeNetwork struct {
 func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 	peerIDs := generateIDs(len(machines))
 
-	allStateMachines := make(map[uint64]stateMachine)
-	allStableStorageInMemory := make(map[uint64]*StorageStableInMemory)
+	allStateMachines := make(map[uint64]stateMachine, len(peerIDs))
+	allStableStorageInMemory := make(map[uint64]*StorageStableInMemory, len(peerIDs))
 
 	for i := range machines {
 		id := peerIDs[i]
 		switch v := machines[i].(type) {
 		case nil:
+			allStableStorageInMemory[id] = NewStorageStableInMemory()
 			allStateMachines[id] = newRaftNode(&Config{
-				ID:         id,
-				allPeerIDs: peerIDs,
-
+				ID:                      id,
+				allPeerIDs:              peerIDs,
 				ElectionTickNum:         10,
 				HeartbeatTimeoutTickNum: 1,
 				LeaderCheckQuorum:       false,
-				StorageStable:           NewStorageStableInMemory(),
+				StorageStable:           allStableStorageInMemory[id],
 				MaxEntryNumPerMsg:       0,
 				MaxInflightMsgNum:       256,
 				LastAppliedIndex:        0,
 			})
-			allStableStorageInMemory[id] = NewStorageStableInMemory()
 
 		case *raftNode:
 			v.id = id
@@ -93,8 +93,19 @@ func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 	}
 }
 
+// (etcd raft.network.send)
+func (fn *fakeNetwork) stepFirstFrontMessage(msgs ...raftpb.Message) {
+	for len(msgs) > 0 {
+		m := msgs[0]
+		st := fn.allStateMachines[m.To]
+		st.Step(m)
+
+		msgs = append(msgs[1:], fn.filter(st.readResetMailbox())...)
+	}
+}
+
 // (etcd raft.network.filter)
-func (fn *fakeNetwork) filter(msgs ...raftpb.Message) []raftpb.Message {
+func (fn *fakeNetwork) filter(msgs []raftpb.Message) []raftpb.Message {
 	var filtered []raftpb.Message
 	for _, msg := range msgs {
 		if fn.allIgnoredMessageType[msg.Type] {
@@ -116,17 +127,6 @@ func (fn *fakeNetwork) filter(msgs ...raftpb.Message) []raftpb.Message {
 	}
 
 	return filtered
-}
-
-// (etcd raft.network.send)
-func (fn *fakeNetwork) stepFirstFrontMessage(msgs ...raftpb.Message) {
-	if len(msgs) > 0 {
-		firstMsg := msgs[0]
-		machine := fn.allStateMachines[firstMsg.To]
-		machine.Step(firstMsg)
-
-		msgs = append(msgs[1:], fn.filter(machine.readResetMailbox()...)...)
-	}
 }
 
 // (etcd raft.network.recover)

@@ -168,7 +168,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 
 	followerProgress := rnd.allProgresses[targetID]
 	if followerProgress.isPaused() {
-		raftLogger.Infof("%q %x is skipping append/snapshot to paused follower %x", rnd.state, rnd.id, targetID)
+		raftLogger.Infof("%q %x skips append/snapshot to paused follower %x", rnd.state, rnd.id, targetID)
 		return
 	}
 
@@ -240,7 +240,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		)
 	}
 
-	raftLogger.Infof("%q %x is sending %q to follower %x in mailbox", rnd.state, rnd.id, msg.Type, msg.To)
+	raftLogger.Infof("%q %x sends %q to follower %x in mailbox", rnd.state, rnd.id, msg.Type, msg.To)
 	rnd.sendToMailbox(msg)
 }
 
@@ -435,7 +435,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 				}
 
 				if rnd.leaderTransfereeID == msg.From && rnd.storageRaftLog.lastIndex() == followerProgress.MatchIndex {
-					raftLogger.Infof("%q %x is force-election-timing out follower %x for leadership transfer", rnd.state, rnd.id, msg.From)
+					raftLogger.Infof("%q %x force-election-times out follower %x for leadership transfer", rnd.state, rnd.id, msg.From)
 					rnd.leaderForceFollowerElectionTimeout(msg.From)
 				}
 			}
@@ -444,13 +444,14 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			raftLogger.Infof(`
 
 	%q %x [last log index=%d]
-	received rejection to MsgAppend
+	received rejection to %q
 	from follower %x [requested log index=%d | follower reject hint last log index=%d]
 
-`, rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), msg.From, msg.LogIndex, msg.RejectHintFollowerLogLastIndex)
+`, rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), msg.Type,
+				msg.From, msg.LogIndex, msg.RejectHintFollowerLogLastIndex)
 
 			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {
-				raftLogger.Infof("%q %x has decreased the progress of follower %x to %s", rnd.state, rnd.id, msg.From, followerProgress)
+				raftLogger.Infof("%q %x decreased the progress of follower %x to %s", rnd.state, rnd.id, msg.From, followerProgress)
 				if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
 					followerProgress.becomeProbe()
 				}
@@ -519,10 +520,10 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 		rnd.leaderTransfereeID = leaderTransfereeID
 		rnd.electionTimeoutElapsedTickNum = 0
-		raftLogger.Infof("%q %x is starting to transfer its leadership to follower %x", rnd.state, rnd.id, rnd.leaderTransfereeID)
+		raftLogger.Infof("%q %x starts transferring its leadership to follower %x", rnd.state, rnd.id, rnd.leaderTransfereeID)
 
 		if rnd.storageRaftLog.lastIndex() == followerProgress.MatchIndex {
-			raftLogger.Infof("%q %x is force-election-timing out follower, leader-transferee %x, which already has up-to-date log", rnd.state, rnd.id, leaderTransfereeID)
+			raftLogger.Infof("%q %x force-election-times out follower, leader-transferee %x, which already has up-to-date log", rnd.state, rnd.id, leaderTransfereeID)
 			rnd.leaderForceFollowerElectionTimeout(leaderTransfereeID)
 		} else {
 			rnd.leaderSendAppendOrSnapshot(leaderTransfereeID)
@@ -564,5 +565,5 @@ func (rnd *raftNode) becomeLeader() {
 	// followers to establish its authority and prevent new elections (Raft 3.4 p16).
 	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
 
-	raftLogger.Infof("%q %x has just become %q at term %d", oldState, rnd.id, rnd.state, rnd.term)
+	raftLogger.Infof("%q %x became %q at term %d", oldState, rnd.id, rnd.state, rnd.term)
 }
