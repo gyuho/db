@@ -30,7 +30,7 @@ type connection struct {
 }
 
 // (etcd raft.network)
-type fakeCluster struct {
+type fakeNetwork struct {
 	allStateMachines         map[uint64]stateMachine
 	allStableStorageInMemory map[uint64]*StorageStableInMemory
 
@@ -39,7 +39,7 @@ type fakeCluster struct {
 }
 
 // (etcd raft.newNetwork)
-func newFakeCluster(machines ...stateMachine) *fakeCluster {
+func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 	peerIDs := generateIDs(len(machines))
 
 	allStateMachines := make(map[uint64]stateMachine)
@@ -80,7 +80,7 @@ func newFakeCluster(machines ...stateMachine) *fakeCluster {
 		}
 	}
 
-	return &fakeCluster{
+	return &fakeNetwork{
 		allStateMachines:         allStateMachines,
 		allStableStorageInMemory: allStableStorageInMemory,
 
@@ -90,10 +90,10 @@ func newFakeCluster(machines ...stateMachine) *fakeCluster {
 }
 
 // (etcd raft.network.filter)
-func (fc *fakeCluster) filter(msgs ...raftpb.Message) []raftpb.Message {
+func (fn *fakeNetwork) filter(msgs ...raftpb.Message) []raftpb.Message {
 	var filtered []raftpb.Message
 	for _, msg := range msgs {
-		if fc.allIgnoredMessageType[msg.Type] {
+		if fn.allIgnoredMessageType[msg.Type] {
 			continue
 		}
 
@@ -102,7 +102,7 @@ func (fc *fakeCluster) filter(msgs ...raftpb.Message) []raftpb.Message {
 			raftLogger.Panicf("%q never goes over network", msg.Type)
 
 		default:
-			percentage := fc.allDroppedConnection[connection{from: msg.From, to: msg.To}]
+			percentage := fn.allDroppedConnection[connection{from: msg.From, to: msg.To}]
 			if rand.Float64() < percentage {
 				continue // skip append
 			}
@@ -115,45 +115,45 @@ func (fc *fakeCluster) filter(msgs ...raftpb.Message) []raftpb.Message {
 }
 
 // (etcd raft.network.send)
-func (fc *fakeCluster) sendAndStepFirstMessage(msgs ...raftpb.Message) {
+func (fn *fakeNetwork) sendAndStepFirstMessage(msgs ...raftpb.Message) {
 	if len(msgs) > 0 {
 		firstMsg := msgs[0]
-		machine := fc.allStateMachines[firstMsg.To]
+		machine := fn.allStateMachines[firstMsg.To]
 		machine.Step(firstMsg)
 
-		msgs = append(msgs[1:], fc.filter(machine.readResetMailbox()...)...)
+		msgs = append(msgs[1:], fn.filter(machine.readResetMailbox()...)...)
 	}
 }
 
 // (etcd raft.network.recover)
-func (fc *fakeCluster) recoverAll() {
-	fc.allDroppedConnection = make(map[connection]float64)
-	fc.allIgnoredMessageType = make(map[raftpb.MESSAGE_TYPE]bool)
+func (fn *fakeNetwork) recoverAll() {
+	fn.allDroppedConnection = make(map[connection]float64)
+	fn.allIgnoredMessageType = make(map[raftpb.MESSAGE_TYPE]bool)
 }
 
 // (etcd raft.network.drop)
-func (fc *fakeCluster) dropConnectionByPercentage(from, to uint64, percentage float64) {
-	fc.allDroppedConnection[connection{from, to}] = percentage
+func (fn *fakeNetwork) dropConnectionByPercentage(from, to uint64, percentage float64) {
+	fn.allDroppedConnection[connection{from, to}] = percentage
 }
 
 // (etcd raft.network.cut)
-func (fc *fakeCluster) cutConnection(id1, id2 uint64) {
-	fc.allDroppedConnection[connection{id1, id2}] = 1
-	fc.allDroppedConnection[connection{id2, id1}] = 1
+func (fn *fakeNetwork) cutConnection(id1, id2 uint64) {
+	fn.allDroppedConnection[connection{id1, id2}] = 1
+	fn.allDroppedConnection[connection{id2, id1}] = 1
 }
 
 // (etcd raft.network.isolate)
-func (fc *fakeCluster) isolate(id uint64) {
-	for sid := range fc.allStateMachines {
+func (fn *fakeNetwork) isolate(id uint64) {
+	for sid := range fn.allStateMachines {
 		if id != sid {
-			fc.cutConnection(id, sid)
+			fn.cutConnection(id, sid)
 		}
 	}
 }
 
 // (etcd raft.network.ignore)
-func (fc *fakeCluster) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
-	fc.allIgnoredMessageType[tp] = true
+func (fn *fakeNetwork) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
+	fn.allIgnoredMessageType[tp] = true
 }
 
 // (etcd raft.idsBySize)
