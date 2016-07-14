@@ -169,20 +169,22 @@ func newRaftNode(c *Config) *raftNode {
 
 	newRaftNode
 
-		state = %q
-		   id = %x
-	all nodes = %q
+	state     = %q
+	id        = %x
+	all nodes = %v
+
+	leader check quorum = %v
 
 	first index = %d
 	last  index = %d
 
-		 term = %d
+	term      = %d
 	last term = %d
 
 	committed index = %d
 	applied   index = %d
 
-`, rnd.state, rnd.id, strings.Join(nodeSlice, ", "),
+`, rnd.state, rnd.id, strings.Join(nodeSlice, ", "), rnd.leaderCheckQuorum,
 		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.lastIndex(),
 		rnd.term, rnd.storageRaftLog.lastTerm(),
 		rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.appliedIndex,

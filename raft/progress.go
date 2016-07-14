@@ -65,9 +65,9 @@ func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
 // (etcd raft.Progress.becomeProbe)
 func (pr *Progress) becomeProbe() {
 	if pr.State == raftpb.PROGRESS_STATE_SNAPSHOT { // snapshot was sent
-		pIdx := pr.PendingSnapshotIndex
+		lastPendingSnapshotIndex := pr.PendingSnapshotIndex
 		pr.resetState(raftpb.PROGRESS_STATE_PROBE)
-		pr.NextIndex = maxUint64(pr.MatchIndex+1, pIdx+1)
+		pr.NextIndex = maxUint64(pr.MatchIndex+1, lastPendingSnapshotIndex+1)
 		return
 	}
 	pr.resetState(raftpb.PROGRESS_STATE_PROBE)
@@ -116,21 +116,21 @@ func (pr *Progress) optimisticUpdate(msgLogIndex uint64) {
 	pr.NextIndex = msgLogIndex + 1
 }
 
-// maybeUpdateAndResume returns false if the given index comes from an outdated message.
+// maybeUpdateAndResume returns false if the update index comes from an outdated message.
 // Otherwise, it updates match, next index and returns true.
-// It only resumes if the message log index is greater than current match index.
+// It only resumes if update index is greater than current match index.
 //
 // (etcd raft.Progress.maybeUpdate)
-func (pr *Progress) maybeUpdateAndResume(msgLogIndex uint64) bool {
+func (pr *Progress) maybeUpdateAndResume(newUpdateIndex uint64) bool {
 	upToDate := false
-	if pr.MatchIndex < msgLogIndex { // update MatchIndex
-		pr.MatchIndex = msgLogIndex
+	if pr.MatchIndex < newUpdateIndex { // update MatchIndex
+		pr.MatchIndex = newUpdateIndex
 		upToDate = true
 		pr.resume()
 	}
 
-	if pr.NextIndex <= msgLogIndex { // update NextIndex
-		pr.NextIndex = msgLogIndex + 1
+	if pr.NextIndex <= newUpdateIndex { // update NextIndex
+		pr.NextIndex = newUpdateIndex + 1
 	}
 
 	return upToDate

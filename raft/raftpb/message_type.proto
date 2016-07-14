@@ -11,7 +11,7 @@ option (gogoproto.goproto_getters_all) = false;
 
 // (etcd raftpb.MessageType)
 enum MESSAGE_TYPE {
-	// INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN message is used locally by Candidate/Follower
+	// INTERNAL_TRIGGER_CAMPAIGN message is used locally by Candidate/Follower
 	// to start an election after election timeout.
 	//
 	// Every server in Raft starts as a follower, and when it has not received
@@ -24,7 +24,7 @@ enum MESSAGE_TYPE {
 	// It is an internal(local) message that is never sent to other peers over the network.
 	//
 	// (etcd: raft.raftpb.MsgHup)
-	INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN = 0;
+	INTERNAL_TRIGGER_CAMPAIGN = 0;
 
 	// INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT message is used locally by Leader,
 	// to signal the leader to send a LEADER_HEARTBEAT to its followers.

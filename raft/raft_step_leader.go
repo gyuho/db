@@ -44,8 +44,11 @@ func (rnd *raftNode) leaderCheckQuorumActive() bool {
 //
 // (etcd raft.raft.tickHeartbeat)
 func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("tickFuncLeaderHeartbeatTimeout must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("tickFuncLeaderHeartbeatTimeout must be called by %q [id=%x | leader id=%x]", rnd.state, rnd.id, rnd.leaderID)
 	}
 
 	rnd.heartbeatTimeoutElapsedTickNum++
@@ -82,8 +85,11 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 //
 // (etcd raft.raft.sendHeartbeat)
 func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderSendHeartbeatTo must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderSendHeartbeatTo must be called by %q [id=%x | leader id=%x]", rnd.state, rnd.id, rnd.leaderID)
 	}
 
 	// committedIndex is min(to.matched, raftNode.committedIndex).
@@ -104,8 +110,11 @@ func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
 //
 // (etcd raft.raft.bcastHeartbeat)
 func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderReplicateHeartbeatRequests must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderReplicateHeartbeatRequests must be called by %q [id=%x | leader id=%x]", rnd.state, rnd.id, rnd.leaderID)
 	}
 
 	for id := range rnd.allProgresses {
@@ -127,12 +136,16 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 //
 // (etcd raft.raft.maybeCommit)
 func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
+
 	matchIndexSlice := make(uint64Slice, 0, len(rnd.allProgresses))
 	for id := range rnd.allProgresses {
 		matchIndexSlice = append(matchIndexSlice, rnd.allProgresses[id].MatchIndex)
 	}
 	sort.Sort(sort.Reverse(matchIndexSlice))
-	indexToCommit := matchIndexSlice[len(rnd.allProgresses)]
+	indexToCommit := matchIndexSlice[len(rnd.allProgresses)/2]
 
 	// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
 	// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
@@ -146,13 +159,16 @@ func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
 //
 // (etcd raft.raft.sendAppend)
 func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderSendAppendOrSnapshot must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderSendAppendOrSnapshot must be called by %q [id=%x | leader id=%x]", rnd.state, rnd.id, rnd.leaderID)
 	}
 
 	followerProgress := rnd.allProgresses[targetID]
 	if followerProgress.isPaused() {
-		raftLogger.Infof("leader %x skips sending heartbeat to paused follower %x", rnd.id, targetID)
+		raftLogger.Infof("%q %x skips append/snapshot to paused follower %x", rnd.state, rnd.id, targetID)
 		return
 	}
 
@@ -183,30 +199,30 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 				followerProgress.inflights.add(entries[len(entries)-1].Index)
 
 			default:
-				raftLogger.Panicf("leader %x cannot send appends to follower %x of unhandled state %s", rnd.id, targetID, followerProgress)
+				raftLogger.Panicf("%q %x cannot send appends to follower %x of unhandled state %s", rnd.state, rnd.id, targetID, followerProgress)
 			}
 		}
 
 	} else { // error if entries had been compacted in leader's logs
 		msg.Type = raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER
 
-		raftLogger.Infof("leader %x now needs to send snapshot to follower %x [term error=%q | entries error=%q]", rnd.id, targetID, errTerm, errEntries)
+		raftLogger.Infof("%q %x now needs to send snapshot to follower %x [term error=%q | entries error=%q]", rnd.state, rnd.id, targetID, errTerm, errEntries)
 		if !followerProgress.RecentActive {
-			raftLogger.Infof("leader %x cancels snapshotting to follower %x [recent active=%v]", rnd.id, targetID, followerProgress.RecentActive)
+			raftLogger.Infof("%q %x cancels snapshotting to follower %x [recent active=%v]", rnd.state, rnd.id, targetID, followerProgress.RecentActive)
 			return
 		}
 
 		snapshot, err := rnd.storageRaftLog.snapshot()
 		if err != nil {
 			if err == ErrSnapshotTemporarilyUnavailable {
-				raftLogger.Infof("leader %x failed to send snapshot to follower %x (%v)", rnd.id, targetID, err)
+				raftLogger.Infof("%q %x failed to send snapshot to follower %x (%v)", rnd.state, rnd.id, targetID, err)
 				return
 			}
-			raftLogger.Panicf("leader %x failed to send snapshot to follower %x (%v)", rnd.id, targetID, err)
+			raftLogger.Panicf("%q %x failed to send snapshot to follower %x (%v)", rnd.state, rnd.id, targetID, err)
 		}
 
 		if raftpb.IsEmptySnapshot(snapshot) {
-			raftLogger.Panicf("leader %x returned empty snapshot", rnd.id)
+			raftLogger.Panicf("%q %x returned empty snapshot", rnd.state, rnd.id)
 		}
 
 		msg.Snapshot = snapshot
@@ -214,17 +230,17 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		followerProgress.becomeSnapshot(snapshot.Metadata.Index)
 		raftLogger.Infof(`
 
-	leader %x [committed index=%d | first index=%d]
+	%q %x [committed index=%d | first index=%d]
 	stopped sending appends and is now sending snapshot [index=%d | term=%d]
 	to follower %x %s
 
-`, rnd.id, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.firstIndex(),
+`, rnd.state, rnd.id, rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.firstIndex(),
 			snapshot.Metadata.Index, snapshot.Metadata.Term,
 			targetID, followerProgress,
 		)
 	}
 
-	raftLogger.Infof("leader %x is sending %q to follower %x in mailbox", rnd.id, msg.Type, msg.To)
+	raftLogger.Infof("%q %x sends %q to follower %x in mailbox", rnd.state, rnd.id, msg.Type, msg.To)
 	rnd.sendToMailbox(msg)
 }
 
@@ -232,8 +248,11 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 //
 // (etcd raft.raft.bcastAppend)
 func (rnd *raftNode) leaderReplicateAppendRequests() {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderReplicateAppendRequests must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderReplicateAppendRequests must be called by %q [id=%x | leader id=%x]", rnd.state, rnd.id, rnd.leaderID)
 	}
 
 	for id := range rnd.allProgresses {
@@ -246,6 +265,10 @@ func (rnd *raftNode) leaderReplicateAppendRequests() {
 
 // (etcd raft.raft.appendEntry)
 func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
+
 	storageLastIndex := rnd.storageRaftLog.lastIndex()
 	for idx := range entries {
 		entries[idx].Index = storageLastIndex + 1 + uint64(idx)
@@ -263,8 +286,11 @@ func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 
 // (etcd raft.raft.sendTimeoutNow)
 func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
 	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("leaderForceFollowerElectionTimeout must be called by leader [id=%x | leader id=%x]", rnd.id, rnd.leaderID)
+		raftLogger.Panicf("leaderForceFollowerElectionTimeout must be called by %q [id=%x | leader id=%x]", rnd.state, rnd.id, rnd.leaderID)
 	}
 
 	rnd.sendToMailbox(raftpb.Message{
@@ -275,6 +301,10 @@ func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 
 // (etcd raft.raft.stepLeader)
 func stepLeader(rnd *raftNode, msg raftpb.Message) {
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
+	}
+
 	// leader to take action, or receive response
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT: // pb.MsgBeat
@@ -283,27 +313,27 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM: // pb.MsgCheckQuorum
 		if !rnd.leaderCheckQuorumActive() {
-			raftLogger.Warningf("leader %x is stepping down to follower since quorum of cluster is not active", rnd.id)
+			raftLogger.Warningf("%q %x is stepping down to %q since quorum of cluster is not active", rnd.state, rnd.id, raftpb.NODE_STATE_FOLLOWER)
 			rnd.becomeFollower(rnd.term, NoNodeID) // becomeFollower(term, leader)
 		}
 		return
 
 	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
 		if len(msg.Entries) == 0 {
-			raftLogger.Panicf("leader %x got empty proposal", rnd.id)
+			raftLogger.Panicf("%q %x got empty proposal", rnd.state, rnd.id)
 		}
 
 		if _, ok := rnd.allProgresses[rnd.id]; !ok {
 			// ???
 			// this node was removed from configuration while serving as leader
 			// drop any new proposals
-			raftLogger.Infof("leader %x was removed from configuration while serving as leader (dropping new proposals)", rnd.id)
+			raftLogger.Infof("%q %x was removed from configuration while serving as leader (dropping new proposals)", rnd.state, rnd.id)
 			return
 		}
 
 		if rnd.leaderTransfereeID != NoNodeID {
-			raftLogger.Infof("leader %x [term=%d] is in progress of transferring its leadership to %x (dropping new proposals)",
-				rnd.id, rnd.term, rnd.leaderTransfereeID)
+			raftLogger.Infof("%q %x [term=%d] is in progress of transferring its leadership to %x (dropping new proposals)",
+				rnd.state, rnd.id, rnd.term, rnd.leaderTransfereeID)
 			return
 		}
 
@@ -323,11 +353,11 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
 		raftLogger.Infof(`
 
-	leader %x [last log term=%d | last log index=%d | voted for %x]
+	%q %x [log term=%d | log index=%d | voted for %x]
 	is rejecting to vote
 	for %x [message log index=%d | message log term=%d]
 
-`, rnd.id, rnd.storageRaftLog.lastTerm(), rnd.storageRaftLog.lastIndex(), rnd.votedFor,
+`, rnd.state, rnd.id, rnd.storageRaftLog.lastTerm(), rnd.storageRaftLog.lastIndex(), rnd.votedFor,
 			msg.From, msg.LogIndex, msg.LogTerm,
 		)
 
@@ -353,7 +383,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	followerProgress, ok := rnd.allProgresses[msg.From]
 	if !ok {
-		raftLogger.Infof("leader %x has no progress of follower %x", rnd.id, msg.From)
+		raftLogger.Infof("%q %x has no progress of follower %x", rnd.state, rnd.id, msg.From)
 		return
 	}
 
@@ -362,7 +392,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		followerProgress.RecentActive = true
 
 		if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE && followerProgress.inflights.full() {
-			raftLogger.Infof("leader %x frees the first inflight message of follower %x", rnd.id, msg.From)
+			raftLogger.Infof("%q %x frees the first inflight message of follower %x", rnd.state, rnd.id, msg.From)
 			followerProgress.inflights.freeFirstOne()
 			//
 			// [10, 20, 30]
@@ -391,7 +421,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 				case raftpb.PROGRESS_STATE_SNAPSHOT:
 					if followerProgress.needSnapshotAbort() { // pr.MatchIndex >= pr.PendingSnapshotIndex
 						followerProgress.becomeProbe()
-						raftLogger.Infof("leader %x is stopping snapshot to follower %x, and resetting progress to %s", rnd.id, msg.From, followerProgress)
+						raftLogger.Infof("%q %x is stopping snapshot to follower %x, and resetting progress to %s", rnd.state, rnd.id, msg.From, followerProgress)
 					}
 				}
 
@@ -405,7 +435,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 				}
 
 				if rnd.leaderTransfereeID == msg.From && rnd.storageRaftLog.lastIndex() == followerProgress.MatchIndex {
-					raftLogger.Infof("leader %x is force-election-timing out follower %x for leadership transfer", rnd.id, msg.From)
+					raftLogger.Infof("%q %x force-election-times out follower %x for leadership transfer", rnd.state, rnd.id, msg.From)
 					rnd.leaderForceFollowerElectionTimeout(msg.From)
 				}
 			}
@@ -413,14 +443,15 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		case true:
 			raftLogger.Infof(`
 
-	leader %x [last log index=%d]
-	received rejection to MsgAppend
+	%q %x [log index=%d | log term=%d]
+	received rejection in %q
 	from follower %x [requested log index=%d | follower reject hint last log index=%d]
 
-`, rnd.id, rnd.storageRaftLog.lastIndex(), msg.From, msg.LogIndex, msg.RejectHintFollowerLogLastIndex)
+`, rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), msg.Type,
+				msg.From, msg.LogIndex, msg.RejectHintFollowerLogLastIndex)
 
 			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {
-				raftLogger.Infof("leader %x has decreased the progress of follower %x to %s", rnd.id, msg.From, followerProgress)
+				raftLogger.Infof("%q %x decreased the progress of follower %x to %s", rnd.state, rnd.id, msg.From, followerProgress)
 				if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
 					followerProgress.becomeProbe()
 				}
@@ -437,7 +468,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		case false:
 			followerProgress.becomeProbe()
 			followerProgress.pause()
-			raftLogger.Infof("leader %x sent snapshot and received response from follower %x %s", rnd.id, msg.From, followerProgress)
+			raftLogger.Infof("%q %x sent snapshot and received response from follower %x %s", rnd.state, rnd.id, msg.From, followerProgress)
 			//
 			// 'leaderReplicateHeartbeatRequests' will resume again
 			// rnd.allProgresses[id].resume()
@@ -446,7 +477,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			followerProgress.snapshotFailed()
 			followerProgress.becomeProbe()
 			followerProgress.pause()
-			raftLogger.Infof("leader %x sent snapshot but got rejected from follower %x %s", rnd.id, msg.From, followerProgress)
+			raftLogger.Infof("%q %x sent snapshot but got rejected from follower %x %s", rnd.state, rnd.id, msg.From, followerProgress)
 			//
 			// 'leaderReplicateHeartbeatRequests' will resume again
 			// rnd.allProgresses[id].resume()
@@ -458,42 +489,41 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		}
 		raftLogger.Infof(`
 
-	leader %x cannot connect to follower %x
-
+	%q %x cannot connect to follower %x
 	leader failed to send message:
 	%s
 
-`, rnd.id, msg.From, raftpb.DescribeMessage(msg))
+`, rnd.state, rnd.id, msg.From, raftpb.DescribeMessage(msg))
 
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRANSFER_LEADER: // pb.MsgTransferLeader
 		lastLeaderTransfereeID := rnd.leaderTransfereeID
 		leaderTransfereeID := msg.From
 
 		if rnd.id == leaderTransfereeID {
-			raftLogger.Infof("leader %x is already a leader, so ignores leadership transfer request", rnd.id)
+			raftLogger.Infof("%q %x is already a leader, so ignores leadership transfer request", rnd.state, rnd.id)
 			return
 		}
 
 		if lastLeaderTransfereeID != NoNodeID {
 			if lastLeaderTransfereeID == leaderTransfereeID {
-				raftLogger.Infof("leader %x is already transferring its leadership to follower %x (ignores this request)", rnd.id, leaderTransfereeID)
+				raftLogger.Infof("%q %x is already transferring its leadership to follower %x (ignores this request)", rnd.state, rnd.id, leaderTransfereeID)
 				return
 			}
 			rnd.stopLeaderTransfer()
 			raftLogger.Infof(`
 
-	leader %x has just cancelled leadership transfer to follower %x
+	%q %x has just cancelled leadership transfer to follower %x
 	(got a new leadership transfer request to follower %x)
 
-`, rnd.id, lastLeaderTransfereeID, leaderTransfereeID)
+`, rnd.state, rnd.id, lastLeaderTransfereeID, leaderTransfereeID)
 		}
 
 		rnd.leaderTransfereeID = leaderTransfereeID
 		rnd.electionTimeoutElapsedTickNum = 0
-		raftLogger.Infof("leader %x is starting to transfer its leadership to follower %x", rnd.id, rnd.leaderTransfereeID)
+		raftLogger.Infof("%q %x starts transferring its leadership to follower %x", rnd.state, rnd.id, rnd.leaderTransfereeID)
 
 		if rnd.storageRaftLog.lastIndex() == followerProgress.MatchIndex {
-			raftLogger.Infof("leader %x is force-election-timing out follower, leader-transferee %x, which already has up-to-date log", rnd.id, leaderTransfereeID)
+			raftLogger.Infof("%q %x force-election-times out follower, leader-transferee %x, which already has up-to-date log", rnd.state, rnd.id, leaderTransfereeID)
 			rnd.leaderForceFollowerElectionTimeout(leaderTransfereeID)
 		} else {
 			rnd.leaderSendAppendOrSnapshot(leaderTransfereeID)
@@ -504,8 +534,9 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 // (etcd raft.raft.becomeLeader)
 func (rnd *raftNode) becomeLeader() {
 	if rnd.state == raftpb.NODE_STATE_FOLLOWER {
-		raftLogger.Panicf("follower %x cannot be leader without going through candidate state", rnd.id)
+		raftLogger.Panicf("%q %x cannot be leader without going through candidate state", rnd.state, rnd.id)
 	}
+	oldState := rnd.state
 
 	rnd.resetWithTerm(rnd.term)
 	rnd.leaderID = rnd.id
@@ -517,7 +548,7 @@ func (rnd *raftNode) becomeLeader() {
 	// get all uncommitted entries
 	entries, err := rnd.storageRaftLog.entries(rnd.storageRaftLog.committedIndex+1, math.MaxUint64)
 	if err != nil {
-		raftLogger.Panicf("candidate %x returned unexpected error (%v) while getting uncommitted entries", rnd.id, err)
+		raftLogger.Panicf("%q %x returned unexpected error (%v) while getting uncommitted entries", rnd.state, rnd.id, err)
 	}
 
 	for i := range entries {
@@ -525,7 +556,7 @@ func (rnd *raftNode) becomeLeader() {
 			continue
 		}
 		if rnd.pendingConfigExist {
-			raftLogger.Panicf("candidate %x has uncommitted duplicate configuration change entry (%+v)", rnd.id, entries[i])
+			raftLogger.Panicf("%q %x has uncommitted duplicate configuration change entry (%+v)", rnd.state, rnd.id, entries[i])
 		}
 		rnd.pendingConfigExist = true
 	}
@@ -534,5 +565,5 @@ func (rnd *raftNode) becomeLeader() {
 	// followers to establish its authority and prevent new elections (Raft 3.4 p16).
 	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
 
-	raftLogger.Infof("candidate %x has just become leader at term %d", rnd.id, rnd.term)
+	raftLogger.Infof("%q %x became %q at term %d", oldState, rnd.id, rnd.state, rnd.term)
 }
