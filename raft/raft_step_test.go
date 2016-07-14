@@ -22,7 +22,7 @@ func Test_Step_campaign_candidate(t *testing.T) {
 	})
 
 	msg := raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN,
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
 		To:   1,
 		From: 1,
 	}

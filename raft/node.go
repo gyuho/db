@@ -193,7 +193,7 @@ func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
 // (etcd raft.node.Campaign)
 func (nd *node) Campaign(ctx context.Context) error {
 	return nd.step(ctx, raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN,
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
 	})
 }
 

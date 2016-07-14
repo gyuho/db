@@ -7,7 +7,7 @@ import "github.com/gyuho/db/raft/raftpb"
 //
 // (etcd raft.raft.Step)
 func (rnd *raftNode) Step(msg raftpb.Message) error {
-	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN { // m.Type == pb.MsgHup
+	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN { // m.Type == pb.MsgHup
 		if rnd.state != raftpb.NODE_STATE_LEADER {
 			raftLogger.Infof("%q %x is starting a new election(campaign) at term %d", rnd.state, rnd.id, rnd.term)
 			rnd.followerBecomeCandidateAndStartCampaign()

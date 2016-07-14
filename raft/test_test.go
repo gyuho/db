@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/gyuho/db/raft/raftpb"
 )
@@ -48,7 +47,7 @@ func generateIDs(n int) []uint64 {
 	ids := make([]uint64, n)
 
 	for i := 0; i < n; i++ {
-		ids[i] = (uint64(i) << 56) | (uint64(time.Now().Add(time.Minute).UnixNano()))
+		ids[i] = uint64(i) + 1
 	}
 	return ids
 }
@@ -59,6 +58,7 @@ func Test_generateIDs(t *testing.T) {
 	for i, id := range ids {
 		if i == 0 {
 			prevID = id
+			fmt.Printf("generated %x\n", id)
 			continue
 		}
 		fmt.Printf("generated %x\n", id)
@@ -130,7 +130,7 @@ func (fn *fakeNetwork) filter(msgs ...raftpb.Message) []raftpb.Message {
 		}
 
 		switch msg.Type {
-		case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_FOLLOWER_OR_CANDIDATE_TO_START_CAMPAIGN:
+		case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN:
 			raftLogger.Panicf("%q never goes over network", msg.Type)
 
 		default:
@@ -147,7 +147,7 @@ func (fn *fakeNetwork) filter(msgs ...raftpb.Message) []raftpb.Message {
 }
 
 // (etcd raft.network.send)
-func (fn *fakeNetwork) sendAndStepFirstMessage(msgs ...raftpb.Message) {
+func (fn *fakeNetwork) stepFirstFrontMessage(msgs ...raftpb.Message) {
 	if len(msgs) > 0 {
 		firstMsg := msgs[0]
 		machine := fn.allStateMachines[firstMsg.To]
