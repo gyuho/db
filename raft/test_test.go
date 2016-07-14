@@ -32,29 +32,6 @@ type connection struct {
 	from, to uint64
 }
 
-// (etcd raft.ents)
-func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
-	st := NewStorageStableInMemory()
-	for i := range terms {
-		st.Append(raftpb.Entry{Index: uint64(i + 1), Term: terms[i]})
-	}
-
-	rnd := newRaftNode(&Config{
-		ID:                      1, // to be overwritten in 'newFakeNetwork'
-		allPeerIDs:              nil,
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       false,
-		StorageStable:           st,
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd.resetWithTerm(0)
-
-	return rnd
-}
-
 // fakeNetwork simulates network message passing for Raft tests.
 //
 // (etcd raft.network)
@@ -181,6 +158,47 @@ func (fn *fakeNetwork) isolate(id uint64) {
 // (etcd raft.network.ignore)
 func (fn *fakeNetwork) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
 	fn.allIgnoredMessageType[tp] = true
+}
+
+// (etcd raft.ents)
+func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
+	st := NewStorageStableInMemory()
+	for i := range terms {
+		st.Append(raftpb.Entry{Index: uint64(i + 1), Term: terms[i]})
+	}
+
+	rnd := newRaftNode(&Config{
+		ID:                      1, // to be overwritten in 'newFakeNetwork'
+		allPeerIDs:              nil,
+		ElectionTickNum:         10,
+		HeartbeatTimeoutTickNum: 1,
+		LeaderCheckQuorum:       false,
+		StorageStable:           st,
+		MaxEntryNumPerMsg:       0,
+		MaxInflightMsgNum:       256,
+		LastAppliedIndex:        0,
+	})
+	rnd.resetWithTerm(0)
+
+	return rnd
+}
+
+// (etcd raft.nextEnts)
+func persistALlUnstableAndApplyNextEntries(rnd *raftNode, st *StorageStableInMemory) []raftpb.Entry {
+	// append all unstable entries to stable
+	st.Append(rnd.storageRaftLog.unstableEntries()...)
+
+	// lastIndex gets the last index from unstable storage first.
+	// If it's not available, try to get the last index in stable storage.
+	//
+	// lastTerm returns the term of raftLog's last log entry.
+	//
+	rnd.storageRaftLog.persistedEntriesAt(rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm())
+
+	appliedEntries := rnd.storageRaftLog.nextEntriesToApply()
+	rnd.storageRaftLog.appliedTo(rnd.storageRaftLog.committedIndex)
+
+	return appliedEntries
 }
 
 // (etcd raft.idsBySize)

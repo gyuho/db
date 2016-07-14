@@ -65,6 +65,7 @@ func Test_Step_leader_election(t *testing.T) {
 			t.Fatalf("#%d: term expected 0, got %d", i, stepNode.term)
 		}
 
+		// to trigger election to 1
 		tt.fakeNetwork.stepFirstFrontMessage(raftpb.Message{
 			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
 			From: 1,
@@ -83,4 +84,40 @@ func Test_Step_leader_election(t *testing.T) {
 
 // (etcd raft.TestLogReplication)
 func Test_Step_log_replication(t *testing.T) {
+	tests := []struct {
+		fakeNetwork        *fakeNetwork
+		msgsToSendOneByOne []raftpb.Message
+
+		wCommittedIndex uint64
+	}{
+		{
+			newFakeNetwork(nil, nil, nil),
+			[]raftpb.Message{
+				{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}},
+			},
+
+			2,
+		},
+	}
+
+	for i, tt := range tests {
+		// to trigger election to 1
+		tt.fakeNetwork.stepFirstFrontMessage(raftpb.Message{
+			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+			From: 1,
+			To:   1,
+		})
+
+		for _, m := range tt.msgsToSendOneByOne {
+			tt.fakeNetwork.stepFirstFrontMessage(m)
+		}
+
+		for id, machine := range tt.fakeNetwork.allStateMachines {
+			sm := machine.(*raftNode)
+
+			if sm.storageRaftLog.committedIndex != tt.wCommittedIndex {
+				t.Fatalf("#%d: id %x committed index expected %d, got %d", i, id, tt.wCommittedIndex, sm.storageRaftLog.committedIndex)
+			}
+		}
+	}
 }
