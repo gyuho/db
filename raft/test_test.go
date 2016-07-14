@@ -42,34 +42,6 @@ type fakeNetwork struct {
 	allIgnoredMessageType map[raftpb.MESSAGE_TYPE]bool
 }
 
-// (etcd raft.idsBySize)
-func generateIDs(n int) []uint64 {
-	ids := make([]uint64, n)
-
-	for i := 0; i < n; i++ {
-		ids[i] = uint64(i) + 1
-	}
-	return ids
-}
-
-func Test_generateIDs(t *testing.T) {
-	ids := generateIDs(10)
-	var prevID uint64
-	for i, id := range ids {
-		if i == 0 {
-			prevID = id
-			fmt.Printf("generated %x\n", id)
-			continue
-		}
-		fmt.Printf("generated %x\n", id)
-		if id == prevID {
-			t.Fatalf("#%d: expected %x != %x", i, prevID, id)
-		}
-
-		id = prevID
-	}
-}
-
 // (etcd raft.newNetwork)
 func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 	peerIDs := generateIDs(len(machines))
@@ -186,4 +158,32 @@ func (fn *fakeNetwork) isolate(id uint64) {
 // (etcd raft.network.ignore)
 func (fn *fakeNetwork) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
 	fn.allIgnoredMessageType[tp] = true
+}
+
+// (etcd raft.idsBySize)
+func generateIDs(n int) []uint64 {
+	ids := make([]uint64, n)
+
+	for i := 0; i < n; i++ {
+		ids[i] = uint64(i) + 1
+	}
+	return ids
+}
+
+func Test_generateIDs(t *testing.T) {
+	ids := generateIDs(10)
+	var prevID uint64
+	for i, id := range ids {
+		if i == 0 {
+			prevID = id
+			fmt.Printf("generated %x\n", id)
+			continue
+		}
+		fmt.Printf("generated %x\n", id)
+		if id == prevID {
+			t.Fatalf("#%d: expected %x != %x", i, prevID, id)
+		}
+
+		id = prevID
+	}
 }
