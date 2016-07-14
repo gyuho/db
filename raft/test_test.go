@@ -32,6 +32,29 @@ type connection struct {
 	from, to uint64
 }
 
+// (etcd raft.ents)
+func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
+	st := NewStorageStableInMemory()
+	for i := range terms {
+		st.Append(raftpb.Entry{Index: uint64(i + 1), Term: terms[i]})
+	}
+
+	rnd := newRaftNode(&Config{
+		ID:                      1, // to be overwritten in 'newFakeNetwork'
+		allPeerIDs:              nil,
+		ElectionTickNum:         10,
+		HeartbeatTimeoutTickNum: 1,
+		LeaderCheckQuorum:       false,
+		StorageStable:           st,
+		MaxEntryNumPerMsg:       0,
+		MaxInflightMsgNum:       256,
+		LastAppliedIndex:        0,
+	})
+	rnd.resetWithTerm(0)
+
+	return rnd
+}
+
 // fakeNetwork simulates network message passing for Raft tests.
 //
 // (etcd raft.network)

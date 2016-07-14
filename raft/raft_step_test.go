@@ -44,6 +44,18 @@ func Test_Step_leader_election(t *testing.T) {
 		wNodeState  raftpb.NODE_STATE
 	}{
 		{newFakeNetwork(nil, nil, nil), raftpb.NODE_STATE_LEADER},
+		{newFakeNetwork(nil, nil, noOpBlackHole), raftpb.NODE_STATE_LEADER},
+		{newFakeNetwork(nil, noOpBlackHole, noOpBlackHole), raftpb.NODE_STATE_CANDIDATE},
+
+		// quorum is 3
+		{newFakeNetwork(nil, noOpBlackHole, noOpBlackHole, nil), raftpb.NODE_STATE_CANDIDATE},
+		{newFakeNetwork(nil, noOpBlackHole, noOpBlackHole, nil, nil), raftpb.NODE_STATE_LEADER},
+
+		// with higher terms than first node
+		{newFakeNetwork(nil, newTestRaftNodeWithTerms(1), newTestRaftNodeWithTerms(2), newTestRaftNodeWithTerms(1, 3), nil), raftpb.NODE_STATE_FOLLOWER},
+
+		// with higher terms including quorum, higest term in <quorum() nodes
+		{newFakeNetwork(newTestRaftNodeWithTerms(1), nil, newTestRaftNodeWithTerms(2), newTestRaftNodeWithTerms(1), nil), raftpb.NODE_STATE_LEADER},
 	}
 
 	for i, tt := range tests {
