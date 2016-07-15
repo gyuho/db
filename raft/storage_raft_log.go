@@ -110,7 +110,7 @@ func (sr *storageRaftLog) lastIndex() uint64 {
 func (sr *storageRaftLog) term(index uint64) (uint64, error) {
 	dummyIndex := sr.firstIndex() - 1
 	if index < dummyIndex || sr.lastIndex() < index {
-		raftLogger.Warningf("out-of-range index '%d' [dummy index=%d | last index=%d], returning term '0'", index, dummyIndex, sr.lastIndex())
+		raftLogger.Warningf("no term for index '%d' [dummy index=%d | last index=%d], returning 0", index, dummyIndex, sr.lastIndex())
 		return 0, nil
 	}
 

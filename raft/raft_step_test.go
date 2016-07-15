@@ -145,6 +145,7 @@ func Test_Step_log_replication(t *testing.T) {
 				}
 			}
 
+			// ensure all proposed entries are applied
 			for k := range proposedEntries {
 				ae := appliedEntries[k]
 				pe := proposedEntries[k]
