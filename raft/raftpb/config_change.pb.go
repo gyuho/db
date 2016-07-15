@@ -2,27 +2,6 @@
 // source: raft/raftpb/config_change.proto
 // DO NOT EDIT!
 
-/*
-	Package raftpb is a generated protocol buffer package.
-
-	It is generated from these files:
-		raft/raftpb/config_change.proto
-		raft/raftpb/entry.proto
-		raft/raftpb/message.proto
-		raft/raftpb/message_type.proto
-		raft/raftpb/snapshot.proto
-		raft/raftpb/states.proto
-
-	It has these top-level messages:
-		ConfigChange
-		Entry
-		Message
-		ConfigState
-		SnapshotMetadata
-		Snapshot
-		SoftState
-		HardState
-*/
 package raftpb
 
 import proto "github.com/golang/protobuf/proto"
@@ -36,10 +15,6 @@ import io "io"
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-const _ = proto.ProtoPackageIsVersion1
 
 // (etcd raftpb.ConfChangeType)
 type CONFIG_CHANGE_TYPE int32
