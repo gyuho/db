@@ -90,11 +90,11 @@ func newNodeReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState 
 	}
 
 	if rnd.leaderReadState.Index != uint64(0) {
-		copied := make([]byte, len(rnd.leaderReadState.Data))
-		copy(copied, rnd.leaderReadState.Data)
+		copied := make([]byte, len(rnd.leaderReadState.RequestCtx))
+		copy(copied, rnd.leaderReadState.RequestCtx)
 
 		nodeReady.LeaderReadState.Index = rnd.leaderReadState.Index
-		nodeReady.LeaderReadState.Data = copied
+		nodeReady.LeaderReadState.RequestCtx = copied
 	}
 
 	return nodeReady

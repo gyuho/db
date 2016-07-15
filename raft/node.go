@@ -385,7 +385,7 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 
 			rnd.mailbox = nil
 			rnd.leaderReadState.Index = uint64(0)
-			rnd.leaderReadState.Data = nil
+			rnd.leaderReadState.RequestCtx = nil
 			advanceCh = nd.advanceCh
 
 		case <-advanceCh: // case <-advancec:
