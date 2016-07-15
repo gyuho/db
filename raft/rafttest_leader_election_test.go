@@ -82,6 +82,22 @@ func Test_raft_leader_election(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestSingleNodeCandidate)
+func Test_raft_leader_election_single_node(t *testing.T) {
+	fn := newFakeNetwork(nil)
+
+	fn.stepFirstFrontMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	if rnd1.state != raftpb.NODE_STATE_LEADER {
+		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd1.state)
+	}
+}
+
 func Test_raft_leader_election_leaderCheckQuorum_candidate(t *testing.T) {
 	rnd1 := newRaftNode(&Config{
 		ID:                      1,
@@ -126,6 +142,10 @@ func Test_raft_leader_election_leaderCheckQuorum_candidate(t *testing.T) {
 	// THEN leader last confirmed its leadership, guaranteed to have been
 	// in contact with quorum within the election timeout, so it will ignore
 	// the vote request from candidate.
+
+	// for i := 0; i < rnd1.electionTimeoutTickNum; i++ {
+	// 	rnd1.tickFunc()
+	// }
 
 	fn.stepFirstFrontMessage(raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
