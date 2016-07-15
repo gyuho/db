@@ -63,7 +63,7 @@ func (rnd *raftNode) followerRespondToLeaderHeartbeat(msg raftpb.Message) {
 }
 
 // (etcd raft.raft.campaign)
-func (rnd *raftNode) followerBecomeCandidateAndStartCampaign() {
+func (rnd *raftNode) followerBecomeCandidateAndStartCampaign(tp raftpb.CAMPAIGN_TYPE) {
 	rnd.becomeCandidate()
 
 	// vote for itself, and then if voted from quorum, become leader
@@ -81,11 +81,17 @@ func (rnd *raftNode) followerBecomeCandidateAndStartCampaign() {
 		raftLogger.Infof("%q %x [log index=%d | log term=%d] sends vote requests to %x at term %d",
 			rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), id, rnd.term,
 		)
+
+		var ctx []byte
+		if tp == raftpb.CAMPAIGN_TYPE_TRANSFER {
+			ctx = []byte(tp.String())
+		}
 		rnd.sendToMailbox(raftpb.Message{
 			Type:     raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE,
 			To:       id,
 			LogIndex: rnd.storageRaftLog.lastIndex(),
 			LogTerm:  rnd.storageRaftLog.lastTerm(),
+			Context:  ctx,
 		})
 	}
 }
@@ -258,7 +264,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
 		raftLogger.Infof("%q %x [log term=%d] received %q, so now campaign to get leadership", rnd.state, rnd.id, rnd.term, msg.Type)
-		rnd.followerBecomeCandidateAndStartCampaign()
+		rnd.followerBecomeCandidateAndStartCampaign(raftpb.CAMPAIGN_TYPE_TRANSFER)
 
 	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndex
 		if rnd.leaderID == NoNodeID {
@@ -275,7 +281,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		}
 
 		rnd.leaderReadState.Index = msg.LogIndex
-		rnd.leaderReadState.Data = msg.Entries[0].Data
+		rnd.leaderReadState.RequestCtx = msg.Entries[0].Data
 	}
 }
 

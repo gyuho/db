@@ -1,6 +1,10 @@
 package raft
 
-import "github.com/gyuho/db/raft/raftpb"
+import (
+	"bytes"
+
+	"github.com/gyuho/db/raft/raftpb"
+)
 
 // Step defines how each Raft node behaves for the given message.
 // State specific step function gets called at the end.
@@ -10,7 +14,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN { // m.Type == pb.MsgHup
 		if rnd.state != raftpb.NODE_STATE_LEADER {
 			raftLogger.Infof("%q %x starts a new election at term %d", rnd.state, rnd.id, rnd.term)
-			rnd.followerBecomeCandidateAndStartCampaign()
+			rnd.followerBecomeCandidateAndStartCampaign(raftpb.CAMPAIGN_TYPE_ELECTION)
 		} else {
 			raftLogger.Infof("%q %x ignores %q", rnd.state, rnd.id, msg.Type)
 		}
@@ -30,9 +34,10 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	case msg.SenderCurrentTerm > rnd.term:
 		leaderID := msg.From
 		if msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
+			isCampaignTransfer := bytes.Equal(msg.Context, []byte(raftpb.CAMPAIGN_TYPE_TRANSFER.String()))
+			inLease := rnd.leaderCheckQuorum && rnd.state != raftpb.NODE_STATE_CANDIDATE && rnd.electionTimeoutTickNum > rnd.electionTimeoutElapsedTickNum
 			// ???
-			// leader check quorum is true, not candidate, election hasn't timed out
-			if rnd.leaderCheckQuorum && rnd.state != raftpb.NODE_STATE_CANDIDATE && rnd.electionTimeoutTickNum > rnd.electionTimeoutElapsedTickNum {
+			if !isCampaignTransfer && inLease {
 				raftLogger.Infof("%q %x [log index=%d | log term=%d | voted for %x] ignores vote from %x [log index=%d | log term=%d] at term %d (remaining election timeout ticks %d)",
 					rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.From, msg.LogIndex, msg.SenderCurrentTerm, rnd.term,
 					rnd.electionTimeoutTickNum-rnd.electionTimeoutElapsedTickNum)
