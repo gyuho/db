@@ -17,7 +17,6 @@ func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
 		// (X)
 		// msg.LogTerm = rnd.term
-		//
 		msg.SenderCurrentTerm = rnd.term
 	}
 

@@ -130,9 +130,9 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 // index of its progresses' match indexes. For example, if given [5, 5, 4],
 // it tries to commit with 5 because quorum of cluster shares that match index.
 //
+// (Raft §3.5 Log replication, p.18)
 // A log entry is committed once the leader has replicated the entry on quorum of cluster.
-// It commits all preceding entries in the leader's log, including the ones from previous leaders
-// (Raft 3.5 p18).
+// It commits all preceding entries in the leader's log, including the ones from previous leaders.
 //
 // (etcd raft.raft.maybeCommit)
 func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
@@ -561,8 +561,18 @@ func (rnd *raftNode) becomeLeader() {
 		rnd.pendingConfigExist = true
 	}
 
+	// (Raft §3.4 Leader election, p.16)
 	// When it becomes leader, it needs to send empty append-entries RPC call (heartbeat) to its
-	// followers to establish its authority and prevent new elections (Raft 3.4 p16).
+	// followers to establish its authority and prevent new elections.
+	//
+	// (Raft §6.4 Processing read-only queries more efficiently, p.72)
+	// Leader Completeness Property guarantees that leader contains all committed entries.
+	// But the leader may not know which entries are committed, especially at the beginning
+	// of new term with new leader. To find out, leader needs to commit an entry in that term.
+	// Raft makes each leader commit a blank no-op entry at the start of its term.
+	// Once this no-op entris get committed, the leader committed index will be at least as large
+	// as other peers in that term.
+	//
 	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
 
 	raftLogger.Infof("%q %x became %q at term %d", oldState, rnd.id, rnd.state, rnd.term)

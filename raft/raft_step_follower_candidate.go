@@ -83,7 +83,7 @@ func (rnd *raftNode) followerBecomeCandidateAndStartCampaign(tp raftpb.CAMPAIGN_
 		)
 
 		var ctx []byte
-		if tp == raftpb.CAMPAIGN_TYPE_TRANSFER {
+		if tp == raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER {
 			ctx = []byte(tp.String())
 		}
 		rnd.sendToMailbox(raftpb.Message{
@@ -236,6 +236,8 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		rnd.followerRestoreSnapshotFromLeader(msg)
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
+		// one vote per term
+
 		// isUpToDate returns true if the given (index, term) log is more up-to-date
 		// than the last entry in the existing logs. It returns true, first if the
 		// term is greater than the last term. Second if the index is greater than
@@ -264,7 +266,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
 		raftLogger.Infof("%q %x [log term=%d] received %q, so now campaign to get leadership", rnd.state, rnd.id, rnd.term, msg.Type)
-		rnd.followerBecomeCandidateAndStartCampaign(raftpb.CAMPAIGN_TYPE_TRANSFER)
+		rnd.followerBecomeCandidateAndStartCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
 
 	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndex
 		if rnd.leaderID == NoNodeID {

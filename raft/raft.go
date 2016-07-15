@@ -62,6 +62,19 @@ type raftNode struct {
 	maxEntryNumPerMsg uint64 // (etcd raft.raft.maxMsgSize)
 	maxInflightMsgNum int    // (etcd raft.raft.maxInflight)
 
+	// leaderCheckQuorum is true, then the leader steps down
+	// if quorum of cluster is not active for an election timeout.
+	//
+	// 1. leaderCheckQuorum is true
+	// AND
+	// 2. election time out hasn't passed yet
+	//
+	// THEN leader last confirmed its leadership, guaranteed to have been
+	// in contact with quorum within the election timeout, so it will ignore
+	// the vote request from candidate.
+	//
+	// So it shouldn't increase its term either.
+	//
 	// (etcd raft.raft.checkQuorum)
 	leaderCheckQuorum bool
 
@@ -80,8 +93,9 @@ type raftNode struct {
 	// (etcd raft.raft.pendingConf)
 	pendingConfigExist bool
 
+	// (Raft §3.10  Leadership transfer extension, p.28)
 	// leaderTransfereeID is the ID of the leader transfer target
-	// when it's not zero (Raft 3.10).
+	// when it's not zero.
 	//
 	// (etcd raft.raft.leadTransferee)
 	leaderTransfereeID uint64

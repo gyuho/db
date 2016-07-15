@@ -13,6 +13,7 @@ package raft
 // do not change any state of replicated state machine, these writes can be time- and
 // resource-consuming.
 //
+// (Raft §6.4 Processing read-only queries more efficiently, p.72)
 // To bypass the Raft log with linearizable reads:
 //
 //   1. If Leader has not yet committed an entry from SenderCurrentTerm, it waits until it has done so.
@@ -33,8 +34,6 @@ package raft
 //      And this is current enought to satisfy linearizability.
 //
 //   7. Leader can now respond to those read-only client requests.
-//
-// (Raft 6.4 Processing read-only queries more efficiently, page 72)
 //
 // (etcd raft.ReadState)
 type LeaderReadState struct {
