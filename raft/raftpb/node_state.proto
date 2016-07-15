@@ -9,8 +9,6 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
 
-// NODE_STATE represents the state of a node in a cluster.
-//
 // (etcd raft.StateType)
 enum NODE_STATE {
 	FOLLOWER  = 0;

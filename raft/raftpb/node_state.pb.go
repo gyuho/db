@@ -14,8 +14,6 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-// NODE_STATE represents the state of a node in a cluster.
-//
 // (etcd raft.StateType)
 type NODE_STATE int32
 

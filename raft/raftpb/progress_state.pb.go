@@ -20,6 +20,8 @@ var _ = math.Inf
 // 'MatchIndex' is the highest known matched index of follower entries.
 // If unknown, it is set to 0. Then leader replicates entries from 'NextIndex'
 // to its last one.
+//
+// (etcd raft.ProgressStateType)
 type PROGRESS_STATE int32
 
 const (
