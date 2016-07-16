@@ -14,7 +14,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN { // m.Type == pb.MsgHup
 		if rnd.state != raftpb.NODE_STATE_LEADER {
 			raftLogger.Infof("%q %x starts a new election at term %d", rnd.state, rnd.id, rnd.term)
-			rnd.followerBecomeCandidateAndStartCampaign(raftpb.CAMPAIGN_TYPE_LEADER_ELECTION)
+			rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_ELECTION)
 		} else {
 			raftLogger.Infof("%q %x ignores %q", rnd.state, rnd.id, msg.Type)
 		}
@@ -35,46 +35,61 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 		leaderID := msg.From
 		if msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
 			// if the vote was requested for leadership transfer
-			// this node should not ignore this vote request
-			// and reverts back to follower if needed
+			// this node should not ignore this vote request so that
+			// it can revert back to follower
 			isLeaderTransfer := bytes.Equal(msg.Context, []byte(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER.String()))
 
+			// WHEN candidate receives a vote request with higher term,
+			// it SHOULD NOT IGNORE the vote request and SHOULD revert back to follower
+			//
+			// WHEN leader receives a vote request with higher term,
+			// and checkQuorum is true and election timeout hasn't passed,
+			// it SHOULD IGNORE the vote request
+			// because it guarantees that the leader is still in lease
+			//
+			// WHEN follower receives a vote request with higher term,
+			// and checkQuorum is true and election timeout hasn't passed,
+			// it SHOULD IGNORE the vote request
+			// because it has been in contact with leader for the last election timeout
+			//
+			notCandidate := rnd.state != raftpb.NODE_STATE_CANDIDATE
+
 			// (Raft §4.2.3 Disruptive servers, p.42)
-			// 1. state must not be candidate, for this node to be ok to reject vote request
-			//
-			// 2. leaderCheckQuorum is true
-			// AND
-			// 3. election time out hasn't passed yet
-			//
-			// THEN leader last confirmed its leadership, guaranteed to have been
-			// in contact with quorum within the election timeout, so it shouldn't
-			// increase its term either.
-			//
-			// SO, it's ok to to reject vote request
 			//
 			// "if a server receives a RequestVote request within the minimum election timeout
 			// of hearing from a current leader, it does not update its term or grant its vote."
 			//
 			// this helps avoid disruptions from servers with old configuration
 			//
-			quorumLease := rnd.state != raftpb.NODE_STATE_CANDIDATE &&
-				rnd.leaderCheckQuorum &&
-				rnd.electionTimeoutTickNum > rnd.electionTimeoutElapsedTickNum
+			// If leaderCheckQuorum is true, leader checks if quorum of cluster are active for every election timeout
+			// (if rnd.allProgresses[id].RecentActive {activeN++}).
+			// And leader maintains 'Progress.RecentActive' for every incoming message from follower.
+			// Now, if quorum is not active, leader reverts back to follower.
+			//
+			// Leader sends internal check-quorum message to trigger quorum-check
+			// for every election timeout (raftNode.tickFuncLeaderHeartbeatTimeout).
+			//
+			// So if leaderCheckQuorum is true and election timeout has not happened yet,
+			// then leader is guaranteed to have been in contact with quorum within
+			// the last election timeout, as a valid leader. So it shouldn't increase its term.
+			//
+			// SO, it's ok to to reject vote request
+			leaderQuorumChecked := rnd.leaderCheckQuorum && rnd.electionTimeoutTickNum > rnd.electionTimeoutElapsedTickNum
 
-			okToIgnore := !isLeaderTransfer && quorumLease
+			ignoreHigherTermVoteRequest := !isLeaderTransfer && notCandidate && leaderQuorumChecked
 
-			if okToIgnore {
+			if ignoreHigherTermVoteRequest {
 				raftLogger.Infof(`
 
 	%q %x [log index=%d | log term=%d | voted for %x]
 	ignores %q
 	from %x [log index=%d | log term=%d] at term %d
-	(remaining election timeout ticks %d)
+	(remaining election timeout ticks %d out of %d)
 
 `,
 					rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor,
 					msg.Type, msg.From, msg.LogIndex, msg.SenderCurrentTerm, rnd.term,
-					rnd.electionTimeoutTickNum-rnd.electionTimeoutElapsedTickNum)
+					rnd.electionTimeoutTickNum-rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum)
 
 				return nil
 			}

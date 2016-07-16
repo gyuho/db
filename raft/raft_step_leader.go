@@ -299,8 +299,80 @@ func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 	})
 }
 
+// (etcd raft.raft.becomeLeader)
+func (rnd *raftNode) becomeLeader() {
+	if rnd.state == raftpb.NODE_STATE_FOLLOWER {
+		raftLogger.Panicf("%q %x cannot be leader without going through candidate state", rnd.state, rnd.id)
+	}
+	oldState := rnd.state
+
+	rnd.resetWithTerm(rnd.term)
+	rnd.leaderID = rnd.id
+	rnd.state = raftpb.NODE_STATE_LEADER
+
+	rnd.stepFunc = stepLeader
+	rnd.tickFunc = rnd.tickFuncLeaderHeartbeatTimeout
+
+	// get all uncommitted entries
+	entries, err := rnd.storageRaftLog.entries(rnd.storageRaftLog.committedIndex+1, math.MaxUint64)
+	if err != nil {
+		raftLogger.Panicf("%q %x returned unexpected error (%v) while getting uncommitted entries", rnd.state, rnd.id, err)
+	}
+
+	for i := range entries {
+		if entries[i].Type != raftpb.ENTRY_TYPE_CONFIG_CHANGE {
+			continue
+		}
+		if rnd.pendingConfigExist {
+			raftLogger.Panicf("%q %x has uncommitted duplicate configuration change entry (%+v)", rnd.state, rnd.id, entries[i])
+		}
+		rnd.pendingConfigExist = true
+	}
+
+	// (Raft §3.4 Leader election, p.16)
+	//
+	// When it becomes leader, it needs to send empty append-entries RPC call (heartbeat) to its
+	// followers to establish its authority and prevent new elections.
+	//
+	//
+	// (Raft §6.4 Processing read-only queries more efficiently, p.72)
+	//
+	// Leader Completeness Property guarantees that leader contains all committed entries.
+	// But the leader may not know which entries are committed, especially at the beginning
+	// of new term with new leader. To find out, leader needs to commit an entry in that term.
+	// Raft makes each leader commit a blank no-op entry at the start of its term.
+	// Once this no-op entris get committed, the leader committed index will be at least as large
+	// as other peers in that term.
+	//
+	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
+
+	raftLogger.Infof("%q %x became %q at term %d", oldState, rnd.id, rnd.state, rnd.term)
+}
+
 // (etcd raft.raft.stepLeader)
 func stepLeader(rnd *raftNode, msg raftpb.Message) {
+
+	// (Raft §3.5 Log replication, p.17)
+	//
+	// Once leader gets elected, it starts serving client requests. Each request contains
+	// a command to be executed by replicated state machines. Leader appends this command
+	// to its log as a new entry, and send append RPCs to its followers to replicate them.
+	//
+	// Leader only commits a log entry only if the entry has been replicated in quorum of cluster.
+	// Then leader applies the entry and returns the results to clients.
+	// When follower finds out the entry is committed, the follower also applies the entry
+	// to its local state machine.
+	//
+	// Leader forces followers to duplicate its own logs. Followers overwrites any conflicting
+	// entries. Leader sends append RPCs by keeping the 'nextIndex' of each follower. And followers
+	// will respond to these requests with reject hints of its last index, if needed.
+	//
+	//
+	// If leaderCheckQuorum is true, leader checks if quorum of cluster are active for every election timeout
+	// (if rnd.allProgresses[id].RecentActive {activeN++}).
+	// And leader maintains 'Progress.RecentActive' for every incoming message from follower.
+	// Now, if quorum is not active, leader reverts back to follower.
+
 	if rnd.state != raftpb.NODE_STATE_LEADER {
 		raftLogger.Panicf("rnd.state must be %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
 	}
@@ -313,7 +385,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM: // pb.MsgCheckQuorum
 		if !rnd.leaderCheckQuorumActive() {
-			raftLogger.Warningf("%q %x is stepping down to %q since quorum of cluster is not active", rnd.state, rnd.id, raftpb.NODE_STATE_FOLLOWER)
+			raftLogger.Warningf("%q %x steps down to %q, because quorum is not active", rnd.state, rnd.id, raftpb.NODE_STATE_FOLLOWER)
 			rnd.becomeFollower(rnd.term, NoNodeID) // becomeFollower(term, leader)
 		}
 		return
@@ -324,7 +396,6 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		}
 
 		if _, ok := rnd.allProgresses[rnd.id]; !ok {
-			// ???
 			// this node was removed from configuration while serving as leader
 			// drop any new proposals
 			raftLogger.Infof("%q %x was removed from configuration while serving as leader (dropping new proposals)", rnd.state, rnd.id)
@@ -351,15 +422,17 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		return
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
-		raftLogger.Infof(`
 
-	%q %x [log term=%d | log index=%d | voted for %x]
-	is rejecting to vote
-	for %x [message log index=%d | message log term=%d]
+		// (Raft §3.4 Leader election, p.17)
+		//
+		// Raft randomizes election timeouts to minimize split votes or two candidates.
+		// And each server votes for candidate on first-come base.
+		// This randomized retry approach elects a leader rapidly, more obvious and understandable.
+		//
+		// leader or candidate rejects vote requests from another server.
 
-`, rnd.state, rnd.id, rnd.storageRaftLog.lastTerm(), rnd.storageRaftLog.lastIndex(), rnd.votedFor,
-			msg.From, msg.LogIndex, msg.LogTerm,
-		)
+		raftLogger.Infof("%q %x [log index=%d | log term=%d | voted for %x] rejects vote request from %x [log index=%d | log term=%d] at term %d",
+			rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.From, msg.LogIndex, msg.LogTerm, rnd.term)
 
 		rnd.sendToMailbox(raftpb.Message{
 			Type:   raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
@@ -444,8 +517,8 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			raftLogger.Infof(`
 
 	%q %x [log index=%d | log term=%d]
-	received rejection in %q
-	from follower %x [requested log index=%d | follower reject hint last log index=%d]
+	received append-request rejection in %q
+	from follower %x [requested log index=%d | follower-reject-hint last log index=%d]
 
 `, rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), msg.Type,
 				msg.From, msg.LogIndex, msg.RejectHintFollowerLogLastIndex)
@@ -490,7 +563,8 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		raftLogger.Infof(`
 
 	%q %x cannot connect to follower %x
-	leader failed to send message:
+	(leader failed to send message)
+
 	%s
 
 `, rnd.state, rnd.id, msg.From, raftpb.DescribeMessage(msg))
@@ -509,13 +583,14 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 				raftLogger.Infof("%q %x is already transferring its leadership to follower %x (ignores this request)", rnd.state, rnd.id, leaderTransfereeID)
 				return
 			}
+
 			rnd.stopLeaderTransfer()
 			raftLogger.Infof(`
 
-	%q %x has just cancelled leadership transfer to follower %x
-	(got a new leadership transfer request to follower %x)
+	%q %x cancelled leadership transfer to follower %x
+	(%x got a new leadership transfer request to follower %x)
 
-`, rnd.state, rnd.id, lastLeaderTransfereeID, leaderTransfereeID)
+`, rnd.state, rnd.id, lastLeaderTransfereeID, rnd.id, leaderTransfereeID)
 		}
 
 		rnd.leaderTransfereeID = leaderTransfereeID
@@ -529,51 +604,4 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			rnd.leaderSendAppendOrSnapshot(leaderTransfereeID)
 		}
 	}
-}
-
-// (etcd raft.raft.becomeLeader)
-func (rnd *raftNode) becomeLeader() {
-	if rnd.state == raftpb.NODE_STATE_FOLLOWER {
-		raftLogger.Panicf("%q %x cannot be leader without going through candidate state", rnd.state, rnd.id)
-	}
-	oldState := rnd.state
-
-	rnd.resetWithTerm(rnd.term)
-	rnd.leaderID = rnd.id
-	rnd.state = raftpb.NODE_STATE_LEADER
-
-	rnd.stepFunc = stepLeader
-	rnd.tickFunc = rnd.tickFuncLeaderHeartbeatTimeout
-
-	// get all uncommitted entries
-	entries, err := rnd.storageRaftLog.entries(rnd.storageRaftLog.committedIndex+1, math.MaxUint64)
-	if err != nil {
-		raftLogger.Panicf("%q %x returned unexpected error (%v) while getting uncommitted entries", rnd.state, rnd.id, err)
-	}
-
-	for i := range entries {
-		if entries[i].Type != raftpb.ENTRY_TYPE_CONFIG_CHANGE {
-			continue
-		}
-		if rnd.pendingConfigExist {
-			raftLogger.Panicf("%q %x has uncommitted duplicate configuration change entry (%+v)", rnd.state, rnd.id, entries[i])
-		}
-		rnd.pendingConfigExist = true
-	}
-
-	// (Raft §3.4 Leader election, p.16)
-	// When it becomes leader, it needs to send empty append-entries RPC call (heartbeat) to its
-	// followers to establish its authority and prevent new elections.
-	//
-	// (Raft §6.4 Processing read-only queries more efficiently, p.72)
-	// Leader Completeness Property guarantees that leader contains all committed entries.
-	// But the leader may not know which entries are committed, especially at the beginning
-	// of new term with new leader. To find out, leader needs to commit an entry in that term.
-	// Raft makes each leader commit a blank no-op entry at the start of its term.
-	// Once this no-op entris get committed, the leader committed index will be at least as large
-	// as other peers in that term.
-	//
-	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
-
-	raftLogger.Infof("%q %x became %q at term %d", oldState, rnd.id, rnd.state, rnd.term)
 }

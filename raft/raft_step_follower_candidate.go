@@ -63,7 +63,7 @@ func (rnd *raftNode) followerRespondToLeaderHeartbeat(msg raftpb.Message) {
 }
 
 // (etcd raft.raft.campaign)
-func (rnd *raftNode) followerBecomeCandidateAndStartCampaign(tp raftpb.CAMPAIGN_TYPE) {
+func (rnd *raftNode) becomeCandidateAndCampaign(tp raftpb.CAMPAIGN_TYPE) {
 	rnd.becomeCandidate()
 
 	// vote for itself, and then if voted from quorum, become leader
@@ -209,8 +209,28 @@ func (rnd *raftNode) followerRestoreSnapshot(snap raftpb.Snapshot) bool {
 	return true
 }
 
+// (etcd raft.raft.becomeFollower)
+func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
+	oldState := rnd.state
+	rnd.state = raftpb.NODE_STATE_FOLLOWER
+	rnd.resetWithTerm(term)
+	rnd.leaderID = leaderID
+
+	rnd.stepFunc = stepFollower
+	rnd.tickFunc = rnd.tickFuncFollowerElectionTimeout
+
+	raftLogger.Infof("%q %x became %q at term %d [leader id=%x]", oldState, rnd.id, rnd.state, term, leaderID)
+}
+
 // (etcd raft.raft.stepFollower)
 func stepFollower(rnd *raftNode, msg raftpb.Message) {
+
+	// (Raft §3.4 Leader election, p.16)
+	//
+	// Follower remains as follower as long as it receives messages from a valid leader.
+	// If a follower receives no messages within election timeout from a valid leader,
+	// it assumes that there is no viable leader and starts an election.
+
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
 		if rnd.leaderID == NoNodeID {
@@ -236,8 +256,6 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		rnd.followerRestoreSnapshotFromLeader(msg)
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
-		// one vote per term
-
 		// isUpToDate returns true if the given (index, term) log is more up-to-date
 		// than the last entry in the existing logs. It returns true, first if the
 		// term is greater than the last term. Second if the index is greater than
@@ -266,7 +284,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
 		raftLogger.Infof("%q %x [log term=%d] received %q, so now campaign to get leadership", rnd.state, rnd.id, rnd.term, msg.Type)
-		rnd.followerBecomeCandidateAndStartCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
+		rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
 
 	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndex
 		if rnd.leaderID == NoNodeID {
@@ -287,24 +305,47 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 	}
 }
 
-// (etcd raft.raft.becomeFollower)
-func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
+// (etcd raft.raft.becomeCandidate)
+func (rnd *raftNode) becomeCandidate() {
+	if rnd.state == raftpb.NODE_STATE_LEADER {
+		raftLogger.Panicf("%q %x cannot transition to candidate", rnd.state, rnd.id)
+	}
 	oldState := rnd.state
-	rnd.state = raftpb.NODE_STATE_FOLLOWER
-	rnd.resetWithTerm(term)
-	rnd.leaderID = leaderID
 
-	rnd.stepFunc = stepFollower
+	rnd.state = raftpb.NODE_STATE_CANDIDATE
+	rnd.resetWithTerm(rnd.term + 1)
+
+	rnd.stepFunc = stepCandidate
 	rnd.tickFunc = rnd.tickFuncFollowerElectionTimeout
 
-	raftLogger.Infof("%q %x became %q at term %d [leader id=%x]", oldState, rnd.id, rnd.state, term, leaderID)
+	rnd.votedFor = rnd.id // vote for itself
+
+	raftLogger.Infof("%q %x became %q at term %d", oldState, rnd.id, raftpb.NODE_STATE_CANDIDATE, rnd.term)
 }
 
 // (etcd raft.raft.stepCandidate)
 func stepCandidate(rnd *raftNode, msg raftpb.Message) {
+
+	// (Raft §3.4 Leader election, p.16)
+	//
+	// To begin an election, a follower increments its current term and becomes candidate.
+	// It then votes for itself and sends vote-requests to its peers. Candidate wins the
+	// election if it gets quorum of votes in the same term.
+	//
+	// Each node can vote for at most one candidate in the given term (vote for first-come).
+	// And at most one candidate can win the election in the given term.
+	//
+	//
+	// (Raft §3.6.1 Election restriction, p.22)
+	//
+	// Raft uses voting process to prevent a candidate from being elected if the candidate
+	// does not contain all committed entries. Candidate must contact quorum, and the voters
+	// rejects the vote requests from this candidate if its own log is more up-to-date, by
+	// comparing the index and term.
+
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
-		raftLogger.Infof("%q %x, so there's no known leader (dropping proposal)", rnd.state, rnd.id)
+		raftLogger.Infof("%q %x so there's no known leader (dropping proposal)", rnd.state, rnd.id)
 		return
 
 	case raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER: // pb.MsgApp
@@ -323,7 +364,16 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 		rnd.followerRestoreSnapshotFromLeader(msg)
 
 	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
-		raftLogger.Infof("%q %x [log index=%d | log term=%d | voted for %x] rejects to vote for %x [log index=%d | log term=%d] at term %d",
+
+		// (Raft §3.4 Leader election, p.17)
+		//
+		// Raft randomizes election timeouts to minimize split votes or two candidates.
+		// And each server votes for candidate on first-come base.
+		// This randomized retry approach elects a leader rapidly, more obvious and understandable.
+		//
+		// leader or candidate rejects vote requests from another server.
+
+		raftLogger.Infof("%q %x [log index=%d | log term=%d | voted for %x] rejects vote request from %x [log index=%d | log term=%d] at term %d",
 			rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor, msg.From, msg.LogIndex, msg.LogTerm, rnd.term)
 		rnd.sendToMailbox(raftpb.Message{
 			Type:   raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
@@ -348,22 +398,4 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
 		raftLogger.Infof("%q %x ignores %q at term %d", rnd.state, rnd.id, msg.Type, rnd.term)
 	}
-}
-
-// (etcd raft.raft.becomeCandidate)
-func (rnd *raftNode) becomeCandidate() {
-	if rnd.state == raftpb.NODE_STATE_LEADER {
-		raftLogger.Panicf("%q %x cannot transition to candidate", rnd.state, rnd.id)
-	}
-	oldState := rnd.state
-
-	rnd.state = raftpb.NODE_STATE_CANDIDATE
-	rnd.resetWithTerm(rnd.term + 1)
-
-	rnd.stepFunc = stepCandidate
-	rnd.tickFunc = rnd.tickFuncFollowerElectionTimeout
-
-	rnd.votedFor = rnd.id // vote for itself
-
-	raftLogger.Infof("%q %x became %q at term %d", oldState, rnd.id, raftpb.NODE_STATE_CANDIDATE, rnd.term)
 }
