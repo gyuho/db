@@ -50,3 +50,11 @@ func init() {
 
 	SetFormatter(NewDefaultFormatter(os.Stderr))
 }
+
+// GetLogger returns the pkg logger, so that external packages can update the log level.
+func GetLogger(name string) (*Logger, bool) {
+	xlogger.mu.Lock()
+	lg, ok := xlogger.loggers[name]
+	xlogger.mu.Unlock()
+	return lg, ok
+}
