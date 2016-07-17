@@ -60,5 +60,6 @@ type StorageStable interface {
 	// state. The leader will send the follower the log entries beginning with
 	// the start entry.
 	//
+	// (etcd raft.Storage.Snapshot)
 	Snapshot() (raftpb.Snapshot, error)
 }

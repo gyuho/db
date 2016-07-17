@@ -346,9 +346,9 @@ func Test_Progress_becomeLeader_resume_by_leaderReplicateHeartbeatRequests(t *te
 	// this should resume follower 2
 	//
 	// stepLeader
-	// case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT: rnd.leaderReplicateHeartbeatRequests()
+	// case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT: rnd.leaderReplicateHeartbeatRequests()
 	rnd.Step(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT,
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT,
 		From: 1,
 		To:   1,
 	})

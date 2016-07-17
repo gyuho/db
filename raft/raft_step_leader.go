@@ -54,7 +54,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 		rnd.electionTimeoutElapsedTickNum = 0
 		if rnd.checkQuorum {
 			rnd.Step(raftpb.Message{
-				Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM,
+				Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM,
 				From: rnd.id,
 			})
 		}
@@ -71,7 +71,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 	if rnd.heartbeatTimeoutElapsedTickNum >= rnd.heartbeatTimeoutTickNum {
 		rnd.heartbeatTimeoutElapsedTickNum = 0
 		rnd.Step(raftpb.Message{
-			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT,
+			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT,
 			From: rnd.id,
 		})
 	}
@@ -82,7 +82,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 // (etcd raft.raft.sendHeartbeat)
 func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
 	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd.assertCalledByLeader()
+	// rnd.assertCalledByLeader()
 
 	// committedIndex is min(to.matched, raftNode.committedIndex).
 	//
@@ -103,7 +103,7 @@ func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
 // (etcd raft.raft.bcastHeartbeat)
 func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd.assertCalledByLeader()
+	// rnd.assertCalledByLeader()
 
 	for id := range rnd.allProgresses {
 		if id == rnd.id { // OR rnd.leaderID
@@ -347,11 +347,11 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	// leader to take action, or receive response
 	switch msg.Type {
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT: // pb.MsgBeat
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT: // pb.MsgBeat
 		rnd.leaderReplicateHeartbeatRequests()
 		return
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM: // pb.MsgCheckQuorum
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM: // pb.MsgCheckQuorum
 		if !rnd.checkQuorumActive() {
 			raftLogger.Warningf("%s steps down to %q, because quorum is not active", rnd.describe(), raftpb.NODE_STATE_FOLLOWER)
 			rnd.becomeFollower(rnd.term, NoNodeID) // becomeFollower(term, leader)

@@ -12,8 +12,8 @@ option (gogoproto.goproto_getters_all) = false;
 // (etcd raft.raftpb.MessageType)
 enum MESSAGE_TYPE {
 	INTERNAL_TRIGGER_CAMPAIGN                  = 0; // (etcd raft.raftpb.MsgHup)
-	INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT  = 1; // (etcd raft.raftpb.MsgBeat)
-	INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM    = 2; // (etcd raft.raftpb.MsgCheckQuorum)
+	INTERNAL_TRIGGER_LEADER_HEARTBEAT          = 1; // (etcd raft.raftpb.MsgBeat)
+	INTERNAL_TRIGGER_CHECK_QUORUM              = 2; // (etcd raft.raftpb.MsgCheckQuorum)
 	INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER = 3; // (etcd raft.raftpb.MsgUnreachable)
 
 	LEADER_HEARTBEAT             = 4; // (etcd raft.raftpb.MsgHeartbeat)

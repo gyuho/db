@@ -14,6 +14,7 @@ type stateMachine interface {
 	readResetMailbox() []raftpb.Message
 }
 
+// (etcd raft.raftNode.readMessages)
 func (rnd *raftNode) readResetMailbox() []raftpb.Message {
 	msgs := rnd.mailbox
 	rnd.mailbox = make([]raftpb.Message, 0)

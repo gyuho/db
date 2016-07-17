@@ -6,7 +6,7 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-func Test_raft_campaign_candidate(t *testing.T) {
+func Test_raft_trigger_campaign_and_candidate(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
 	msg := raftpb.Message{
@@ -20,6 +20,82 @@ func Test_raft_campaign_candidate(t *testing.T) {
 	rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
 	if rnd.term != 1 {
 		t.Fatalf("term expected 1, got %d", rnd.term)
+	}
+}
+
+// (etcd raft.TestPromotable)
+func Test_raft_promotableToLeader(t *testing.T) {
+	tests := []struct {
+		rnd         *raftNode
+		wPromotable bool
+	}{
+		{newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory()), true},
+		{newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory()), true},
+		{newTestRaftNode(1, []uint64{}, 10, 1, NewStorageStableInMemory()), false},
+		{newTestRaftNode(1, []uint64{2, 3}, 10, 1, NewStorageStableInMemory()), false},
+	}
+	for i, tt := range tests {
+		if g := tt.rnd.promotableToLeader(); g != tt.wPromotable {
+			t.Fatalf("#%d: promotable to leader expected %v, got %v", i, tt.wPromotable, g)
+		}
+	}
+}
+
+// (etcd raft.TestRecvMsgBeat)
+func Test_raft_Step_trigger_leader_heartbeat(t *testing.T) {
+	tests := []struct {
+		currentState raftpb.NODE_STATE
+		stepFunc     func(r *raftNode, msg raftpb.Message)
+		msgToStep    raftpb.Message
+
+		wMsgNum int
+	}{
+		{
+			raftpb.NODE_STATE_LEADER,
+			stepLeader,
+			raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1},
+
+			2,
+		},
+
+		{ // candidate ignores MsgBeat (MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT)
+			raftpb.NODE_STATE_CANDIDATE,
+			stepCandidate,
+			raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1},
+
+			0,
+		},
+
+		{ // follower ignores MsgBeat (MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT)
+			raftpb.NODE_STATE_FOLLOWER,
+			stepFollower,
+			raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1},
+
+			0,
+		},
+	}
+
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+		rnd.storageRaftLog = &storageRaftLog{
+			storageStable: &StorageStableInMemory{snapshotEntries: []raftpb.Entry{{}, {Index: 1, Term: 0}, {Index: 2, Term: 1}}},
+		}
+		rnd.term = 1
+
+		rnd.state = tt.currentState
+		rnd.stepFunc = tt.stepFunc
+
+		rnd.Step(tt.msgToStep)
+
+		msgs := rnd.readResetMailbox()
+		if len(msgs) != tt.wMsgNum {
+			t.Fatalf("#%d: message num expected %d, got %d", i, tt.wMsgNum, len(msgs))
+		}
+		for _, msg := range msgs {
+			if msg.Type != raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT {
+				t.Fatalf("msg.Type expected %q, got %q", raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT, msg.Type)
+			}
+		}
 	}
 }
 

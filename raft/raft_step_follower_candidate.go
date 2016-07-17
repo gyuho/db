@@ -338,6 +338,9 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 		rnd.leaderReadState.Index = msg.LogIndex
 		rnd.leaderReadState.RequestCtx = msg.Entries[0].Data
+
+	default:
+		raftLogger.Infof("%s ignores %q from %x", rnd.describe(), msg.Type, msg.From)
 	}
 }
 
@@ -440,5 +443,8 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
 		raftLogger.Infof("%s ignored %q", rnd.describe(), msg.Type)
+
+	default:
+		raftLogger.Infof("%s ignores %q from %x", rnd.describe(), msg.Type, msg.From)
 	}
 }
