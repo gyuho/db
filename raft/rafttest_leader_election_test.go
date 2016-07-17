@@ -100,6 +100,29 @@ func Test_raft_Step_trigger_leader_heartbeat(t *testing.T) {
 }
 
 // (etcd raft.TestCampaignWhileLeader)
+func Test_raft_Step_trigger_campaign_while_leader(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+
+	rnd.Step(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
+
+	oldTerm := rnd.term
+
+	rnd.Step(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd.term != oldTerm {
+		t.Fatalf("term should not be increased (expected %d, got %d)", oldTerm, rnd.term)
+	}
+}
 
 // (etcd raft.TestLeaderElection)
 func Test_raft_leader_election(t *testing.T) {
