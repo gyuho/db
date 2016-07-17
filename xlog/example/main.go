@@ -6,10 +6,10 @@ import (
 	"github.com/gyuho/db/xlog"
 )
 
-var logger = xlog.NewLogger("example")
+var logger = xlog.NewLogger("example", xlog.INFO)
 
 func main() {
-	xlog.SetDebug(true)
+	logger.SetMaxLogLevel(xlog.DEBUG)
 
 	log.Println("Hello World!")
 	logger.Println("Hello World!")
