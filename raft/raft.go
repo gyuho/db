@@ -3,7 +3,6 @@ package raft
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 
 	"github.com/gyuho/db/raft/raftpb"
 )
@@ -62,8 +61,12 @@ type raftNode struct {
 	maxEntryNumPerMsg uint64 // (etcd raft.raft.maxMsgSize)
 	maxInflightMsgNum int    // (etcd raft.raft.maxInflight)
 
+	// checkQuorum is true
+	// and quorum of cluster is not active for an election timeout
+	// then the leader steps down to follower.
+	//
 	// (etcd raft.raft.checkQuorum)
-	leaderCheckQuorum bool
+	checkQuorum bool
 
 	term      uint64          // (etcd raft.raft.Term)
 	votedFor  uint64          // (etcd raft.raft.Vote)
@@ -80,24 +83,15 @@ type raftNode struct {
 	// (etcd raft.raft.pendingConf)
 	pendingConfigExist bool
 
+	// (Raft §3.10  Leadership transfer extension, p.28)
 	// leaderTransfereeID is the ID of the leader transfer target
-	// when it's not zero (Raft 3.10).
+	// when it's not zero.
 	//
 	// (etcd raft.raft.leadTransferee)
 	leaderTransfereeID uint64
 
 	// (etcd raft.raft.readState)
 	leaderReadState LeaderReadState
-}
-
-// LeaderReadState provides the state of read-only query.
-// The application must send raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX
-// first, before it reads LeaderReadState from NodeReady.
-//
-// (etcd raft.ReadState)
-type LeaderReadState struct {
-	Index uint64
-	Data  []byte
 }
 
 // newRaftNode creates a new raftNode with the given Config.
@@ -126,9 +120,9 @@ func newRaftNode(c *Config) *raftNode {
 		maxEntryNumPerMsg: c.MaxEntryNumPerMsg,
 		maxInflightMsgNum: c.MaxInflightMsgNum,
 
-		leaderCheckQuorum: c.LeaderCheckQuorum,
+		checkQuorum: c.CheckQuorum,
 
-		leaderReadState: LeaderReadState{Index: uint64(0), Data: nil},
+		leaderReadState: LeaderReadState{Index: uint64(0), RequestCtx: nil},
 	}
 
 	hardState, configState, err := c.StorageStable.GetState()
@@ -167,28 +161,9 @@ func newRaftNode(c *Config) *raftNode {
 
 	raftLogger.Infof(`
 
-	newRaftNode
+	NEW NODE %s
 
-	state     = %q
-	id        = %x
-	all nodes = %v
-
-	leader check quorum = %v
-
-	first index = %d
-	last  index = %d
-
-	term      = %d
-	last term = %d
-
-	committed index = %d
-	applied   index = %d
-
-`, rnd.state, rnd.id, strings.Join(nodeSlice, ", "), rnd.leaderCheckQuorum,
-		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.lastIndex(),
-		rnd.term, rnd.storageRaftLog.lastTerm(),
-		rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.appliedIndex,
-	)
+`, rnd.describeLong())
 
 	return rnd
 }
@@ -292,4 +267,40 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 	rnd.votedFor = state.VotedFor
 	rnd.storageRaftLog.committedIndex = state.CommittedIndex
 	rnd.term = state.Term
+}
+
+func (rnd *raftNode) describe() string {
+	return fmt.Sprintf("%q %x [term=%d | leader id=%x]", rnd.state, rnd.id, rnd.term, rnd.leaderID)
+}
+
+func (rnd *raftNode) describeLong() string {
+	return fmt.Sprintf(`%q %x [node current term=%d | voted for %x | leader id=%x]
+	[first log index=%d | committed index=%d | applied index=%d | last log index=%d | last log term=%d]`,
+		rnd.state, rnd.id, rnd.term, rnd.votedFor, rnd.leaderID,
+		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.appliedIndex,
+		rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm())
+}
+
+func (rnd *raftNode) assertNodeState(expected raftpb.NODE_STATE) {
+	if rnd.state != expected {
+		raftLogger.Panicf("%s in unexpected state (expected %q)", rnd.describe(), expected)
+	}
+}
+
+func (rnd *raftNode) assertUnexpectedNodeState(unexpected raftpb.NODE_STATE) {
+	if rnd.state == unexpected {
+		raftLogger.Panicf("%s in unexpected state", rnd.describe())
+	}
+}
+
+func (rnd *raftNode) assertCalledByLeader() {
+	if rnd.id != rnd.leaderID {
+		raftLogger.Panicf("MUST BE called by the leader(%x), but called by %q %x", rnd.leaderID, rnd.state, rnd.id)
+	}
+}
+
+func (rnd *raftNode) assertCalledByNoneLeader() {
+	if rnd.id == rnd.leaderID {
+		raftLogger.Panicf("MUST NOT BE called by the leader(%x), but called by %q %x", rnd.leaderID, rnd.state, rnd.id)
+	}
 }

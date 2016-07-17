@@ -7,19 +7,28 @@ import (
 )
 
 // StorageStableInMemory implements StorageStable interface backed by in-memory storage.
+//
+// (etcd raft.MemoryStorage)
 type StorageStableInMemory struct {
 	mu sync.Mutex
 
+	// (etcd raft.MemoryStorage.hardState)
 	hardState raftpb.HardState
 
 	// snapshot contains metadata and encoded bytes data.
+	//
+	// (etcd raft.MemoryStorage.snapshot)
 	snapshot raftpb.Snapshot
 
 	// snapshotEntries[idx]'s raft log index == idx + snapshot.Metadata.Index
+	//
+	// (etcd raft.MemoryStorage.ents)
 	snapshotEntries []raftpb.Entry
 }
 
 // NewStorageStableInMemory creates an empty StorageStable in memory.
+//
+// (etcd raft.NewMemoryStorage)
 func NewStorageStableInMemory() *StorageStableInMemory {
 	return &StorageStableInMemory{
 		// populate with one dummy entry at term 0
@@ -34,10 +43,6 @@ func (ms *StorageStableInMemory) GetState() (raftpb.HardState, raftpb.ConfigStat
 	return ms.hardState, ms.snapshot.Metadata.ConfigState, nil
 }
 
-func (ms *StorageStableInMemory) firstIndex() uint64 {
-	return ms.snapshotEntries[0].Index + 1 // because first index is dummy at term 0
-}
-
 // FirstIndex returns the first index.
 //
 // (etcd raft.MemoryStorage.FirstIndex)
@@ -49,8 +54,9 @@ func (ms *StorageStableInMemory) FirstIndex() (uint64, error) {
 	return idx, nil
 }
 
-func (ms *StorageStableInMemory) lastIndex() uint64 {
-	return ms.snapshotEntries[len(ms.snapshotEntries)-1].Index
+// (etcd raft.MemoryStorage.firstIndex)
+func (ms *StorageStableInMemory) firstIndex() uint64 {
+	return ms.snapshotEntries[0].Index + 1 // because first index is dummy at term 0
 }
 
 // LastIndex returns the last index.
@@ -62,6 +68,11 @@ func (ms *StorageStableInMemory) LastIndex() (uint64, error) {
 	ms.mu.Unlock()
 
 	return idx, nil
+}
+
+// (etcd raft.MemoryStorage.lastIndex)
+func (ms *StorageStableInMemory) lastIndex() uint64 {
+	return ms.snapshotEntries[len(ms.snapshotEntries)-1].Index
 }
 
 // Term returns the term of the given index.

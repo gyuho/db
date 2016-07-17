@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package raftpb;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+// (etcd raft.CampaignType)
+enum CAMPAIGN_TYPE {
+	LEADER_ELECTION = 0;
+	LEADER_TRANSFER = 1;
+}

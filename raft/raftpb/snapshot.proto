@@ -31,6 +31,6 @@ enum SNAPSHOT_STATUS {
 // Snapshot contains snapshot data and meta-data.
 // It is stored in stable storage before messages are sent.
 message Snapshot {
-	SnapshotMetadata Metadata = 1 [(gogoproto.nullable) = false]; // generate without pointer
+	SnapshotMetadata Metadata = 1 [(gogoproto.nullable) = false]; // to generate without pointer
 	bytes Data = 2;
 }

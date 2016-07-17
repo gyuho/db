@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// (etcd raft.TestInflightsAdd)
 func Test_inflights_add_no_rotating(t *testing.T) {
 	ins := newInflights(10)
 
@@ -41,6 +42,7 @@ func Test_inflights_add_no_rotating(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestInflightsAdd)
 func Test_inflights_add_rotating(t *testing.T) {
 	ins := newInflights(10)
 	ins.bufferStart = 5
@@ -78,6 +80,7 @@ func Test_inflights_add_rotating(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestInflightFreeTo)
 func Test_inflights_freeTo(t *testing.T) {
 	ins := newInflights(10)
 	for i := 0; i < 10; i++ { // no rotation
@@ -159,6 +162,7 @@ func Test_inflights_freeTo(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestInflightFreeFirstOne)
 func Test_inflights_freeFirstOne(t *testing.T) {
 	ins := newInflights(10)
 	for i := 100; i < 110; i++ {

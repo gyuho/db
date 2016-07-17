@@ -9,38 +9,14 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
 
-// NODE_STATE represents the state of a node in a cluster.
-enum NODE_STATE {
-	FOLLOWER  = 0;
-	CANDIDATE = 1;
-	LEADER    = 2;
-}
-
-// SoftState provides state that is useful for logging and debugging.
-// The state is volatile and does not need to be persisted to the WAL.
-//
-// (etcd raftpb.SoftState)
-message SoftState {
-	NODE_STATE NodeState = 1;
-	uint64     LeaderID  = 2;
-}
-
-// HardState is the current state of the Raft node.
-// It must be stored in stable storage before messages are sent.
-//
-// (etcd raftpb.HardState)
-message HardState {
-	uint64 VotedFor       = 1;
-	uint64 CommittedIndex = 2;
-	uint64 Term           = 3;
-}
-
 // PROGRESS_STATE represents the state of follower progress, in leader's viewpoint.
 // Leader maintains progresses of all followers, and replicates entries to the followers
 // based on their progresses. Follower.Progress has 'MatchIndex' and 'NextIndex'.
 // 'MatchIndex' is the highest known matched index of follower entries.
 // If unknown, it is set to 0. Then leader replicates entries from 'NextIndex'
 // to its last one.
+//
+// (etcd raft.ProgressStateType)
 enum PROGRESS_STATE {
 	// When a follower is in PROBE state, leader sends at most one message
 	// for each heartbeat interval. This is to probe the actual progress of

@@ -1,6 +1,9 @@
 package raft
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Config contains the parameters to start a Raft node.
 type Config struct {
@@ -35,9 +38,11 @@ type Config struct {
 	// (etcd raft.Config.HeartbeatTick)
 	HeartbeatTimeoutTickNum int
 
-	// LeaderCheckQuorum is true, then a leader checks if quorum is active,
+	// CheckQuorum is true, then a leader checks if quorum is active,
 	// for an election timeout. If not, the leader steps down.
-	LeaderCheckQuorum bool
+	//
+	// (etcd raft.Config.CheckQuorum)
+	CheckQuorum bool
 
 	// StorageStable implements storage for Raft logs, where a node stores its
 	// entries and states, reads the persisted data when needed.
@@ -86,11 +91,11 @@ func (c *Config) validate() error {
 	}
 
 	if c.HeartbeatTimeoutTickNum <= 0 {
-		return errors.New("heartbeat tick must be greater than 0")
+		return fmt.Errorf("heartbeat tick (%d) must be greater than 0", c.HeartbeatTimeoutTickNum)
 	}
 
 	if c.ElectionTickNum <= c.HeartbeatTimeoutTickNum {
-		return errors.New("election tick must be greater than heartbeat tick")
+		return fmt.Errorf("election tick (%d) must be greater than heartbeat tick (%d)", c.ElectionTickNum, c.HeartbeatTimeoutTickNum)
 	}
 
 	if c.MaxInflightMsgNum <= 0 {

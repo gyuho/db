@@ -12,19 +12,27 @@ import (
 // (etcd raft.raftLog)
 type storageRaftLog struct {
 	// storageStable contains all stable entries since the last snapshot.
+	//
+	// (etcd raft.raftLog.storage)
 	storageStable StorageStable
 
 	// storageUnstable contains all unstable entries and snapshot to store into stableStorage.
 	// No need to define in pointer because 'storageRaftLog' will be passed with pointer.
+	//
+	// (etcd raft.raftLog.unstable)
 	storageUnstable storageUnstable
 
 	// committedIndex is the higest log position that is known to be stored in
 	// the stable storage "on a quorum of nodes".
+	//
+	// (etcd raft.raftLog.committed)
 	committedIndex uint64
 
 	// appliedIndex is the highest log position that the application has been
 	// instructed to apply to its state machine.
 	// Must: appliedIndex <= committedIndex
+	//
+	// (etcd raft.raftLog.applied)
 	appliedIndex uint64
 }
 
@@ -110,7 +118,7 @@ func (sr *storageRaftLog) lastIndex() uint64 {
 func (sr *storageRaftLog) term(index uint64) (uint64, error) {
 	dummyIndex := sr.firstIndex() - 1
 	if index < dummyIndex || sr.lastIndex() < index {
-		raftLogger.Warningf("out-of-range index '%d' [dummy index=%d | last index=%d], returning term '0'", index, dummyIndex, sr.lastIndex())
+		raftLogger.Warningf("no term for index '%d' [dummy index=%d | last index=%d], returning 0", index, dummyIndex, sr.lastIndex())
 		return 0, nil
 	}
 

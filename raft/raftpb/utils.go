@@ -49,26 +49,39 @@ func IsResponseMessage(tp MESSAGE_TYPE) bool {
 // (etcd raft.IsLocalMsg)
 func IsInternalMessage(tp MESSAGE_TYPE) bool {
 	return tp == MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN ||
-		tp == MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_SEND_HEARTBEAT ||
+		tp == MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT ||
 		tp == MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER ||
 		tp == MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER ||
-		tp == MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_TO_CHECK_QUORUM ||
+		tp == MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM ||
 		tp == MESSAGE_TYPE_INTERNAL_TRANSFER_LEADER
+
+	// ???
+	// MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER
 }
 
-// DescribeEntry describes Entry in human-readable format.
-//
-// (etcd raft.DescribeEntry)
-func DescribeEntry(e Entry) string {
-	return fmt.Sprintf("[index=%d | term=%d | type=%q | data=%q]", e.Index, e.Term, e.Type, e.Data)
+// DescribeMessage decribes message.
+func DescribeMessage(msg Message) string {
+	return fmt.Sprintf(`%q [from=%x | message sender current term=%d]`, msg.Type, msg.From, msg.SenderCurrentTerm)
 }
 
-// DescribeMessage describes Message in human-readable format.
+// DescribeMessageLong decribes message.
+func DescribeMessageLong(msg Message) string {
+	return fmt.Sprintf(`%q
+	[from=%x ➝ to=%x | sender current committed index=%d | sender current term=%d]
+	[log index=%d | log term=%d | reject=%v | reject hint follower last index=%d]
+	[snapshot metadata index=%d | snapshot metadata term=%d]`,
+		msg.Type, msg.From, msg.To, msg.SenderCurrentCommittedIndex, msg.SenderCurrentTerm,
+		msg.LogIndex, msg.LogTerm, msg.Reject, msg.RejectHintFollowerLogLastIndex,
+		msg.Snapshot.Metadata.Index, msg.Snapshot.Metadata.Term,
+	)
+}
+
+// DescribeMessageLongLong describes Message in human-readable format.
 //
 // (etcd raft.DescribeMessage)
-func DescribeMessage(msg Message) string {
+func DescribeMessageLongLong(msg Message) string {
 	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, "Message [type=%q | from=%X ➝ to=%X | current committed index=%d, sender current term=%d | log index=%d, log term=%d | reject=%v, reject hint follower last index=%d]",
+	fmt.Fprintf(buf, `Message [type=%q | from=%x ➝ to=%x | sender current committed index=%d, sender current term=%d | log index=%d, log term=%d | reject=%v, reject hint follower last index=%d]`,
 		msg.Type, msg.From, msg.To, msg.SenderCurrentCommittedIndex, msg.SenderCurrentTerm, msg.LogIndex, msg.LogTerm, msg.Reject, msg.RejectHintFollowerLogLastIndex)
 
 	if len(msg.Entries) > 0 {
@@ -87,4 +100,11 @@ func DescribeMessage(msg Message) string {
 	}
 
 	return buf.String()
+}
+
+// DescribeEntry describes Entry in human-readable format.
+//
+// (etcd raft.DescribeEntry)
+func DescribeEntry(e Entry) string {
+	return fmt.Sprintf("[index=%d | term=%d | type=%q | data=%q]", e.Index, e.Term, e.Type, e.Data)
 }

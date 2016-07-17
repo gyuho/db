@@ -14,6 +14,7 @@ type stateMachine interface {
 	readResetMailbox() []raftpb.Message
 }
 
+// (etcd raft.raftNode.readMessages)
 func (rnd *raftNode) readResetMailbox() []raftpb.Message {
 	msgs := rnd.mailbox
 	rnd.mailbox = make([]raftpb.Message, 0)
@@ -60,7 +61,7 @@ func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 				allPeerIDs:              peerIDs,
 				ElectionTickNum:         10,
 				HeartbeatTimeoutTickNum: 1,
-				LeaderCheckQuorum:       false,
+				CheckQuorum:             false,
 				StorageStable:           allStableStorageInMemory[id],
 				MaxEntryNumPerMsg:       0,
 				MaxInflightMsgNum:       256,
@@ -129,6 +130,8 @@ func (fn *fakeNetwork) filter(msgs []raftpb.Message) []raftpb.Message {
 	return filtered
 }
 
+// recoverAll recovers all dropped connections and resets ignored message types.
+//
 // (etcd raft.network.recover)
 func (fn *fakeNetwork) recoverAll() {
 	fn.allDroppedConnection = make(map[connection]float64)
@@ -146,6 +149,8 @@ func (fn *fakeNetwork) cutConnection(id1, id2 uint64) {
 	fn.allDroppedConnection[connection{id2, id1}] = 1
 }
 
+// isolate cuts all outgoing, incoming connections.
+//
 // (etcd raft.network.isolate)
 func (fn *fakeNetwork) isolate(id uint64) {
 	for sid := range fn.allStateMachines {
@@ -160,6 +165,21 @@ func (fn *fakeNetwork) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
 	fn.allIgnoredMessageType[tp] = true
 }
 
+// (etcd raft.newTestRaft)
+func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *raftNode {
+	return newRaftNode(&Config{
+		ID:                      id,
+		allPeerIDs:              allPeerIDs,
+		ElectionTickNum:         electionTick,
+		HeartbeatTimeoutTickNum: heartbeatTick,
+		CheckQuorum:             false,
+		StorageStable:           stableStorage,
+		MaxEntryNumPerMsg:       0,
+		MaxInflightMsgNum:       256,
+		LastAppliedIndex:        0,
+	})
+}
+
 // (etcd raft.ents)
 func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
 	st := NewStorageStableInMemory()
@@ -172,7 +192,7 @@ func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
 		allPeerIDs:              nil,
 		ElectionTickNum:         10,
 		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       false,
+		CheckQuorum:             false,
 		StorageStable:           st,
 		MaxEntryNumPerMsg:       0,
 		MaxInflightMsgNum:       256,

@@ -265,7 +265,8 @@ func (nd *node) ReportUnreachable(targetID uint64) {
 	select {
 	case nd.incomingMessageCh <- raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER,
-		From: targetID}:
+		From: targetID,
+	}:
 
 	case <-nd.doneCh:
 	}
@@ -277,7 +278,8 @@ func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 	case nd.incomingMessageCh <- raftpb.Message{
 		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
 		From:   targetID,
-		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED}:
+		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED,
+	}:
 
 	case <-nd.doneCh:
 	}
@@ -333,13 +335,13 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 		if rnd.leaderID != leaderID {
 			if rnd.hasLeader() { // rnd.leaderID != NoNodeID
 				if leaderID == NoNodeID {
-					raftLogger.Infof("%x elected leader %x at term %d", rnd.id, rnd.leaderID, rnd.term)
+					raftLogger.Infof("%s elected leader %x", rnd.describe(), rnd.leaderID)
 				} else {
-					raftLogger.Infof("%x changed its leader from %x to %x at term %d", rnd.id, leaderID, rnd.leaderID, rnd.term)
+					raftLogger.Infof("%s changed its leader from %x to %x", rnd.describe(), leaderID, rnd.leaderID)
 				}
 				incomingProposalMessageCh = nd.incomingProposalMessageCh
 			} else {
-				raftLogger.Infof("%x lost leader %x at term %d", rnd.id, leaderID, rnd.term)
+				raftLogger.Infof("%s lost leader %x", rnd.describe(), leaderID)
 				incomingProposalMessageCh = nil
 			}
 			leaderID = rnd.leaderID
@@ -385,7 +387,7 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 
 			rnd.mailbox = nil
 			rnd.leaderReadState.Index = uint64(0)
-			rnd.leaderReadState.Data = nil
+			rnd.leaderReadState.RequestCtx = nil
 			advanceCh = nd.advanceCh
 
 		case <-advanceCh: // case <-advancec:
@@ -433,7 +435,7 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 				rnd.resetPendingConfigExist() // ???
 
 			default:
-				raftLogger.Panicf("%x has received unknown config change type %q", rnd.id, configChange.Type)
+				raftLogger.Panicf("%s has received unknown config change type %q", rnd.describe(), configChange.Type)
 			}
 
 			select {
