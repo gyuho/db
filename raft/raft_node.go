@@ -20,7 +20,7 @@ func (rnd *raftNode) allNodeIDs() []uint64 {
 func (rnd *raftNode) addNode(id uint64) {
 	if _, ok := rnd.allProgresses[id]; ok {
 		// ???
-		raftLogger.Infof("ignoring redundant 'addNode' call to %x (can happen when initial boostrapping entries are applied twice)", id)
+		raftLogger.Infof("%q %s ignores redundant 'addNode' call to %x (can happen when initial boostrapping entries are applied twice)", rnd.state, rnd.id, id)
 		return
 	}
 
@@ -35,7 +35,7 @@ func (rnd *raftNode) deleteNode(id uint64) {
 
 	if len(rnd.allProgresses) == 0 {
 		// ???
-		raftLogger.Infof("%x has no progresses when raftNode.deleteNode(%x)... returning...", rnd.id, id)
+		raftLogger.Infof("%q %x has no progresses when raftNode.deleteNode(%x)... returning...", rnd.state, rnd.id, id)
 		return
 	}
 
