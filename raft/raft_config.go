@@ -1,6 +1,9 @@
 package raft
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Config contains the parameters to start a Raft node.
 type Config struct {
@@ -86,11 +89,11 @@ func (c *Config) validate() error {
 	}
 
 	if c.HeartbeatTimeoutTickNum <= 0 {
-		return errors.New("heartbeat tick must be greater than 0")
+		return fmt.Errorf("heartbeat tick (%d) must be greater than 0", c.HeartbeatTimeoutTickNum)
 	}
 
 	if c.ElectionTickNum <= c.HeartbeatTimeoutTickNum {
-		return errors.New("election tick must be greater than heartbeat tick")
+		return fmt.Errorf("election tick (%d) must be greater than heartbeat tick (%d)", c.ElectionTickNum, c.HeartbeatTimeoutTickNum)
 	}
 
 	if c.MaxInflightMsgNum <= 0 {

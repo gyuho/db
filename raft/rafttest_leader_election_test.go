@@ -7,19 +7,7 @@ import (
 )
 
 func Test_raft_campaign_candidate(t *testing.T) {
-	rnd := newRaftNode(&Config{
-		ID:         1,
-		allPeerIDs: []uint64{1, 2, 3},
-
-		ElectionTickNum:         5,
-		HeartbeatTimeoutTickNum: 1,
-
-		LeaderCheckQuorum: false,
-		StorageStable:     NewStorageStableInMemory(),
-		MaxEntryNumPerMsg: 0,
-		MaxInflightMsgNum: 256,
-		LastAppliedIndex:  0,
-	})
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
 	msg := raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
@@ -101,39 +89,13 @@ func Test_raft_leader_election_single_node(t *testing.T) {
 }
 
 func Test_raft_leader_election_leaderCheckQuorum_candidate(t *testing.T) {
-	rnd1 := newRaftNode(&Config{
-		ID:                      1,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd2 := newRaftNode(&Config{
-		ID:                      2,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd3 := newRaftNode(&Config{
-		ID:                      3,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
+	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+	rnd1.leaderCheckQuorum = true
+	rnd2.leaderCheckQuorum = true
+	rnd3.leaderCheckQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
 
@@ -162,39 +124,13 @@ func Test_raft_leader_election_leaderCheckQuorum_candidate(t *testing.T) {
 
 // (etcd raft.TestLeaderElectionWithCheckQuorum)
 func Test_raft_leader_election_leaderCheckQuorum_leader(t *testing.T) {
-	rnd1 := newRaftNode(&Config{
-		ID:                      1,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd2 := newRaftNode(&Config{
-		ID:                      2,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd3 := newRaftNode(&Config{
-		ID:                      3,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
+	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+	rnd1.leaderCheckQuorum = true
+	rnd2.leaderCheckQuorum = true
+	rnd3.leaderCheckQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
 
@@ -254,39 +190,13 @@ func Test_raft_leader_election_leaderCheckQuorum_leader(t *testing.T) {
 
 // (etcd raft.TestLeaderSupersedingWithCheckQuorum)
 func Test_raft_leader_election_leaderCheckQuorum_leader_ignore_vote(t *testing.T) {
-	rnd1 := newRaftNode(&Config{
-		ID:                      1,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd2 := newRaftNode(&Config{
-		ID:                      2,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd3 := newRaftNode(&Config{
-		ID:                      3,
-		allPeerIDs:              []uint64{1, 2, 3},
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       true,
-		StorageStable:           NewStorageStableInMemory(),
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
+	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+	rnd1.leaderCheckQuorum = true
+	rnd2.leaderCheckQuorum = true
+	rnd3.leaderCheckQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
 

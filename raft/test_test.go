@@ -160,6 +160,21 @@ func (fn *fakeNetwork) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
 	fn.allIgnoredMessageType[tp] = true
 }
 
+// (etcd raft.newTestRaft)
+func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *raftNode {
+	return newRaftNode(&Config{
+		ID:                      id,
+		allPeerIDs:              allPeerIDs,
+		ElectionTickNum:         electionTick,
+		HeartbeatTimeoutTickNum: heartbeatTick,
+		LeaderCheckQuorum:       false,
+		StorageStable:           stableStorage,
+		MaxEntryNumPerMsg:       0,
+		MaxInflightMsgNum:       256,
+		LastAppliedIndex:        0,
+	})
+}
+
 // (etcd raft.ents)
 func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
 	st := NewStorageStableInMemory()
