@@ -1,2 +1,2 @@
-// raft-example is an example usage of raft package.
+// raft-example shows how to use raft package.
 package main
