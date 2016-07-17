@@ -12,11 +12,11 @@ import (
 // (etcd raft.stateMachine)
 type stateMachine interface {
 	Step(msg raftpb.Message) error
-	readResetMailbox() []raftpb.Message
+	readAndClearMailbox() []raftpb.Message
 }
 
 // (etcd raft.raftNode.readMessages)
-func (rnd *raftNode) readResetMailbox() []raftpb.Message {
+func (rnd *raftNode) readAndClearMailbox() []raftpb.Message {
 	msgs := rnd.mailbox
 	rnd.mailbox = make([]raftpb.Message, 0)
 
@@ -25,8 +25,8 @@ func (rnd *raftNode) readResetMailbox() []raftpb.Message {
 
 type blackHole struct{}
 
-func (blackHole) Step(raftpb.Message) error          { return nil }
-func (blackHole) readResetMailbox() []raftpb.Message { return nil }
+func (blackHole) Step(raftpb.Message) error             { return nil }
+func (blackHole) readAndClearMailbox() []raftpb.Message { return nil }
 
 var noOpBlackHole = &blackHole{}
 
@@ -102,7 +102,7 @@ func (fn *fakeNetwork) stepFirstFrontMessage(msgs ...raftpb.Message) {
 		st := fn.allStateMachines[m.To]
 		st.Step(m)
 
-		msgs = append(msgs[1:], fn.filter(st.readResetMailbox())...)
+		msgs = append(msgs[1:], fn.filter(st.readAndClearMailbox())...)
 	}
 }
 

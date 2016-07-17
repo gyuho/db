@@ -87,7 +87,7 @@ func Test_raft_Step_trigger_leader_heartbeat(t *testing.T) {
 
 		rnd.Step(tt.msgToStep)
 
-		msgs := rnd.readResetMailbox()
+		msgs := rnd.readAndClearMailbox()
 		if len(msgs) != tt.wMsgNum {
 			t.Fatalf("#%d: message num expected %d, got %d", i, tt.wMsgNum, len(msgs))
 		}
