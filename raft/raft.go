@@ -3,7 +3,6 @@ package raft
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 
 	"github.com/gyuho/db/raft/raftpb"
 )
@@ -162,28 +161,9 @@ func newRaftNode(c *Config) *raftNode {
 
 	raftLogger.Infof(`
 
-	newRaftNode
+	NEW NODE %s
 
-	state     = %q
-	id        = %x
-	all nodes = %v
-
-	check quorum = %v
-
-	first index = %d
-	last  index = %d
-
-	term      = %d
-	last term = %d
-
-	committed index = %d
-	applied   index = %d
-
-`, rnd.state, rnd.id, strings.Join(nodeSlice, ", "), rnd.checkQuorum,
-		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.lastIndex(),
-		rnd.term, rnd.storageRaftLog.lastTerm(),
-		rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.appliedIndex,
-	)
+`, rnd.describeLong())
 
 	return rnd
 }

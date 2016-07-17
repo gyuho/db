@@ -7,3 +7,5 @@ package raft
 // (etcd raft.TestSendAppendForProgressReplicate)
 
 // (etcd raft.TestSendAppendForProgressSnapshot)
+
+// (etcd raft.TestRecvMsgUnreachable)

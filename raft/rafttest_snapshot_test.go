@@ -1,5 +1,7 @@
 package raft
 
+// (etcd raft.TestBcastBeat)
+
 // (etcd raft.TestSendingSnapshotSetPendingSnapshot)
 
 // (etcd raft.TestPendingSnapshotPauseReplication)
