@@ -34,7 +34,7 @@ func Benchmark_xlog_rotate_without_flock(b *testing.B) {
 
 	xlog.SetFormatter(ft)
 
-	logger := xlog.NewLogger("test")
+	logger := xlog.NewLogger("test", xlog.DEBUG)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -65,7 +65,7 @@ func Benchmark_xlog_rotate_with_flock(b *testing.B) {
 
 	xlog.SetFormatter(ft)
 
-	logger := xlog.NewLogger("test")
+	logger := xlog.NewLogger("test", xlog.DEBUG)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -87,9 +87,9 @@ func Benchmark_xlog(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	xlog.SetFormatter(xlog.NewDefaultFormatter(f, true))
+	xlog.SetFormatter(xlog.NewDefaultFormatter(f))
 
-	logger := xlog.NewLogger("test")
+	logger := xlog.NewLogger("test", xlog.DEBUG)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

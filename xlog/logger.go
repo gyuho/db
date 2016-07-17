@@ -21,7 +21,7 @@ const (
 	// INFO just indicates information.
 	INFO
 
-	// DEBUG is debug-level logging, hidden by default.
+	// DEBUG is debug-level logging.
 	DEBUG
 )
 
@@ -45,32 +45,40 @@ func (l LogLevel) String() string {
 
 // Logger contains log prefix(pkg) and LogLevel.
 type Logger struct {
-	pkg string
+	pkg    string
+	maxLvl LogLevel
 }
 
 // NewLogger returns a Logger with pkg prefix.
-func NewLogger(pkg string) *Logger {
-	xlogger.mu.Lock()
-	defer xlogger.mu.Unlock()
+func NewLogger(pkg string, maxLvl LogLevel) *Logger {
+	lg := &Logger{pkg: pkg, maxLvl: maxLvl}
 
-	lg, ok := xlogger.loggers[pkg]
-	if !ok {
-		lg = &Logger{pkg: pkg}
-		xlogger.loggers[pkg] = lg
-	}
+	xlogger.mu.Lock() // overwrite
+	xlogger.loggers[pkg] = lg
+	xlogger.mu.Unlock()
 
 	return lg
 }
 
-func (l *Logger) log(lvl LogLevel, txt string) {
+// SetMaxLogLevel updates logger's LogLevel.
+func (l *Logger) SetMaxLogLevel(lvl LogLevel) {
 	xlogger.mu.Lock()
-	defer xlogger.mu.Unlock()
+	l.maxLvl = lvl
+	xlogger.mu.Unlock()
+}
 
+func (l *Logger) log(lvl LogLevel, txt string) {
 	if lvl < CRITICAL || lvl > DEBUG {
 		return
 	}
 
+	xlogger.mu.Lock()
+	if l.maxLvl < lvl {
+		xlogger.mu.Unlock()
+		return
+	}
 	xlogger.formatter.WriteFlush(l.pkg, lvl, txt)
+	xlogger.mu.Unlock()
 }
 
 func (l *Logger) Panic(args ...interface{}) {

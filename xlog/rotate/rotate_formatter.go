@@ -26,7 +26,6 @@ func getLogName() string {
 type Config struct {
 	// Dir is the directory to put log files.
 	Dir      string
-	Debug    bool
 	FileLock bool
 
 	RotateFileSize int64
@@ -34,8 +33,7 @@ type Config struct {
 }
 
 type formatter struct {
-	dir   string
-	debug bool
+	dir string
 
 	rotateFileSize int64
 
@@ -95,7 +93,6 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 
 	ft := &formatter{
 		dir:            cfg.Dir,
-		debug:          cfg.Debug,
 		rotateFileSize: cfg.RotateFileSize,
 		rotateDuration: cfg.RotateDuration,
 		started:        time.Now(),
@@ -108,10 +105,6 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 
 // WriteFlush writes log and flushes it. This is protected by mutex in xlog.
 func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
-	if !ft.debug && lvl == xlog.DEBUG {
-		return
-	}
-
 	ft.w.WriteString(time.Now().String()[:26])
 	ft.w.WriteString(" " + lvl.String() + " | ")
 	if pkg != "" {
@@ -200,10 +193,6 @@ func (ft *formatter) unsafeRotate() {
 	ft.file = fileTmp
 
 	ft.started = time.Now()
-}
-
-func (ft *formatter) SetDebug(debug bool) {
-	ft.debug = debug
 }
 
 func (ft *formatter) Flush() {

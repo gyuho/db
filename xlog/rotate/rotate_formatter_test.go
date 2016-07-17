@@ -41,7 +41,7 @@ func TestRotateByFileSize(t *testing.T) {
 
 	xlog.SetFormatter(ft)
 
-	logger := xlog.NewLogger("test")
+	logger := xlog.NewLogger("test", xlog.DEBUG)
 
 	logger.Println(strings.Repeat("a", 101))
 	logger.Println("Hello World!")
@@ -90,7 +90,7 @@ func TestRotateByDuration(t *testing.T) {
 
 	xlog.SetFormatter(ft)
 
-	logger := xlog.NewLogger("test")
+	logger := xlog.NewLogger("test", xlog.DEBUG)
 
 	time.Sleep(rotateDuration)
 	logger.Println("Hello World!")
