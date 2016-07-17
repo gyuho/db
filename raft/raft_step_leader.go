@@ -402,7 +402,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	RECEIVED %s
-	(GOT VOTE-REQUEST from, and REJECT-VOTED FOR %x)
+	(GOT VOTE-REQUEST FROM, and REJECT-VOTED FOR %x)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 

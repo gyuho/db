@@ -337,3 +337,38 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 }
 
 // (etcd raft.TestNonPromotableVoterWithCheckQuorum)
+func Test_raft_leader_election_checkQuorum_non_promotable_voter(t *testing.T) {
+	rnd1 := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd2 := newTestRaftNode(2, []uint64{1}, 10, 1, NewStorageStableInMemory())
+
+	rnd1.checkQuorum = true
+	rnd2.checkQuorum = true
+
+	fn := newFakeNetwork(rnd1, rnd2)
+
+	// remove again, because it is updated inside 'newFakeNetwork'
+	rnd2.deleteProgress(2)
+	if rnd2.promotableToLeader() { // _, ok := rnd.allProgresses[rnd.id]
+		t.Fatalf("rnd2 must not be promotable %s", rnd2.describe())
+	}
+
+	// time out rnd2
+	for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
+		rnd2.tickFunc()
+	}
+
+	// trigger campaign in rnd1
+	fn.stepFirstFrontMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leader must be 1, got %d", rnd1.leaderID)
+	}
+	if rnd2.leaderID != 1 {
+		t.Fatalf("leader must be 1, got %d", rnd2.leaderID)
+	}
+}

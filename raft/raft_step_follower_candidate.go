@@ -291,7 +291,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	RECEIVED %s
-	(GOT VOTE-REQUEST from, and VOTES FOR %x)
+	(GOT VOTE-REQUEST FROM, and VOTES FOR %x)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 
@@ -306,7 +306,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	RECEIVED %s
-	(GOT VOTE-REQUEST from, and REJECT-VOTES FOR %x)
+	(GOT VOTE-REQUEST FROM, and REJECT-VOTES FOR %x)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 
@@ -414,7 +414,7 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	REJECTED %s
-	(GOT VOTE-REQUEST from, and REJECT-VOTED FOR %x)
+	(GOT VOTE-REQUEST FROM, and REJECT-VOTED FOR %x)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 
