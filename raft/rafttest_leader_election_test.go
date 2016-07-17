@@ -322,11 +322,15 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 		To:   3,
 	})
 
-	// leader finds out the candidate with higher term
-	// and reverts back to follower?
+	// once candidate rnd3 gets the heartbeat from leader,
+	// it must revert back to follower first
+	//
+	// And rnd3 handles heartbeat and responds with higher term
+	// and then leader rnd1 gets the response with higher term,
+	// so it reverts back to follower
 	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
-	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
+	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	if rnd3.term != rnd1.term {
 		t.Fatalf("rnd2 term expected %d, got %d", rnd1.term, rnd3.term)
 	}

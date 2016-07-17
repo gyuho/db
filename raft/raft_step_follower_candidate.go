@@ -240,7 +240,7 @@ func (rnd *raftNode) becomeFollower(term, leaderID uint64) {
 	rnd.stepFunc = stepFollower
 	rnd.tickFunc = rnd.tickFuncFollowerElectionTimeout
 
-	raftLogger.Infof("%s became %q from %q", rnd.describe(), raftpb.NODE_STATE_FOLLOWER, oldState)
+	raftLogger.Infof("%s just transitioned from %q", rnd.describe(), oldState)
 }
 
 // (etcd raft.raft.stepFollower)
@@ -356,7 +356,7 @@ func (rnd *raftNode) becomeCandidate() {
 
 	rnd.votedFor = rnd.id // vote for itself
 
-	raftLogger.Infof("%s became %q from %q", rnd.describe(), raftpb.NODE_STATE_CANDIDATE, oldState)
+	raftLogger.Infof("%s just transitioned from %q", rnd.describe(), oldState)
 }
 
 // (etcd raft.raft.stepCandidate)

@@ -317,7 +317,7 @@ func (rnd *raftNode) becomeLeader() {
 	//
 	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: nil})
 
-	raftLogger.Infof("%s became %q from %q", rnd.describe(), raftpb.NODE_STATE_CANDIDATE, oldState)
+	raftLogger.Infof("%s just transitioned from %q", rnd.describe(), oldState)
 }
 
 // (etcd raft.raft.stepLeader)

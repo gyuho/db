@@ -86,7 +86,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	IGNORES %s
 	which has HIGHER term (sender current log term '%d' > node current term '%d')
 	(elapsed election timeout ticks: %d out of %d)
-	(IGNORED VOTE-REQUEST from candidate with HIGHER term!)
+	(IGNORES VOTE-REQUEST from CANDIDATE with "HIGHER" term!)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg),
 					msg.SenderCurrentTerm, rnd.term,
@@ -103,7 +103,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	RECEIVED %s
 	which has HIGHER term (sender current log term '%d' > node current term '%d')
 	(elapsed election timeout ticks: %d out of %d)
-	(GOT VOTE-REQUEST from candidate with HIGHER term, so need to BECOME FOLLOWER with sender term '%d')
+	(GOT VOTE-REQUEST from CANDIDATE with HIGHER term, so need to BECOME FOLLOWER with sender term '%d')
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg),
 			msg.SenderCurrentTerm, rnd.term,

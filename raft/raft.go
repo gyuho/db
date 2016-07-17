@@ -303,13 +303,13 @@ func (rnd *raftNode) describeLong() string {
 
 func (rnd *raftNode) assertNodeState(expected raftpb.NODE_STATE) {
 	if rnd.state != expected {
-		raftLogger.Panicf("%s has unexpected node state, expected %q", rnd.describe(), expected)
+		raftLogger.Panicf("%s in unexpected state (expected %q)", rnd.describe(), expected)
 	}
 }
 
 func (rnd *raftNode) assertUnexpectedNodeState(unexpected raftpb.NODE_STATE) {
 	if rnd.state == unexpected {
-		raftLogger.Panicf("%s has unexpected node state %q", rnd.describe(), unexpected)
+		raftLogger.Panicf("%s in unexpected state", rnd.describe())
 	}
 }
 
