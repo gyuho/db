@@ -84,12 +84,12 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	%q %x [log index=%d | log term=%d | voted for %x]
 	ignores %q
 	from %x [log index=%d | log term=%d] at term %d
-	(remaining election timeout ticks %d out of %d)
+	(elapsed election timeout %d out of %d ticks)
 
 `,
 					rnd.state, rnd.id, rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm(), rnd.votedFor,
 					msg.Type, msg.From, msg.LogIndex, msg.SenderCurrentTerm, rnd.term,
-					rnd.electionTimeoutTickNum-rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum)
+					rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum)
 
 				return nil
 			}
@@ -129,5 +129,6 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	}
 
 	rnd.stepFunc(rnd, msg)
+
 	return nil
 }
