@@ -314,7 +314,7 @@ func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
 		return nil
 	}
 
-	needFsync := raftpb.MustStoreHardState(w.hardState, st, len(ents))
+	needFsync := raftpb.HardStateContainUpdates(w.hardState, st, len(ents))
 
 	// write entries
 	for i := range ents {
