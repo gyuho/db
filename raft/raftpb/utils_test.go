@@ -15,7 +15,7 @@ func Test_DescribeEntry(t *testing.T) {
 	fmt.Println(DescribeEntry(entry))
 }
 
-func Test_DescribeMessage(t *testing.T) {
+func Test_DescribeMessageLongLong(t *testing.T) {
 	entry := Entry{
 		Type:  ENTRY_TYPE_NORMAL,
 		Index: 2,
@@ -23,12 +23,12 @@ func Test_DescribeMessage(t *testing.T) {
 		Data:  []byte("hello"),
 	}
 	msg := Message{
-		Type:     MESSAGE_TYPE_RESPONSE_TO_LEADER_REQUEST_APPEND,
+		Type:     MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
 		From:     7777,
 		To:       9999,
 		LogIndex: 10,
 		LogTerm:  5,
 		Entries:  []Entry{entry},
 	}
-	fmt.Println(DescribeMessage(msg))
+	fmt.Println(DescribeMessageLongLong(msg))
 }

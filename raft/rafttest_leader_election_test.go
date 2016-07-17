@@ -17,9 +17,7 @@ func Test_raft_campaign_candidate(t *testing.T) {
 	rnd.sendToMailbox(msg)
 	rnd.Step(msg)
 
-	if rnd.state != raftpb.NODE_STATE_CANDIDATE {
-		t.Fatalf("node state expected %q, got %q", raftpb.NODE_STATE_CANDIDATE, rnd.state)
-	}
+	rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
 	if rnd.term != 1 {
 		t.Fatalf("term expected 1, got %d", rnd.term)
 	}
@@ -88,24 +86,38 @@ func Test_raft_leader_election_single_node(t *testing.T) {
 	}
 }
 
-func Test_raft_leader_election_leaderCheckQuorum_candidate(t *testing.T) {
+func Test_raft_leader_election_checkQuorum_candidate(t *testing.T) {
 	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
-	rnd1.leaderCheckQuorum = true
-	rnd2.leaderCheckQuorum = true
-	rnd3.leaderCheckQuorum = true
+	rnd1.checkQuorum = true
+	rnd2.checkQuorum = true
+	rnd3.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
 
-	// 1. leaderCheckQuorum is true
-	// AND
-	// 2. election time out hasn't passed yet
+	// (Raft §4.2.3 Disruptive servers, p.42)
 	//
-	// THEN leader last confirmed its leadership, guaranteed to have been
-	// in contact with quorum within the election timeout, so it will ignore
-	// the vote request from candidate.
+	// "if a server receives a RequestVote request within the minimum election timeout
+	// of hearing from a current leader, it does not update its term or grant its vote."
+	//
+	// this helps avoid disruptions from servers with old configuration
+	//
+	// If checkQuorum is true, leader checks if quorum of cluster are active for every election timeout
+	// (if rnd.allProgresses[id].RecentActive {activeN++}).
+	// And leader maintains 'Progress.RecentActive' for every incoming message from follower.
+	// Now, if quorum is not active, leader reverts back to follower.
+	//
+	// Leader sends internal check-quorum message to trigger quorum-check
+	// for every election timeout (raftNode.tickFuncLeaderHeartbeatTimeout).
+	//
+	// So if checkQuorum is true and election timeout has not happened yet,
+	// then leader is guaranteed to have been in contact with quorum within
+	// the last election timeout, as a valid leader.
+	// So it shouldn't increase its term.
+	//
+	// SO, it's ok to to reject vote request
 
 	// for i := 0; i < rnd1.electionTimeoutTickNum; i++ {
 	// 	rnd1.tickFunc()
@@ -123,19 +135,19 @@ func Test_raft_leader_election_leaderCheckQuorum_candidate(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderElectionWithCheckQuorum)
-func Test_raft_leader_election_leaderCheckQuorum_leader(t *testing.T) {
+func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
-	rnd1.leaderCheckQuorum = true
-	rnd2.leaderCheckQuorum = true
-	rnd3.leaderCheckQuorum = true
+	rnd1.checkQuorum = true
+	rnd2.checkQuorum = true
+	rnd3.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
 
 	// time out rnd2, so that rnd2 now does not ignore the vote request
-	// and becomes the follower. And rnd1 will start campaign, and rnd2
+	// and rnd2 becomes the follower. And rnd1 will start campaign, and rnd2
 	// will be able to vote for rnd1 to be a leader
 	for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
 		rnd2.tickFunc()
@@ -147,16 +159,9 @@ func Test_raft_leader_election_leaderCheckQuorum_leader(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
-
-	if rnd1.state != raftpb.NODE_STATE_LEADER {
-		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd1.state)
-	}
-	if rnd2.state != raftpb.NODE_STATE_FOLLOWER {
-		t.Fatalf("rnd2 state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd2.state)
-	}
-	if rnd3.state != raftpb.NODE_STATE_FOLLOWER {
-		t.Fatalf("rnd3 state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd3.state)
-	}
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 
 	// rnd1 check quorum is true, and passed election timeout
 	// so it won't ignore the vote request, and then revert back to follower
@@ -176,27 +181,20 @@ func Test_raft_leader_election_leaderCheckQuorum_leader(t *testing.T) {
 		From: 3,
 		To:   3,
 	})
-
-	if rnd1.state != raftpb.NODE_STATE_FOLLOWER {
-		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd1.state)
-	}
-	if rnd2.state != raftpb.NODE_STATE_FOLLOWER {
-		t.Fatalf("rnd2 state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd2.state)
-	}
-	if rnd3.state != raftpb.NODE_STATE_LEADER {
-		t.Fatalf("rnd3 state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd3.state)
-	}
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd3.assertNodeState(raftpb.NODE_STATE_LEADER)
 }
 
 // (etcd raft.TestLeaderSupersedingWithCheckQuorum)
-func Test_raft_leader_election_leaderCheckQuorum_leader_ignore_vote(t *testing.T) {
+func Test_raft_leader_election_checkQuorum_leader_ignore_vote(t *testing.T) {
 	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
-	rnd1.leaderCheckQuorum = true
-	rnd2.leaderCheckQuorum = true
-	rnd3.leaderCheckQuorum = true
+	rnd1.checkQuorum = true
+	rnd2.checkQuorum = true
+	rnd3.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
 
@@ -214,15 +212,9 @@ func Test_raft_leader_election_leaderCheckQuorum_leader_ignore_vote(t *testing.T
 		From: 1,
 		To:   1,
 	})
-	if rnd1.state != raftpb.NODE_STATE_LEADER {
-		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd1.state)
-	}
-	if rnd2.state != raftpb.NODE_STATE_FOLLOWER {
-		t.Fatalf("rnd2 state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd2.state)
-	}
-	if rnd3.state != raftpb.NODE_STATE_FOLLOWER {
-		t.Fatalf("rnd3 state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd3.state)
-	}
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 
 	// rnd3 will start campaign
 	// but the vote requests will be rejected by rnd2
@@ -263,5 +255,81 @@ func Test_raft_leader_election_leaderCheckQuorum_leader_ignore_vote(t *testing.T
 }
 
 // (etcd raft.TestFreeStuckCandidateWithCheckQuorum)
+func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing.T) {
+	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+	rnd1.checkQuorum = true
+	rnd2.checkQuorum = true
+	rnd3.checkQuorum = true
+
+	fn := newFakeNetwork(rnd1, rnd2, rnd3)
+
+	// time out rnd2, so that rnd2 now does not ignore the vote request
+	// and rnd2 becomes the follower. And rnd1 will start campaign, and rnd2
+	// will be able to vote for rnd1 to be a leader
+	for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
+		rnd2.tickFunc()
+	}
+
+	// rnd1 will start campaign and become the leader
+	fn.stepFirstFrontMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+
+	// isolate leader (cut all outgoing, incoming connections)
+	fn.isolate(1)
+
+	// trigger election from 3
+	fn.stepFirstFrontMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 3,
+		To:   3,
+	})
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
+	if rnd2.term+1 != rnd3.term {
+		t.Fatalf("rnd2 expected term increase %d, got %d", rnd2.term+1, rnd3.term)
+	}
+
+	// trigger election from 3, again for safety
+	fn.stepFirstFrontMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 3,
+		To:   3,
+	})
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
+	if rnd2.term+2 != rnd3.term {
+		t.Fatalf("rnd2 expected term increase %d, got %d", rnd2.term+2, rnd3.term)
+	}
+
+	// recover all dropped connections
+	fn.recoverAll()
+
+	// was-isolated leader now sends heartbeat to now-new-candidate
+	fn.stepFirstFrontMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT,
+		From: 1,
+		To:   3,
+	})
+
+	// leader finds out the candidate with higher term
+	// and reverts back to follower?
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
+	if rnd3.term != rnd1.term {
+		t.Fatalf("rnd2 term expected %d, got %d", rnd1.term, rnd3.term)
+	}
+}
 
 // (etcd raft.TestNonPromotableVoterWithCheckQuorum)

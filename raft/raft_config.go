@@ -38,9 +38,11 @@ type Config struct {
 	// (etcd raft.Config.HeartbeatTick)
 	HeartbeatTimeoutTickNum int
 
-	// LeaderCheckQuorum is true, then a leader checks if quorum is active,
+	// CheckQuorum is true, then a leader checks if quorum is active,
 	// for an election timeout. If not, the leader steps down.
-	LeaderCheckQuorum bool
+	//
+	// (etcd raft.Config.CheckQuorum)
+	CheckQuorum bool
 
 	// StorageStable implements storage for Raft logs, where a node stores its
 	// entries and states, reads the persisted data when needed.

@@ -60,7 +60,7 @@ func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 				allPeerIDs:              peerIDs,
 				ElectionTickNum:         10,
 				HeartbeatTimeoutTickNum: 1,
-				LeaderCheckQuorum:       false,
+				CheckQuorum:             false,
 				StorageStable:           allStableStorageInMemory[id],
 				MaxEntryNumPerMsg:       0,
 				MaxInflightMsgNum:       256,
@@ -129,6 +129,8 @@ func (fn *fakeNetwork) filter(msgs []raftpb.Message) []raftpb.Message {
 	return filtered
 }
 
+// recoverAll recovers all dropped connections and resets ignored message types.
+//
 // (etcd raft.network.recover)
 func (fn *fakeNetwork) recoverAll() {
 	fn.allDroppedConnection = make(map[connection]float64)
@@ -146,6 +148,8 @@ func (fn *fakeNetwork) cutConnection(id1, id2 uint64) {
 	fn.allDroppedConnection[connection{id2, id1}] = 1
 }
 
+// isolate cuts all outgoing, incoming connections.
+//
 // (etcd raft.network.isolate)
 func (fn *fakeNetwork) isolate(id uint64) {
 	for sid := range fn.allStateMachines {
@@ -167,7 +171,7 @@ func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick
 		allPeerIDs:              allPeerIDs,
 		ElectionTickNum:         electionTick,
 		HeartbeatTimeoutTickNum: heartbeatTick,
-		LeaderCheckQuorum:       false,
+		CheckQuorum:             false,
 		StorageStable:           stableStorage,
 		MaxEntryNumPerMsg:       0,
 		MaxInflightMsgNum:       256,
@@ -187,7 +191,7 @@ func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
 		allPeerIDs:              nil,
 		ElectionTickNum:         10,
 		HeartbeatTimeoutTickNum: 1,
-		LeaderCheckQuorum:       false,
+		CheckQuorum:             false,
 		StorageStable:           st,
 		MaxEntryNumPerMsg:       0,
 		MaxInflightMsgNum:       256,
