@@ -37,6 +37,8 @@ func Test_raft_campaign_candidate(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestCampaignWhileLeader)
+
 // (etcd raft.TestLeaderElection)
 func Test_raft_leader_election(t *testing.T) {
 	tests := []struct {
@@ -344,7 +346,12 @@ func Test_raft_leader_election_leaderCheckQuorum_leader_ignore_vote(t *testing.T
 		From: 3,
 		To:   3,
 	})
+
 	if rnd3.state != raftpb.NODE_STATE_LEADER {
 		t.Fatalf("rnd3 state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd3.state)
 	}
 }
+
+// (etcd raft.TestFreeStuckCandidateWithCheckQuorum)
+
+// (etcd raft.TestNonPromotableVoterWithCheckQuorum)
