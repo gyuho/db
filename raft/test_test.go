@@ -2,20 +2,67 @@ package raft
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/gyuho/db/raft/raftpb"
 )
 
+const (
+	defaultTestElectionTickNum         = 10
+	defaultTestHeartbeatTimeoutTickNum = 1
+	defaultTestMaxEntryNumPerMsg       = math.MaxUint64
+	defaultTestMaxInflightMsgNum       = 15
+)
+
+// (etcd raft.newTestRaft)
+func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *raftNode {
+	return newRaftNode(&Config{
+		ID:                      id,
+		allPeerIDs:              allPeerIDs,
+		ElectionTickNum:         electionTick,
+		HeartbeatTimeoutTickNum: heartbeatTick,
+		CheckQuorum:             false,
+		StorageStable:           stableStorage,
+		MaxEntryNumPerMsg:       defaultTestMaxEntryNumPerMsg,
+		MaxInflightMsgNum:       defaultTestMaxInflightMsgNum,
+		LastAppliedIndex:        0,
+	})
+}
+
+// (etcd raft.ents)
+func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
+	st := NewStorageStableInMemory()
+	for i := range terms {
+		st.Append(raftpb.Entry{Index: uint64(i + 1), Term: terms[i]})
+	}
+
+	rnd := newRaftNode(&Config{
+		ID:                      1, // to be overwritten in 'newFakeNetwork'
+		allPeerIDs:              nil,
+		ElectionTickNum:         defaultTestElectionTickNum,
+		HeartbeatTimeoutTickNum: defaultTestHeartbeatTimeoutTickNum,
+		CheckQuorum:             false,
+		StorageStable:           st,
+		MaxEntryNumPerMsg:       defaultTestMaxEntryNumPerMsg,
+		MaxInflightMsgNum:       defaultTestMaxInflightMsgNum,
+		LastAppliedIndex:        0,
+	})
+	rnd.resetWithTerm(0)
+
+	return rnd
+}
+
 // (etcd raft.stateMachine)
 type stateMachine interface {
 	Step(msg raftpb.Message) error
-	readResetMailbox() []raftpb.Message
+	readAndClearMailbox() []raftpb.Message
 }
 
 // (etcd raft.raftNode.readMessages)
-func (rnd *raftNode) readResetMailbox() []raftpb.Message {
+func (rnd *raftNode) readAndClearMailbox() []raftpb.Message {
 	msgs := rnd.mailbox
 	rnd.mailbox = make([]raftpb.Message, 0)
 
@@ -24,8 +71,8 @@ func (rnd *raftNode) readResetMailbox() []raftpb.Message {
 
 type blackHole struct{}
 
-func (blackHole) Step(raftpb.Message) error          { return nil }
-func (blackHole) readResetMailbox() []raftpb.Message { return nil }
+func (blackHole) Step(raftpb.Message) error             { return nil }
+func (blackHole) readAndClearMailbox() []raftpb.Message { return nil }
 
 var noOpBlackHole = &blackHole{}
 
@@ -56,17 +103,7 @@ func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 		switch v := machines[i].(type) {
 		case nil:
 			allStableStorageInMemory[id] = NewStorageStableInMemory()
-			allStateMachines[id] = newRaftNode(&Config{
-				ID:                      id,
-				allPeerIDs:              peerIDs,
-				ElectionTickNum:         10,
-				HeartbeatTimeoutTickNum: 1,
-				CheckQuorum:             false,
-				StorageStable:           allStableStorageInMemory[id],
-				MaxEntryNumPerMsg:       0,
-				MaxInflightMsgNum:       256,
-				LastAppliedIndex:        0,
-			})
+			allStateMachines[id] = newTestRaftNode(id, peerIDs, 10, 1, allStableStorageInMemory[id])
 
 		case *raftNode:
 			v.id = id
@@ -101,7 +138,7 @@ func (fn *fakeNetwork) stepFirstFrontMessage(msgs ...raftpb.Message) {
 		st := fn.allStateMachines[m.To]
 		st.Step(m)
 
-		msgs = append(msgs[1:], fn.filter(st.readResetMailbox())...)
+		msgs = append(msgs[1:], fn.filter(st.readAndClearMailbox())...)
 	}
 }
 
@@ -165,44 +202,6 @@ func (fn *fakeNetwork) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
 	fn.allIgnoredMessageType[tp] = true
 }
 
-// (etcd raft.newTestRaft)
-func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *raftNode {
-	return newRaftNode(&Config{
-		ID:                      id,
-		allPeerIDs:              allPeerIDs,
-		ElectionTickNum:         electionTick,
-		HeartbeatTimeoutTickNum: heartbeatTick,
-		CheckQuorum:             false,
-		StorageStable:           stableStorage,
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-}
-
-// (etcd raft.ents)
-func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
-	st := NewStorageStableInMemory()
-	for i := range terms {
-		st.Append(raftpb.Entry{Index: uint64(i + 1), Term: terms[i]})
-	}
-
-	rnd := newRaftNode(&Config{
-		ID:                      1, // to be overwritten in 'newFakeNetwork'
-		allPeerIDs:              nil,
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
-		CheckQuorum:             false,
-		StorageStable:           st,
-		MaxEntryNumPerMsg:       0,
-		MaxInflightMsgNum:       256,
-		LastAppliedIndex:        0,
-	})
-	rnd.resetWithTerm(0)
-
-	return rnd
-}
-
 // (etcd raft.nextEnts)
 func persistALlUnstableAndApplyNextEntries(rnd *raftNode, st *StorageStableInMemory) []raftpb.Entry {
 	// append all unstable entries to stable
@@ -246,5 +245,28 @@ func Test_generateIDs(t *testing.T) {
 		}
 
 		id = prevID
+	}
+}
+
+// (etcd raft.TestRaftNodes)
+func Test_raft_allNodeIDs(t *testing.T) {
+	tests := []struct {
+		ids  []uint64
+		wids []uint64
+	}{
+		{
+			[]uint64{1, 2, 3},
+			[]uint64{1, 2, 3},
+		},
+		{
+			[]uint64{3, 2, 1},
+			[]uint64{1, 2, 3},
+		},
+	}
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, tt.ids, 10, 1, NewStorageStableInMemory())
+		if !reflect.DeepEqual(rnd.allNodeIDs(), tt.wids) {
+			t.Fatalf("#%d: all node IDs = %+v, want %+v", i, rnd.allNodeIDs(), tt.wids)
+		}
 	}
 }

@@ -11,9 +11,9 @@ import (
 
 func TestDefaultFormatterLogger(t *testing.T) {
 	buf := new(bytes.Buffer)
-	SetFormatter(NewDefaultFormatter(buf, false))
+	SetFormatter(NewDefaultFormatter(buf))
 
-	logger := NewLogger("test")
+	logger := NewLogger("test", INFO)
 	logger.Println("Hello World!")
 	logger.Debugln("DO NOT PRINT THIS")
 
@@ -35,9 +35,9 @@ func TestDefaultFormatterLoggerFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	SetFormatter(NewDefaultFormatter(f, true))
+	SetFormatter(NewDefaultFormatter(f))
 
-	logger := NewLogger("test")
+	logger := NewLogger("test", DEBUG)
 	logger.Println("Hello World!")
 	logger.Debugln("TEST")
 

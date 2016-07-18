@@ -26,13 +26,19 @@ package raft
 // (etcd raft.inflights)
 type inflights struct {
 	// buffer contains the last entry indexes of each message.
-	buffer []uint64 // (etcd raft.inflights.buffer)
+	//
+	// (etcd raft.inflights.buffer)
+	buffer []uint64
 
 	// starting index in the buffer
-	bufferStart int // (etcd raft.inflights.start)
+	//
+	// (etcd raft.inflights.start)
+	bufferStart int
 
 	// number of inflights in the buffer
-	bufferCount int // (etcd raft.inflights.count)
+	//
+	// (etcd raft.inflights.count)
+	bufferCount int
 }
 
 // (etcd raft.inflights.newInflights)
@@ -50,7 +56,7 @@ func (ins *inflights) size() int {
 
 // (etcd raft.inflights.full)
 func (ins *inflights) full() bool {
-	return len(ins.buffer) == ins.bufferCount
+	return ins.bufferCount == len(ins.buffer)
 }
 
 // inflight must be incremental.

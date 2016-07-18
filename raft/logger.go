@@ -68,7 +68,8 @@ func GetLogger() Logger {
 }
 
 func init() {
-	raftLogger.SetLogger(xlog.NewLogger("raft"))
+	// raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.DEBUG))
 }
 
 func (s *settableLogger) Panic(v ...interface{})                 { s.GetLogger().Panic(v...) }

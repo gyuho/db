@@ -11,7 +11,6 @@ type Formatter interface {
 	// WriteFlush writes the log and flush it to disk.
 	// This must be protected by mutex, outside.
 	WriteFlush(pkg string, lvl LogLevel, txt string)
-	SetDebug(debug bool)
 	Flush()
 }
 
@@ -19,13 +18,6 @@ type Formatter interface {
 func SetFormatter(f Formatter) {
 	xlogger.mu.Lock()
 	xlogger.formatter = f
-	xlogger.mu.Unlock()
-}
-
-// SetDebug sets debug for Formatter.
-func SetDebug(debug bool) {
-	xlogger.mu.Lock()
-	xlogger.formatter.SetDebug(debug)
 	xlogger.mu.Unlock()
 }
 
@@ -53,8 +45,16 @@ func init() {
 	log.SetFlags(0)
 	log.SetPrefix("")
 	log.SetOutput(stdLogWriter{
-		l: NewLogger(""),
+		l: NewLogger("", INFO),
 	})
 
-	SetFormatter(NewDefaultFormatter(os.Stderr, false))
+	SetFormatter(NewDefaultFormatter(os.Stderr))
+}
+
+// GetLogger returns the pkg logger, so that external packages can update the log level.
+func GetLogger(name string) (*Logger, bool) {
+	xlogger.mu.Lock()
+	lg, ok := xlogger.loggers[name]
+	xlogger.mu.Unlock()
+	return lg, ok
 }

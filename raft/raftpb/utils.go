@@ -59,6 +59,11 @@ func IsInternalMessage(tp MESSAGE_TYPE) bool {
 	// MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER
 }
 
+// (etcd wal.mustSync)
+func HardStateContainUpdates(prevHardState, hardState HardState, entryNum int) bool {
+	return entryNum != 0 || prevHardState.VotedFor != hardState.VotedFor || prevHardState.Term != hardState.Term
+}
+
 // DescribeMessage decribes message.
 func DescribeMessage(msg Message) string {
 	return fmt.Sprintf(`%q [from=%x | message sender current term=%d]`, msg.Type, msg.From, msg.SenderCurrentTerm)
