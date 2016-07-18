@@ -77,6 +77,36 @@ func Test_raft_snapshot_heartbeat(t *testing.T) {
 }
 
 // (etcd raft.TestSendingSnapshotSetPendingSnapshot)
+func Test_raft_snapshot_followerRestoreSnapshot_pending_snapshot(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	})
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	// resetWithTerm updates all progresses
+	// NextIndex: rnd.storageRaftLog.lastIndex() + 1,
+
+	// to force 1 to send snapshot to 2
+	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex()
+	rnd.Step(raftpb.Message{
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+		From:     2,
+		To:       1,
+		LogIndex: rnd.allProgresses[2].NextIndex - 1,
+		Reject:   true,
+	})
+
+	if rnd.allProgresses[2].PendingSnapshotIndex != 11 {
+		t.Fatalf("rnd.allProgresses[2].PendingSnapshotIndex expected 11, got %d", rnd.allProgresses[2].PendingSnapshotIndex)
+	}
+}
 
 // (etcd raft.TestPendingSnapshotPauseReplication)
 

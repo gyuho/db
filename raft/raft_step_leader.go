@@ -189,7 +189,15 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 	} else { // error if entries had been compacted in leader's logs
 		msg.Type = raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER
 
-		raftLogger.Infof("%s now needs to send snapshot to follower %x [term error=%q | entries error=%q]", rnd.describe(), targetID, errTerm, errEntries)
+		raftLogger.Infof(`
+
+	%s
+	NOW NEEDS TO SEND %q
+	to follower %x
+	[term error='%v' | entries error='%v']
+
+`, rnd.describeLong(), msg.Type, targetID, errTerm, errEntries)
+
 		if !followerProgress.RecentActive {
 			raftLogger.Infof("%s cancels snapshotting to follower %x [recent active=%v]", rnd.describe(), targetID, followerProgress.RecentActive)
 			return
@@ -213,12 +221,11 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		followerProgress.becomeSnapshot(snapshot.Metadata.Index)
 		raftLogger.Infof(`
 
-   %s
-   STOPPED sending appends
-   and NOW SENDS SNAPSHOT [index=%d | term=%d]
-   to follower %x %s
+	%s
+	NOW SENDS %q [index=%d | term=%d]
+	to follower %x %s
 
-`, rnd.describeLong(), snapshot.Metadata.Index, snapshot.Metadata.Term, targetID, followerProgress)
+`, rnd.describeLong(), msg.Type, snapshot.Metadata.Index, snapshot.Metadata.Term, targetID, followerProgress)
 
 	}
 
