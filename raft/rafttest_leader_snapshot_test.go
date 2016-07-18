@@ -269,6 +269,44 @@ func Test_raft_snapshot_abort(t *testing.T) {
 }
 
 // (etcd raft.TestRestore)
+func Test_raft_snapshot_restore(t *testing.T) {
+	snap := raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2, 3}},
+		},
+	}
+
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	if ok := rnd.followerRestoreSnapshot(snap); !ok {
+		t.Fatalf("followerRestoreSnapshot expected true, got %v", ok)
+	}
+
+	if !reflect.DeepEqual(rnd.allNodeIDs(), snap.Metadata.ConfigState.IDs) {
+		t.Fatalf("all node ids expected %+v, got %+v", snap.Metadata.ConfigState.IDs, rnd.allNodeIDs())
+	}
+
+	if rnd.storageRaftLog.lastIndex() != snap.Metadata.Index {
+		t.Fatalf("rnd.storageRaftLog.lastIndex() expected %d, got %d", snap.Metadata.Index, rnd.storageRaftLog.lastIndex())
+	}
+
+	term, err := rnd.storageRaftLog.term(snap.Metadata.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if term != snap.Metadata.Term {
+		t.Fatalf("term expected %d, got %d", snap.Metadata.Term, term)
+	}
+
+	if ok := rnd.followerRestoreSnapshot(snap); ok {
+		t.Fatalf("followerRestoreSnapshot expected false, got %v", ok)
+	}
+	//
+	// if rnd.storageRaftLog.committedIndex >= snap.Metadata.Index {
+	// 	return false
+	// }
+}
 
 // (etcd raft.TestRestoreIgnoreSnapshot)
 
