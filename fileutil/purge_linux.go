@@ -10,6 +10,10 @@ import (
 
 // PurgeFile purges files in directory periodically by its suffix.
 func PurgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan struct{}) <-chan error {
+	return purgeFile(dir, suffix, max, interval, stop, nil)
+}
+
+func purgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan struct{}, purgec chan<- string) <-chan error {
 	errc := make(chan error, 1)
 	go func() {
 		for {
@@ -27,6 +31,7 @@ func PurgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan
 			}
 			sort.Strings(ns)
 
+			fnames = ns
 			for len(ns) > int(max) {
 				f := filepath.Join(dir, ns[0])
 
@@ -50,6 +55,12 @@ func PurgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan
 
 				// pop-front
 				ns = ns[1:]
+			}
+
+			if purgec != nil {
+				for i := 0; i < len(fnames)-len(ns); i++ {
+					purgec <- fnames[i]
+				}
 			}
 
 			select {
