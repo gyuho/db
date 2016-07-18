@@ -109,6 +109,40 @@ func Test_raft_snapshot_followerRestoreSnapshot_pending_snapshot(t *testing.T) {
 }
 
 // (etcd raft.TestPendingSnapshotPauseReplication)
+func Test_raft_snapshot_pause_replication(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	})
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	rnd.allProgresses[2].becomeSnapshot(11)
+
+	rnd.Step(raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+		From:    1,
+		To:      1,
+		Entries: []raftpb.Entry{{Data: []byte("testdata")}},
+	})
+
+	msgs := rnd.readAndClearMailbox()
+	if len(msgs) != 0 {
+		t.Fatalf("len(msgs) expected 0, got %d", len(msgs))
+	}
+	/*
+	   followerProgress := rnd.allProgresses[targetID]
+	   if followerProgress.isPaused() { // snapshot returns true
+	   	raftLogger.Debugf("%s skips append/snapshot to paused follower %x", rnd.describe(), targetID)
+	   	return
+	   }
+	*/
+}
 
 // (etcd raft.TestSnapshotFailure)
 
