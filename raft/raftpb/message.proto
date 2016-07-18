@@ -15,9 +15,9 @@ import "raft/raftpb/snapshot.proto";
 
 // (etcd raft.raftpb.Message)
 message Message {
-	MESSAGE_TYPE Type  = 1; // (etcd raft.raftpb.Message.type)
-	uint64       From  = 2; // (etcd raft.raftpb.Message.from)
-	uint64       To    = 3; // (etcd raft.raftpb.Message.to)
+	MESSAGE_TYPE Type = 1; // (etcd raft.raftpb.Message.type)
+	uint64       From = 2; // (etcd raft.raftpb.Message.from)
+	uint64       To   = 3; // (etcd raft.raftpb.Message.to)
 
 	uint64 SenderCurrentCommittedIndex = 4; // (etcd raft.raftpb.Message.commit)
 	uint64 SenderCurrentTerm           = 5; // (etcd raft.raftpb.Message.term)
