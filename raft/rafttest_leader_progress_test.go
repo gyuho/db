@@ -220,9 +220,21 @@ func Test_raft_leader_progress_increase_next_index(t *testing.T) {
 }
 
 // (etcd raft.TestSendAppendForProgressProbe)
+func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
+
+}
 
 // (etcd raft.TestSendAppendForProgressReplicate)
+func Test_raft_leader_progress_append_to_progress_replicate(t *testing.T) {
+
+}
 
 // (etcd raft.TestSendAppendForProgressSnapshot)
+func Test_raft_leader_progress_append_to_progress_snapshot(t *testing.T) {
+
+}
 
 // (etcd raft.TestRecvMsgUnreachable)
+func Test_raft_leader_progress_unreachable(t *testing.T) {
+
+}
