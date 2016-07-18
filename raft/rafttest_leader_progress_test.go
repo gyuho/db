@@ -7,7 +7,7 @@ import (
 )
 
 // (etcd raft.TestMsgAppFlowControlFull)
-func Test_raft_progress_inflights_full(t *testing.T) {
+func Test_raft_leader_progress_inflights_full(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
@@ -44,7 +44,7 @@ func Test_raft_progress_inflights_full(t *testing.T) {
 }
 
 // (etcd raft.TestMsgAppFlowControlMoveForward)
-func Test_raft_progress_inflights_move_forward(t *testing.T) {
+func Test_raft_leader_progress_inflights_move_forward(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
@@ -104,7 +104,7 @@ func Test_raft_progress_inflights_move_forward(t *testing.T) {
 }
 
 // (etcd raft.TestMsgAppFlowControlRecvHeartbeat)
-func Test_raft_progress_inflights_full_heartbeat(t *testing.T) {
+func Test_raft_leader_progress_inflights_full_heartbeat(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
@@ -164,6 +164,60 @@ func Test_raft_progress_inflights_full_heartbeat(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderIncreaseNext)
+func Test_raft_leader_progress_increase_next_index(t *testing.T) {
+	prevEntries := []raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1}}
+
+	tests := []struct {
+		progressState raftpb.PROGRESS_STATE
+		nextIndex     uint64
+
+		wNextIndex uint64
+	}{
+		{
+			/*
+				case raftpb.PROGRESS_STATE_REPLICATE:
+					lastIndex := msg.Entries[len(msg.Entries)-1].Index
+					followerProgress.optimisticUpdate(lastIndex)
+					followerProgress.inflights.add(lastIndex)
+
+				func (pr *Progress) optimisticUpdate(msgLogIndex uint64) {
+					pr.NextIndex = msgLogIndex + 1
+				}
+			*/
+			raftpb.PROGRESS_STATE_REPLICATE,
+			2,
+
+			// 3 entries from prevEntries + 1 from becomeLeader
+			/// 1 entry from proposal
+			// so, last index is 5
+			6,
+		},
+
+		{
+			raftpb.PROGRESS_STATE_PROBE,
+			2,
+
+			2,
+		},
+	}
+
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+		rnd.storageRaftLog.appendToStorageUnstable(prevEntries...)
+		rnd.becomeCandidate()
+		rnd.becomeLeader()
+
+		pr := rnd.allProgresses[2]
+		pr.State = tt.progressState
+		pr.NextIndex = tt.nextIndex
+
+		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+
+		if pr.NextIndex != tt.wNextIndex {
+			t.Fatalf("#%d: next index expected %d, got %d", i, tt.wNextIndex, pr.NextIndex)
+		}
+	}
+}
 
 // (etcd raft.TestSendAppendForProgressProbe)
 
