@@ -150,7 +150,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 
 	followerProgress := rnd.allProgresses[targetID]
 	if followerProgress.isPaused() {
-		raftLogger.Infof("%s skips append/snapshot to paused follower %x", rnd.describe(), targetID)
+		raftLogger.Debugf("%s skips append/snapshot to paused follower %x", rnd.describe(), targetID)
 		return
 	}
 
@@ -221,7 +221,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 
 	}
 
-	raftLogger.Infof("%s sends %q to follower %x in mailbox", rnd.describe(), msg.Type, msg.To)
+	raftLogger.Debugf("%s sends %q to follower %x in mailbox", rnd.describe(), msg.Type, msg.To)
 	rnd.sendToMailbox(msg)
 }
 

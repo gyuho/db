@@ -68,6 +68,7 @@ func GetLogger() Logger {
 }
 
 func init() {
+	// raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
 	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.DEBUG))
 }
 
