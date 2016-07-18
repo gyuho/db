@@ -161,14 +161,14 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 	term, errTerm := rnd.storageRaftLog.term(followerProgress.NextIndex - 1) // term of leader
 	entries, errEntries := rnd.storageRaftLog.entries(followerProgress.NextIndex, rnd.maxEntryNumPerMsg)
 
-	if errTerm == nil || errEntries == nil {
+	if errTerm == nil && errEntries == nil {
 		msg.Type = raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER
-
 		msg.LogIndex = followerProgress.NextIndex - 1
 		msg.LogTerm = term
 		msg.Entries = entries
 		msg.SenderCurrentCommittedIndex = rnd.storageRaftLog.committedIndex
-		if len(entries) > 0 {
+
+		if len(msg.Entries) > 0 {
 			switch followerProgress.State {
 			case raftpb.PROGRESS_STATE_PROBE:
 				followerProgress.pause()
@@ -177,8 +177,9 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 				// rnd.allProgresses[id].resume()
 
 			case raftpb.PROGRESS_STATE_REPLICATE:
-				followerProgress.optimisticUpdate(entries[len(entries)-1].Index)
-				followerProgress.inflights.add(entries[len(entries)-1].Index)
+				lastIndex := msg.Entries[len(msg.Entries)-1].Index
+				followerProgress.optimisticUpdate(lastIndex)
+				followerProgress.inflights.add(lastIndex)
 
 			default:
 				raftLogger.Panicf("%s cannot send appends to follower %x of unhandled state %s", rnd.describe(), targetID, followerProgress)
@@ -245,10 +246,12 @@ func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	storageLastIndex := rnd.storageRaftLog.lastIndex()
+
 	for idx := range entries {
 		entries[idx].Index = storageLastIndex + 1 + uint64(idx)
 		entries[idx].Term = rnd.term
 	}
+
 	rnd.storageRaftLog.appendToStorageUnstable(entries...)
 
 	rnd.allProgresses[rnd.id].maybeUpdateAndResume(rnd.storageRaftLog.lastIndex())
@@ -428,7 +431,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	followerProgress, ok := rnd.allProgresses[msg.From]
 	if !ok {
-		raftLogger.Infof("%s has no progress of follower %x", rnd.describe(), msg.From)
+		raftLogger.Debugf("%s has no progress of follower %x", rnd.describe(), msg.From)
 		return
 	}
 
@@ -437,7 +440,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		followerProgress.RecentActive = true
 
 		if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE && followerProgress.inflights.full() {
-			raftLogger.Infof("%s frees the first inflight message of follower %x", rnd.describe(), msg.From)
+			raftLogger.Debugf("%s frees the first inflight message of follower %x", rnd.describe(), msg.From)
 			followerProgress.inflights.freeFirstOne()
 			//
 			// [10, 20, 30]
@@ -452,8 +455,25 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		followerProgress.RecentActive = true
 
 		switch msg.Reject {
+		case true:
+			raftLogger.Infof(`
+
+	%s
+	RECEIVED %s
+	(leader append request is REJECTED!)
+
+`, rnd.describeLong(), raftpb.DescribeMessageLong(msg))
+
+			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {
+				raftLogger.Infof("%s decreased the progress of follower %x to %s", rnd.describe(), msg.From, followerProgress)
+				if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
+					followerProgress.becomeProbe()
+				}
+				rnd.leaderSendAppendOrSnapshot(msg.From) // retry
+			}
+
 		case false:
-			wasPaused := followerProgress.isPaused()
+			wasPausedOrFull := followerProgress.isPaused()
 			if followerProgress.maybeUpdateAndResume(msg.LogIndex) {
 				switch followerProgress.State {
 				case raftpb.PROGRESS_STATE_PROBE:
@@ -475,7 +495,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 				// it tries to commit with 5 because quorum of cluster shares that match index.
 				if rnd.leaderMaybeCommitWithQuorumMatchIndex() {
 					rnd.leaderReplicateAppendRequests()
-				} else if wasPaused { // now resumed, so send now
+				} else if wasPausedOrFull { // if maybeCommit didn't succeed, since it's now resumed, so send now
 					rnd.leaderSendAppendOrSnapshot(msg.From)
 				}
 
@@ -483,23 +503,6 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 					raftLogger.Infof("%s force-election-times out follower %x for leadership transfer", rnd.describe(), msg.From)
 					rnd.leaderForceFollowerElectionTimeout(msg.From)
 				}
-			}
-
-		case true:
-			raftLogger.Infof(`
-
-	%s
-	RECEIVED %s
-	(leader append request is REJECTED!)
-
-`, rnd.describeLong(), raftpb.DescribeMessageLong(msg))
-
-			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {
-				raftLogger.Infof("%s decreased the progress of follower %x to %s", rnd.describe(), msg.From, followerProgress)
-				if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
-					followerProgress.becomeProbe()
-				}
-				rnd.leaderSendAppendOrSnapshot(msg.From) // retry
 			}
 		}
 
