@@ -183,8 +183,90 @@ func Test_raft_snapshot_failure(t *testing.T) {
 }
 
 // (etcd raft.TestSnapshotSucceed)
+func Test_raft_snapshot_succeed(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	})
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	rnd.allProgresses[2].NextIndex = 1
+	rnd.allProgresses[2].becomeSnapshot(11)
+
+	rnd.Step(raftpb.Message{
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
+		From:   2,
+		To:     1,
+		Reject: false,
+	})
+	// followerProgress.becomeProbe()
+	// followerProgress.pause()
+	//
+	// becomeProbe:
+	// if pr.State == raftpb.PROGRESS_STATE_SNAPSHOT { // snapshot was sent
+	// 	lastPendingSnapshotIndex := pr.PendingSnapshotIndex
+	// 	pr.resetState(raftpb.PROGRESS_STATE_PROBE)
+	// 	pr.NextIndex = maxUint64(pr.MatchIndex+1, lastPendingSnapshotIndex+1)
+	// 	return
+	// }
+
+	if rnd.allProgresses[2].PendingSnapshotIndex != 0 {
+		t.Fatalf("rnd.allProgresses[2].PendingSnapshotIndex expected 0, got %d", rnd.allProgresses[2].PendingSnapshotIndex)
+	}
+	if rnd.allProgresses[2].NextIndex != 12 {
+		t.Fatalf("rnd.allProgresses[2].NextIndex expected 12, got %d", rnd.allProgresses[2].NextIndex)
+	}
+	if !rnd.allProgresses[2].isPaused() {
+		t.Fatalf("rnd.allProgresses[2].isPaused() expected true, got %v", rnd.allProgresses[2].isPaused())
+	}
+}
 
 // (etcd raft.TestSnapshotAbort)
+func Test_raft_snapshot_abort(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	})
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	rnd.allProgresses[2].NextIndex = 1
+	rnd.allProgresses[2].becomeSnapshot(11)
+
+	rnd.Step(raftpb.Message{
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+		From:     2,
+		To:       1,
+		LogIndex: 11,
+	})
+	// case raftpb.PROGRESS_STATE_SNAPSHOT:
+	// 		if followerProgress.needSnapshotAbort() { // pr.MatchIndex >= pr.PendingSnapshotIndex
+	// 			followerProgress.becomeProbe()
+	// 			raftLogger.Infof("%s is stopping snapshot to follower %x, and resetting progress to %s", rnd.describe(), msg.From, followerProgress)
+	// 		}
+	// 	}
+
+	if rnd.allProgresses[2].PendingSnapshotIndex != 0 {
+		t.Fatalf("rnd.allProgresses[2].PendingSnapshotIndex expected 0, got %d", rnd.allProgresses[2].PendingSnapshotIndex)
+	}
+	if rnd.allProgresses[2].NextIndex != 12 {
+		t.Fatalf("rnd.allProgresses[2].NextIndex expected 12, got %d", rnd.allProgresses[2].NextIndex)
+	}
+	if !rnd.allProgresses[2].isPaused() {
+		t.Fatalf("rnd.allProgresses[2].isPaused() expected true, got %v", rnd.allProgresses[2].isPaused())
+	}
+}
 
 // (etcd raft.TestRestore)
 

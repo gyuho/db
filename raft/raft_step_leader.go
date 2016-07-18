@@ -522,7 +522,14 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		case false:
 			followerProgress.becomeProbe()
 			followerProgress.pause()
-			raftLogger.Infof("%s sent snapshot and received response from follower %x %s", rnd.describe(), msg.From, followerProgress)
+			raftLogger.Infof(`
+
+	%s
+	SENT SNAPSHOT and RECEIVED RESPONSE
+	from follower %x
+	%s
+
+`, rnd.describeLong(), msg.From, followerProgress)
 			//
 			// 'leaderReplicateHeartbeatRequests' will resume again
 			// rnd.allProgresses[id].resume()
@@ -531,7 +538,14 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			followerProgress.snapshotFailed() // set pending snapshot index to 0
 			followerProgress.becomeProbe()
 			followerProgress.pause()
-			raftLogger.Infof("%s sent snapshot but got rejected from follower %x %s", rnd.describe(), msg.From, followerProgress)
+			raftLogger.Infof(`
+
+	%s
+	SENT SNAPSHOT BUT GOT REJECTED
+	from follower %x
+	%s
+
+`, rnd.describeLong(), msg.From, followerProgress)
 			//
 			// 'leaderReplicateHeartbeatRequests' will resume again
 			// rnd.allProgresses[id].resume()
