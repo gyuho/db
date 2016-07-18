@@ -282,12 +282,54 @@ func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
 
 // (etcd raft.TestSendAppendForProgressReplicate)
 func Test_raft_leader_progress_append_to_progress_replicate(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+	rnd.readAndClearMailbox()
 
+	rnd.allProgresses[2].becomeReplicate()
+
+	for i := 0; i < 3; i++ {
+		rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: []byte("testdata")})
+		rnd.leaderSendAppendOrSnapshot(2)
+
+		if rnd.allProgresses[2].isPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected false, got %v", i, rnd.allProgresses[2].isPaused())
+		}
+		msgs := rnd.readAndClearMailbox()
+		if len(msgs) != 1 {
+			t.Fatalf("#%d: len(msgs) expected 1, got %d", i, len(msgs))
+		}
+	}
 }
 
 // (etcd raft.TestSendAppendForProgressSnapshot)
 func Test_raft_leader_progress_append_to_progress_snapshot(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+	rnd.readAndClearMailbox()
 
+	rnd.allProgresses[2].becomeSnapshot(10)
+	/*
+	   isPaused returns true
+
+	   case raftpb.PROGRESS_STATE_SNAPSHOT:
+	   	return true
+	*/
+
+	for i := 0; i < 10; i++ {
+		rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: []byte("testdata")})
+		rnd.leaderSendAppendOrSnapshot(2)
+
+		if !rnd.allProgresses[2].isPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected true, got %v", i, rnd.allProgresses[2].isPaused())
+		}
+		msgs := rnd.readAndClearMailbox()
+		if len(msgs) != 0 {
+			t.Fatalf("#%d: len(msgs) expected 0, got %d", i, len(msgs))
+		}
+	}
 }
 
 // (etcd raft.TestRecvMsgUnreachable)
