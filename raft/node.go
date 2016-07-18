@@ -359,9 +359,6 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 			if _, ok := rnd.allProgresses[msg.From]; ok || !raftpb.IsResponseMessage(msg.Type) { // ???
 				rnd.Step(msg)
 			}
-			// else, the message is from unknown node
-			// OR
-			// ???
 
 		case nodeReadyCh <- nodeReady: // case readyc <- rd:
 			// NodeReady returns a channel that receives point-in-time state of Node.
@@ -432,7 +429,7 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 				rnd.deleteNode(configChange.NodeID)
 
 			case raftpb.CONFIG_CHANGE_TYPE_UPDATE_NODE:
-				rnd.resetPendingConfigExist() // ???
+				rnd.resetPendingConfigExist()
 
 			default:
 				raftLogger.Panicf("%s has received unknown config change type %q", rnd.describe(), configChange.Type)

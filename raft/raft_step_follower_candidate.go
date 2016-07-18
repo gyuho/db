@@ -37,8 +37,6 @@ func (rnd *raftNode) candidateReceivedVoteFrom(fromID uint64, voted bool) int {
 
 	if _, ok := rnd.votedFrom[fromID]; !ok {
 		rnd.votedFrom[fromID] = voted
-	} else { // ???
-		raftLogger.Panicf("%s received duplicate votes from %x (voted %v)", rnd.describe(), fromID, voted)
 	}
 
 	grantedN := 0
