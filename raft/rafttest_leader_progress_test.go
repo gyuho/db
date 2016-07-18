@@ -221,7 +221,63 @@ func Test_raft_leader_progress_increase_next_index(t *testing.T) {
 
 // (etcd raft.TestSendAppendForProgressProbe)
 func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+	rnd.readAndClearMailbox()
 
+	// empty no-op entry
+	ents := rnd.storageRaftLog.unstableEntries()
+	if len(ents) != 1 {
+		t.Fatalf("len(ents) expected 1, got %+v", ents)
+	}
+	if len(ents[0].Data) != 0 {
+		t.Fatalf("len(ents[0].Entries) expected 0, got %+v", ents)
+	}
+
+	rnd.allProgresses[2].becomeProbe()
+
+	for i := 0; i < 3; i++ {
+		rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: []byte("testdata")})
+		rnd.leaderSendAppendOrSnapshot(2)
+
+		msgs := rnd.readAndClearMailbox()
+		if len(msgs) != 1 {
+			t.Fatalf("#%d: len(msgs) expected 1, got %d", i, len(msgs))
+		}
+		if msgs[0].LogIndex != 0 {
+			t.Fatalf("#%d: msgs[0].LogIndex expected 0, got %d", i, msgs[0].LogIndex)
+		}
+
+		if !rnd.allProgresses[2].isPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected true, got %v", i, rnd.allProgresses[2].isPaused())
+		}
+
+		for j := 0; j < 10; j++ {
+			rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: []byte("testdata")})
+			rnd.leaderSendAppendOrSnapshot(2)
+			if msgs := rnd.readAndClearMailbox(); len(msgs) != 0 { // because it's probe and paused
+				t.Fatalf("#%d.%d: len(msgs) expected 0, got %d", i, j, len(msgs))
+			}
+		}
+
+		// trigger leader heartbeat
+		for j := 0; j < rnd.heartbeatTimeoutTickNum; j++ {
+			rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1})
+		}
+		// rnd.leaderReplicateHeartbeatRequests() // resume all progresses
+
+		if rnd.allProgresses[2].isPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected false, got %v", i, rnd.allProgresses[2].isPaused())
+		}
+		msgs = rnd.readAndClearMailbox()
+		if len(msgs) != 1 {
+			t.Fatalf("#%d: len(msgs) expected 1, got %d", i, len(msgs))
+		}
+		if msgs[0].Type != raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT {
+			t.Fatalf("#%d: msgs[0].Type expected %q, got %q", i, raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT, msgs[0].Type)
+		}
+	}
 }
 
 // (etcd raft.TestSendAppendForProgressReplicate)

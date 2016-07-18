@@ -351,7 +351,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	// leader to take action, or receive response
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT: // pb.MsgBeat
-		rnd.leaderReplicateHeartbeatRequests()
+		rnd.leaderReplicateHeartbeatRequests() // resume all progresses
 		return
 
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM: // pb.MsgCheckQuorum
