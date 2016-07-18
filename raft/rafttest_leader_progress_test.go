@@ -224,6 +224,7 @@ func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
+
 	rnd.readAndClearMailbox()
 
 	// empty no-op entry
@@ -285,6 +286,7 @@ func Test_raft_leader_progress_append_to_progress_replicate(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
+
 	rnd.readAndClearMailbox()
 
 	rnd.allProgresses[2].becomeReplicate()
@@ -308,6 +310,7 @@ func Test_raft_leader_progress_append_to_progress_snapshot(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
+
 	rnd.readAndClearMailbox()
 
 	rnd.allProgresses[2].becomeSnapshot(10)
@@ -334,5 +337,35 @@ func Test_raft_leader_progress_append_to_progress_snapshot(t *testing.T) {
 
 // (etcd raft.TestRecvMsgUnreachable)
 func Test_raft_leader_progress_unreachable(t *testing.T) {
+	prevEntries := []raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1}}
+	st := NewStorageStableInMemory()
+	st.Append(prevEntries...)
 
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, st)
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	rnd.readAndClearMailbox()
+
+	rnd.allProgresses[2].MatchIndex = 3
+	rnd.allProgresses[2].becomeReplicate()
+	rnd.allProgresses[2].optimisticUpdate(5)
+
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER, From: 2, To: 1})
+	// THEN
+	//
+	// if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
+	//     followerProgress.becomeProbe()
+	// }
+	//
+	// becomeProbe sets:
+	// pr.NextIndex = pr.MatchIndex + 1
+
+	if rnd.allProgresses[2].State != raftpb.PROGRESS_STATE_PROBE {
+		t.Fatalf("state expected %q, got %q", raftpb.PROGRESS_STATE_PROBE, rnd.allProgresses[2].State)
+	}
+
+	if wNextIndex := rnd.allProgresses[2].MatchIndex + 1; rnd.allProgresses[2].NextIndex != wNextIndex {
+		t.Fatalf("rnd.allProgresses[2].NextIndex expected %d, got %d", wNextIndex, rnd.allProgresses[2].NextIndex)
+	}
 }
