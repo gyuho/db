@@ -145,6 +145,42 @@ func Test_raft_snapshot_pause_replication(t *testing.T) {
 }
 
 // (etcd raft.TestSnapshotFailure)
+func Test_raft_snapshot_failure(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	})
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	rnd.allProgresses[2].NextIndex = 1
+	rnd.allProgresses[2].becomeSnapshot(11)
+
+	rnd.Step(raftpb.Message{
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
+		From:   2,
+		To:     1,
+		Reject: true,
+	})
+	// followerProgress.snapshotFailed() // set pending snapshot index to 0
+	// followerProgress.becomeProbe()
+	// followerProgress.pause()
+
+	if rnd.allProgresses[2].PendingSnapshotIndex != 0 {
+		t.Fatalf("rnd.allProgresses[2].PendingSnapshotIndex expected 0, got %d", rnd.allProgresses[2].PendingSnapshotIndex)
+	}
+	if rnd.allProgresses[2].NextIndex != 1 {
+		t.Fatalf("rnd.allProgresses[2].NextIndex expected 1, got %d", rnd.allProgresses[2].NextIndex)
+	}
+	if !rnd.allProgresses[2].isPaused() {
+		t.Fatalf("rnd.allProgresses[2].isPaused() expected true, got %v", rnd.allProgresses[2].isPaused())
+	}
+}
 
 // (etcd raft.TestSnapshotSucceed)
 

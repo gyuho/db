@@ -528,7 +528,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			// rnd.allProgresses[id].resume()
 
 		case true:
-			followerProgress.snapshotFailed()
+			followerProgress.snapshotFailed() // set pending snapshot index to 0
 			followerProgress.becomeProbe()
 			followerProgress.pause()
 			raftLogger.Infof("%s sent snapshot but got rejected from follower %x %s", rnd.describe(), msg.From, followerProgress)
