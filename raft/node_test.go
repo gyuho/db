@@ -11,7 +11,24 @@ import (
 
 // (etcd raft.TestReadyContainUpdates)
 func Test_node_Ready_contains_updates(t *testing.T) {
+	tests := []struct {
+		rd              Ready
+		wContainUpdates bool
+	}{
+		{Ready{}, false},
+		{Ready{SoftState: &raftpb.SoftState{LeaderID: 1}}, true},
+		{Ready{HardStateToSave: raftpb.HardState{VotedFor: 1}}, true},
+		{Ready{EntriesToSave: make([]raftpb.Entry, 1, 1)}, true},
+		{Ready{EntriesToCommit: make([]raftpb.Entry, 1, 1)}, true},
+		{Ready{MessagesToSend: make([]raftpb.Message, 1, 1)}, true},
+		{Ready{SnapshotToSave: raftpb.Snapshot{Metadata: raftpb.SnapshotMetadata{Index: 1}}}, true},
+	}
 
+	for i, tt := range tests {
+		if g := tt.rd.ContainsUpdates(); g != tt.wContainUpdates {
+			t.Errorf("#%d: ContainsUpdates expected %v, got %v", i, tt.wContainUpdates, g)
+		}
+	}
 }
 
 // (etcd raft.TestSoftStateEqual)
