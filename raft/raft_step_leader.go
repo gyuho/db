@@ -81,11 +81,6 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 //
 // (etcd raft.raft.sendHeartbeat)
 func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	// rnd.assertCalledByLeader()
-
-	// committedIndex is min(to.matched, raftNode.committedIndex).
-	//
 	var (
 		matched         = rnd.allProgresses[targetID].MatchIndex
 		commitInStorage = rnd.storageRaftLog.committedIndex
@@ -102,9 +97,6 @@ func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
 //
 // (etcd raft.raft.bcastHeartbeat)
 func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	// rnd.assertCalledByLeader()
-
 	for id := range rnd.allProgresses {
 		if id == rnd.id { // OR rnd.leaderID
 			continue
@@ -124,8 +116,6 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 //
 // (etcd raft.raft.maybeCommit)
 func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-
 	matchIndexSlice := make(uint64Slice, 0, len(rnd.allProgresses))
 	for id := range rnd.allProgresses {
 		matchIndexSlice = append(matchIndexSlice, rnd.allProgresses[id].MatchIndex)
@@ -145,12 +135,9 @@ func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
 //
 // (etcd raft.raft.sendAppend)
 func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd.assertCalledByLeader()
-
 	followerProgress := rnd.allProgresses[targetID]
 	if followerProgress.isPaused() {
-		raftLogger.Debugf("%s skips append/snapshot to paused follower %x", rnd.describe(), targetID)
+		raftLogger.Debugf("%s SKIPS append/snapshot to paused follower %x", rnd.describe(), targetID)
 		return
 	}
 
@@ -192,7 +179,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		raftLogger.Infof(`
 
 	%s
-	NOW NEEDS TO SEND %q
+	TRIES TO SEND %q
 	to FOLLOWER %x
 	[term error='%v' | entries error='%v']
 
@@ -222,14 +209,15 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		raftLogger.Infof(`
 
 	%s
-	NOW SENDS %q [index=%d | term=%d]
-	to FOLLOWER %x %s
+	SENDS %q [index=%d | term=%d]
+	to FOLLOWER %x
+	%s
 
 `, rnd.describeLong(), msg.Type, snapshot.Metadata.Index, snapshot.Metadata.Term, targetID, followerProgress)
 
 	}
 
-	raftLogger.Debugf("%s sends %q to FOLLOWER %x in mailbox", rnd.describe(), msg.Type, msg.To)
+	raftLogger.Debugf("%s SENDS %q to FOLLOWER %x in mailbox", rnd.describe(), msg.Type, msg.To)
 	rnd.sendToMailbox(msg)
 }
 

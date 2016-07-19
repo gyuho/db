@@ -133,7 +133,7 @@ func (rnd *raftNode) followerHandleAppendFromLeader(msg raftpb.Message) {
 	})
 }
 
-// (etcd raft.raft.handleSnapshot with raftpb.MsgSnap)
+// (etcd raft.raft.handleSnapshot)
 func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 	rnd.assertCalledByNoneLeader()
 
@@ -151,12 +151,13 @@ func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 
 	%s
 	FINISHED RESTORATION FROM LEADER SNAPSHOT
-	(sending snapshot response to leader)
+	(sending snapshot RESPONSE to LEADER)
 
 `, rnd.describeLong())
 
 		rnd.sendToMailbox(raftpb.Message{
-			Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
+			// (X) raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
+			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 			To:       msg.From,
 			LogIndex: rnd.storageRaftLog.lastIndex(),
 		})
@@ -167,12 +168,13 @@ func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 
 	%s
 	IGNORED LEADER SNAPSHOT
-	(sending snapshot response to leader)
+	(sending snapshot RESPONSE to LEADER)
 
 `, rnd.describeLong())
 
 	rnd.sendToMailbox(raftpb.Message{
-		Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
+		// (X) raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 		To:       msg.From,
 		LogIndex: rnd.storageRaftLog.committedIndex,
 	})

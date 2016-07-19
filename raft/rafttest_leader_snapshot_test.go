@@ -440,7 +440,7 @@ func Test_raft_snapshot_restore_slow_node(t *testing.T) {
 
 	// to make 3 fall behind
 	fn.isolate(3)
-	for i := 0; i < 100; i++ {
+	for i := 0; i <= 10; i++ {
 		fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
 	}
 
@@ -461,8 +461,11 @@ func Test_raft_snapshot_restore_slow_node(t *testing.T) {
 	// trigger snapshot
 	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
 
-	// trigger commit?
+	// trigger commit
 	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+
+	// 'maybeUpdateAndResume' updates MatchIndex
+	// 'leaderMaybeCommitWithQuorumMatchIndex' updates the committed index
 
 	rndFollower := fn.allStateMachines[3].(*raftNode)
 	if rndFollower.storageRaftLog.committedIndex != rndLeader.storageRaftLog.committedIndex {
