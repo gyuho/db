@@ -3,7 +3,7 @@ package raft
 import (
 	"sync"
 
-	"github.com/gyuho/db/xlog"
+	"github.com/gyuho/db/pkg/xlog"
 )
 
 // Logger defines logging interface for Raft.

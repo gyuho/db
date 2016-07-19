@@ -100,7 +100,7 @@ func (rnd *raftNode) becomeCandidateAndCampaign(tp raftpb.CAMPAIGN_TYPE) {
 func (rnd *raftNode) followerHandleAppendFromLeader(msg raftpb.Message) {
 	if rnd.storageRaftLog.committedIndex > msg.LogIndex {
 		rnd.sendToMailbox(raftpb.Message{
-			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 			To:       msg.From,
 			LogIndex: rnd.storageRaftLog.committedIndex,
 		})
@@ -109,7 +109,7 @@ func (rnd *raftNode) followerHandleAppendFromLeader(msg raftpb.Message) {
 
 	if lastIndex, ok := rnd.storageRaftLog.maybeAppend(msg.LogIndex, msg.LogTerm, msg.SenderCurrentCommittedIndex, msg.Entries...); ok {
 		rnd.sendToMailbox(raftpb.Message{
-			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 			To:       msg.From,
 			LogIndex: lastIndex,
 		})
@@ -125,7 +125,7 @@ func (rnd *raftNode) followerHandleAppendFromLeader(msg raftpb.Message) {
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), rnd.storageRaftLog.lastIndex())
 
 	rnd.sendToMailbox(raftpb.Message{
-		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 		To:       msg.From,
 		LogIndex: msg.LogIndex,
 		Reject:   true,
@@ -133,7 +133,7 @@ func (rnd *raftNode) followerHandleAppendFromLeader(msg raftpb.Message) {
 	})
 }
 
-// (etcd raft.raft.handleSnapshot with raftpb.MsgSnap)
+// (etcd raft.raft.handleSnapshot)
 func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 	rnd.assertCalledByNoneLeader()
 
@@ -145,18 +145,19 @@ func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg))
 
-	if rnd.followerRestoreSnapshot(msg.Snapshot) {
+	if rnd.restoreSnapshot(msg.Snapshot) {
 
 		raftLogger.Infof(`
 
 	%s
 	FINISHED RESTORATION FROM LEADER SNAPSHOT
-	(sending snapshot response to leader)
+	(sending snapshot RESPONSE to LEADER)
 
 `, rnd.describeLong())
 
 		rnd.sendToMailbox(raftpb.Message{
-			Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
+			// (X) raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
+			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 			To:       msg.From,
 			LogIndex: rnd.storageRaftLog.lastIndex(),
 		})
@@ -167,22 +168,23 @@ func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
 
 	%s
 	IGNORED LEADER SNAPSHOT
-	(sending snapshot response to leader)
+	(sending snapshot RESPONSE to LEADER)
 
 `, rnd.describeLong())
 
 	rnd.sendToMailbox(raftpb.Message{
-		Type:     raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
+		// (X) raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 		To:       msg.From,
 		LogIndex: rnd.storageRaftLog.committedIndex,
 	})
 }
 
-// followerRestoreSnapshot returns true iff snapshot index is greater than committed index
+// restoreSnapshot returns true iff snapshot index is greater than committed index
 // and the snapshot contains an entries of log and term that does not exist in the current follower.
 //
 // (etcd raft.raft.restore)
-func (rnd *raftNode) followerRestoreSnapshot(snap raftpb.Snapshot) bool {
+func (rnd *raftNode) restoreSnapshot(snap raftpb.Snapshot) bool {
 	if rnd.storageRaftLog.committedIndex >= snap.Metadata.Index {
 		return false
 	}
@@ -260,7 +262,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		msg.To = rnd.leaderID
 		rnd.sendToMailbox(msg)
 
-	case raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER: // pb.MsgApp
+	case raftpb.MESSAGE_TYPE_LEADER_APPEND: // pb.MsgApp
 		rnd.electionTimeoutElapsedTickNum = 0
 		rnd.leaderID = msg.From
 		rnd.followerHandleAppendFromLeader(msg)
@@ -270,7 +272,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		rnd.leaderID = msg.From
 		rnd.followerRespondToLeaderHeartbeat(msg)
 
-	case raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER: // pb.MsgSnap
+	case raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT: // pb.MsgSnap
 		rnd.electionTimeoutElapsedTickNum = 0
 		rnd.leaderID = msg.From
 		rnd.followerRestoreSnapshotFromLeader(msg)
@@ -386,7 +388,7 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 		raftLogger.Infof("%s so there's no known leader (dropping proposal)", rnd.describe())
 		return
 
-	case raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER: // pb.MsgApp
+	case raftpb.MESSAGE_TYPE_LEADER_APPEND: // pb.MsgApp
 		raftLogger.Infof("%s steps down to %q, because it received %q from leader %x", rnd.describe(), raftpb.NODE_STATE_FOLLOWER, msg.Type, msg.From)
 		rnd.becomeFollower(rnd.term, msg.From)
 		rnd.followerHandleAppendFromLeader(msg)
@@ -396,7 +398,7 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 		rnd.becomeFollower(rnd.term, msg.From)
 		rnd.followerRespondToLeaderHeartbeat(msg)
 
-	case raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER: // pb.MsgSnap
+	case raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT: // pb.MsgSnap
 		raftLogger.Infof("%s steps down to %q, because it received %q from leader %x", rnd.describe(), raftpb.NODE_STATE_FOLLOWER, msg.Type, msg.From)
 		rnd.becomeFollower(msg.SenderCurrentTerm, msg.From)
 		rnd.followerRestoreSnapshotFromLeader(msg)

@@ -116,7 +116,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 		// checkQuorum is true, and message from leader with lower term
 		if rnd.checkQuorum &&
 			(msg.Type == raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT ||
-				msg.Type == raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER) {
+				msg.Type == raftpb.MESSAGE_TYPE_LEADER_APPEND) {
 
 			// messages from leader with lower term is possible with network delay or network partition.
 			//
@@ -126,7 +126,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			// If check quorum is true, we may not advance the term on MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE,
 			// so we need to generate other message to advance the term.
 			rnd.sendToMailbox(raftpb.Message{
-				Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+				Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 				To:   msg.From, // to leader
 			})
 			// this will update msg.SenderCurrentTerm with rnd.term

@@ -81,11 +81,6 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 //
 // (etcd raft.raft.sendHeartbeat)
 func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	// rnd.assertCalledByLeader()
-
-	// committedIndex is min(to.matched, raftNode.committedIndex).
-	//
 	var (
 		matched         = rnd.allProgresses[targetID].MatchIndex
 		commitInStorage = rnd.storageRaftLog.committedIndex
@@ -102,9 +97,6 @@ func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
 //
 // (etcd raft.raft.bcastHeartbeat)
 func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	// rnd.assertCalledByLeader()
-
 	for id := range rnd.allProgresses {
 		if id == rnd.id { // OR rnd.leaderID
 			continue
@@ -124,8 +116,6 @@ func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
 //
 // (etcd raft.raft.maybeCommit)
 func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-
 	matchIndexSlice := make(uint64Slice, 0, len(rnd.allProgresses))
 	for id := range rnd.allProgresses {
 		matchIndexSlice = append(matchIndexSlice, rnd.allProgresses[id].MatchIndex)
@@ -145,12 +135,9 @@ func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
 //
 // (etcd raft.raft.sendAppend)
 func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd.assertCalledByLeader()
-
 	followerProgress := rnd.allProgresses[targetID]
 	if followerProgress.isPaused() {
-		raftLogger.Debugf("%s skips append/snapshot to paused follower %x", rnd.describe(), targetID)
+		raftLogger.Debugf("%s SKIPS append/snapshot to paused follower %x", rnd.describe(), targetID)
 		return
 	}
 
@@ -162,7 +149,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 	entries, errEntries := rnd.storageRaftLog.entries(followerProgress.NextIndex, rnd.maxEntryNumPerMsg)
 
 	if errTerm == nil && errEntries == nil {
-		msg.Type = raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER
+		msg.Type = raftpb.MESSAGE_TYPE_LEADER_APPEND
 		msg.LogIndex = followerProgress.NextIndex - 1
 		msg.LogTerm = term
 		msg.Entries = entries
@@ -187,21 +174,29 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		}
 
 	} else { // error if entries had been compacted in leader's logs
-		msg.Type = raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER
+		msg.Type = raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT
 
-		raftLogger.Infof("%s now needs to send snapshot to follower %x [term error=%q | entries error=%q]", rnd.describe(), targetID, errTerm, errEntries)
+		raftLogger.Infof(`
+
+	%s
+	TRIES TO SEND %q
+	to FOLLOWER %x
+	[term error='%v' | entries error='%v']
+
+`, rnd.describeLong(), msg.Type, targetID, errTerm, errEntries)
+
 		if !followerProgress.RecentActive {
-			raftLogger.Infof("%s cancels snapshotting to follower %x [recent active=%v]", rnd.describe(), targetID, followerProgress.RecentActive)
+			raftLogger.Infof("%s cancels snapshotting to FOLLOWER %x [recent active=%v]", rnd.describe(), targetID, followerProgress.RecentActive)
 			return
 		}
 
 		snapshot, err := rnd.storageRaftLog.snapshot()
 		if err != nil {
 			if err == ErrSnapshotTemporarilyUnavailable {
-				raftLogger.Infof("%s failed to send snapshot to follower %x (%v)", rnd.describe(), targetID, err)
+				raftLogger.Infof("%s failed to send snapshot to FOLLOWER %x (%v)", rnd.describe(), targetID, err)
 				return
 			}
-			raftLogger.Panicf("%s failed to send snapshot to follower %x (%v)", rnd.describe(), targetID, err)
+			raftLogger.Panicf("%s failed to send snapshot to FOLLOWER %x (%v)", rnd.describe(), targetID, err)
 		}
 
 		if raftpb.IsEmptySnapshot(snapshot) {
@@ -213,16 +208,16 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		followerProgress.becomeSnapshot(snapshot.Metadata.Index)
 		raftLogger.Infof(`
 
-   %s
-   STOPPED sending appends
-   and NOW SENDS SNAPSHOT [index=%d | term=%d]
-   to follower %x %s
+	%s
+	SENDS %q [index=%d | term=%d]
+	to FOLLOWER %x
+	%s
 
-`, rnd.describeLong(), snapshot.Metadata.Index, snapshot.Metadata.Term, targetID, followerProgress)
+`, rnd.describeLong(), msg.Type, snapshot.Metadata.Index, snapshot.Metadata.Term, targetID, followerProgress)
 
 	}
 
-	raftLogger.Debugf("%s sends %q to follower %x in mailbox", rnd.describe(), msg.Type, msg.To)
+	raftLogger.Debugf("%s SENDS %q to FOLLOWER %x in mailbox", rnd.describe(), msg.Type, msg.To)
 	rnd.sendToMailbox(msg)
 }
 
@@ -451,7 +446,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			rnd.leaderSendAppendOrSnapshot(msg.From)
 		}
 
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER: // pb.MsgAppResp
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND: // pb.MsgAppResp
 		followerProgress.RecentActive = true
 
 		switch msg.Reject {
@@ -460,12 +455,19 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	RECEIVED %s
-	(leader append request is REJECTED!)
+	(LEADER APPEND-REQUEST is REJECTED!)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg))
 
 			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {
-				raftLogger.Infof("%s decreased the progress of follower %x to %s", rnd.describe(), msg.From, followerProgress)
+				raftLogger.Infof(`
+
+	%s
+	decreased the progress of FOLLOWER %x
+	to %s
+
+`, rnd.describeLong(), msg.From, followerProgress)
+
 				if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
 					followerProgress.becomeProbe()
 				}
@@ -506,7 +508,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			}
 		}
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER: // pb.MsgSnapStatus
+	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT: // pb.MsgSnapStatus
 		if followerProgress.State != raftpb.PROGRESS_STATE_SNAPSHOT {
 			return
 		}
@@ -515,16 +517,30 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		case false:
 			followerProgress.becomeProbe()
 			followerProgress.pause()
-			raftLogger.Infof("%s sent snapshot and received response from follower %x %s", rnd.describe(), msg.From, followerProgress)
+			raftLogger.Infof(`
+
+	%s
+	SENT SNAPSHOT and RECEIVED RESPONSE
+	from FOLLOWER %x
+	%s
+
+`, rnd.describeLong(), msg.From, followerProgress)
 			//
 			// 'leaderReplicateHeartbeatRequests' will resume again
 			// rnd.allProgresses[id].resume()
 
 		case true:
-			followerProgress.snapshotFailed()
+			followerProgress.snapshotFailed() // set pending snapshot index to 0
 			followerProgress.becomeProbe()
 			followerProgress.pause()
-			raftLogger.Infof("%s sent snapshot but got rejected from follower %x %s", rnd.describe(), msg.From, followerProgress)
+			raftLogger.Infof(`
+
+	%s
+	SENT SNAPSHOT BUT GOT REJECTED
+	from FOLLOWER %x
+	%s
+
+`, rnd.describeLong(), msg.From, followerProgress)
 			//
 			// 'leaderReplicateHeartbeatRequests' will resume again
 			// rnd.allProgresses[id].resume()
@@ -540,7 +556,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	RECEIVED %s
-	(leader FAILED TO SEND message to follower %x)
+	(LEADER FAILED TO SEND message to FOLLOWER %x)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 
@@ -563,8 +579,8 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			raftLogger.Infof(`
 
 	%s
-	CANCELLED leadership transfer to follower %x
-	(%x got a new leadership transfer request to follower %x)
+	CANCELLED leadership transfer to FOLLOWER %x
+	(%x got a new leadership transfer request to FOLLOWER %x)
 
 `, rnd.describeLong(), lastLeaderTransfereeID, rnd.id, leaderTransfereeID)
 		}
