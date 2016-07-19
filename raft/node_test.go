@@ -33,7 +33,20 @@ func Test_node_Ready_contains_updates(t *testing.T) {
 
 // (etcd raft.TestSoftStateEqual)
 func Test_node_soft_state_equal(t *testing.T) {
+	tests := []struct {
+		softState *raftpb.SoftState
+		wEqual    bool
+	}{
+		{&raftpb.SoftState{}, true},
+		{&raftpb.SoftState{LeaderID: 1}, false},
+		{&raftpb.SoftState{NodeState: raftpb.NODE_STATE_LEADER}, false},
+	}
 
+	for i, tt := range tests {
+		if g := tt.softState.Equal(&raftpb.SoftState{}); g != tt.wEqual {
+			t.Fatalf("#%d: equal expected %v, got %v", i, tt.wEqual, g)
+		}
+	}
 }
 
 // (etcd raft.TestIsHardStateEqual)
