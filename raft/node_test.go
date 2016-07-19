@@ -136,8 +136,6 @@ func Test_node_Step_propose(t *testing.T) {
 	}
 }
 
-// (etcd raft.TestNodeProposeConfig)
-
 // (etcd raft.TestBlockProposal)
 
 // (etcd raft.TestNodeTick)

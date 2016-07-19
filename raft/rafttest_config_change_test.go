@@ -13,3 +13,5 @@ package raft
 // (etcd raft.TestRemoveNode)
 
 // (etcd raft.TestCommitAfterRemoveNode)
+
+// (etcd raft.TestNodeProposeConfig)
