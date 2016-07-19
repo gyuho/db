@@ -412,7 +412,23 @@ func Test_raft_snapshot_restore_leader_cancel_snapshot(t *testing.T) {
 
 // (etcd raft.TestRestoreFromSnapMsg)
 func Test_raft_snapshot_restore_msg_snap(t *testing.T) {
+	snap := raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	}
 
+	rnd := newTestRaftNode(2, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT, From: 1, SenderCurrentTerm: 2, Snapshot: snap})
+
+	if rnd.leaderID != uint64(1) {
+		t.Fatalf("leaderID expected 1, got %d", rnd.leaderID)
+	}
+	if rnd.term != uint64(2) {
+		t.Fatalf("term expected 2, got %d", rnd.term)
+	}
 }
 
 // (etcd raft.TestSlowNodeRestore)
