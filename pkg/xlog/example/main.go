@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/gyuho/db/xlog"
+	"github.com/gyuho/db/pkg/xlog"
 )
 
 var logger = xlog.NewLogger("example", xlog.INFO)

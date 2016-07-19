@@ -9,10 +9,13 @@ import (
 )
 
 // PurgeFile purges files in directory periodically by its suffix.
+//
+// (etcd pkg.fileutil.PurgeFile)
 func PurgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan struct{}) <-chan error {
 	return purgeFile(dir, suffix, max, interval, stop, nil)
 }
 
+// (etcd pkg.fileutil.purgeFile)
 func purgeFile(dir, suffix string, max uint, interval time.Duration, stop <-chan struct{}, purgec chan<- string) <-chan error {
 	errc := make(chan error, 1)
 	go func() {

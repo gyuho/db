@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gyuho/db/fileutil"
-	"github.com/gyuho/db/xlog"
+	"github.com/gyuho/db/pkg/fileutil"
+	"github.com/gyuho/db/pkg/xlog"
 )
 
 func TestGetLogName(t *testing.T) {

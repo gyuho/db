@@ -5,7 +5,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/pkg/fileutil"
 )
 
 func getWALName(seq, index uint64) string {

@@ -7,7 +7,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/gyuho/db/crc"
+	"github.com/gyuho/db/pkg/crcutil"
 	"github.com/gyuho/db/wal/walpb"
 )
 
@@ -30,7 +30,7 @@ type encoder struct {
 
 func newEncoder(w io.Writer, prevCRC uint32) *encoder {
 	return &encoder{
-		crc: crc.New(prevCRC, crcTable),
+		crc: crcutil.New(prevCRC, crcTable),
 
 		// 1MB buffer
 		recordBuf: make([]byte, 1024*1024),

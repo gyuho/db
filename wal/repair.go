@@ -4,8 +4,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/gyuho/db/crc"
-	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/pkg/crcutil"
+	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/wal/walpb"
 )
 
@@ -37,7 +37,7 @@ func Repair(dir string) bool {
 				}
 
 				// update the CRC of the decoder when needed
-				dec.crc = crc.New(rec.CRC, crcTable)
+				dec.crc = crcutil.New(rec.CRC, crcTable)
 			}
 			continue
 

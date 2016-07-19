@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gyuho/db/fileutil"
+	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/wal/walpb"
 )

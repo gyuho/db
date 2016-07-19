@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/gyuho/db/crc"
+	"github.com/gyuho/db/pkg/crcutil"
 	"github.com/gyuho/db/wal/walpb"
 )
 
@@ -28,7 +28,7 @@ func newDecoder(r ...io.Reader) *decoder {
 		readers[i] = bufio.NewReader(r[i])
 	}
 	return &decoder{
-		crc:          crc.New(0, crcTable),
+		crc:          crcutil.New(0, crcTable),
 		bufioReaders: readers,
 	}
 }

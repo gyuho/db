@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// (etcd pkg.fileutil.TestPurgeFile)
 func TestPurgeFile(t *testing.T) {
 	dir, err := ioutil.TempDir("", "purgefile")
 	if err != nil {

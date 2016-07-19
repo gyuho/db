@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/gyuho/db/crc"
+	"github.com/gyuho/db/pkg/crcutil"
 	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/wal/walpb"
 )
@@ -50,7 +50,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 				return nil, hardstate, nil, ErrCRCMismatch
 			}
 			// update the CRC of the decoder when needed
-			dec.crc = crc.New(rec.CRC, crcTable)
+			dec.crc = crcutil.New(rec.CRC, crcTable)
 
 		case walpb.RECORD_TYPE_METADATA:
 			if metadata != nil && !bytes.Equal(metadata, rec.Data) {

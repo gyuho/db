@@ -1,4 +1,4 @@
-package crc
+package crcutil
 
 import (
 	"hash"
