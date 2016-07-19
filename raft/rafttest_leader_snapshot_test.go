@@ -309,6 +309,38 @@ func Test_raft_snapshot_restore(t *testing.T) {
 }
 
 // (etcd raft.TestRestoreIgnoreSnapshot)
+func Test_raft_snapshot_restore_ignore(t *testing.T) {
+	prevEntries := []raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1}}
+
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd.storageRaftLog.appendToStorageUnstable(prevEntries...)
+	rnd.storageRaftLog.commitTo(1)
+
+	snap := raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       1,
+			Term:        1,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	}
+
+	// ignore snapshot
+	if ok := rnd.followerRestoreSnapshot(snap); ok {
+		t.Fatalf("restore expected false, got %v", ok)
+	}
+	if rnd.storageRaftLog.committedIndex != 1 {
+		t.Fatalf("committed index expected 1, got %d", rnd.storageRaftLog.committedIndex)
+	}
+
+	// ignore snapshot and fast-forward commit
+	snap.Metadata.Index = 2
+	if ok := rnd.followerRestoreSnapshot(snap); ok {
+		t.Fatalf("restore expected false, got %v", ok)
+	}
+	if rnd.storageRaftLog.committedIndex != 2 {
+		t.Fatalf("committed index expected 2, got %d", rnd.storageRaftLog.committedIndex)
+	}
+}
 
 // (etcd raft.TestProvideSnap)
 
