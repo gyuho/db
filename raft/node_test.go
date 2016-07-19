@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -67,6 +68,7 @@ func Test_node_Step_unblock(t *testing.T) {
 			err := nd.Step(ctx, raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER})
 			errc <- err
 		}()
+
 		tt.unblockFunc()
 
 		select {
@@ -93,6 +95,46 @@ func Test_node_Step_unblock(t *testing.T) {
 }
 
 // (etcd raft.TestNodePropose)
+func Test_node_Step_propose(t *testing.T) {
+	nd := newNode()
+
+	storage := NewStorageStableInMemory()
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, storage)
+	go nd.runWithRaftNode(rnd)
+
+	nd.Campaign(context.TODO())
+
+	var msgs []raftpb.Message
+
+	for {
+		rd := <-nd.Ready()
+		storage.Append(rd.EntriesToSave...)
+
+		// until this becomes leader
+		if rnd.id == rd.SoftState.LeaderID {
+			rnd.stepFunc = func(r *raftNode, m raftpb.Message) {
+				msgs = append(msgs, m)
+			}
+			nd.Advance()
+			break
+		}
+
+		nd.Advance()
+	}
+
+	nd.Propose(context.TODO(), []byte("testdata"))
+	nd.Stop()
+
+	if len(msgs) != 1 {
+		t.Fatalf("len(msgs) expected %d, got %d", len(msgs), 1)
+	}
+	if msgs[0].Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
+		t.Fatalf("msg.Type expected %q, got %q", raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, msgs[0].Type)
+	}
+	if !bytes.Equal(msgs[0].Entries[0].Data, []byte("testdata")) {
+		t.Fatalf("data expected %q, got %q", []byte("testdata"), msgs[0].Entries[0].Data)
+	}
+}
 
 // (etcd raft.TestNodeReadIndex)
 

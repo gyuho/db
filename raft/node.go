@@ -53,31 +53,31 @@ type Node interface {
 	// (etcd raft.Node.Stop)
 	Stop()
 
-	// NodeReady returns a channel that receives point-in-time state of Node.
-	// Advance() method must be followed, after applying the state in NodeReady.
+	// Ready returns a channel that receives point-in-time state of Node.
+	// 'Advance' method MUST be followed, AFTER APPLYING the state in Ready.
 	//
-	// (etcd raft.Node.NodeReady)
-	NodeReady() <-chan NodeReady
+	// (etcd raft.Node.Ready)
+	Ready() <-chan Ready
 
 	// Advance notifies the Node that the application has saved the progress
-	// up to the last NodeReady state. And it prepares the Node to return the
-	// next point-in-time state, NodeReady.
+	// up to the last Ready state. And it prepares the Node to return the
+	// next point-in-time state, Ready.
 	//
-	// The application should call Advance AFTER it applies the entries in the
-	// last NodeReady state.
+	// The application MUST call 'Advance' AFTER it applies the entries in the
+	// last Ready state.
 	//
 	// However, as an optimization, the application may call Advance
 	// WHILE it is applying the commands.
 	//
-	// For example, when the last NodeReady contains a snapshot, the application
+	// For example, when the last Ready contains a snapshot, the application
 	// might take a long time to apply the snapshot data. To continue receiving
-	// NodeReady without blocking Raft progress, it can call Advance before
-	// finishing applying the last NodeReady.
+	// Ready without blocking Raft progress, it can call Advance before
+	// finishing applying the last Ready.
 	//
-	// When an application receives NodeReady where SoftState.NodeState is Candidate,
+	// When an application receives Ready where SoftState.NodeState is Candidate,
 	// it must apply all pending configuration changes if any.
 	//
-	//   nr := <-nd.NodeReady()
+	//   nr := <-nd.Ready()
 	//   go apply(nr.EntriesToCommit)
 	//   if nr.SoftState.NodeState == Candidate { waitAllApplied() }
 	//   nd.Advance()
@@ -106,8 +106,8 @@ type node struct {
 	configChangeCh chan raftpb.ConfigChange // confc chan pb.ConfChange
 	configStateCh  chan raftpb.ConfigState  // confstatec chan pb.ConfState
 
-	nodeReadyCh chan NodeReady // readyc chan Ready
-	advanceCh   chan struct{}  // advancec chan struct{}
+	readyCh   chan Ready    // readyc chan Ready
+	advanceCh chan struct{} // advancec chan struct{}
 
 	stopCh chan struct{} // stop chan struct{}
 	doneCh chan struct{} // done  chan struct{}
@@ -132,8 +132,8 @@ func newNode() node {
 		configChangeCh: make(chan raftpb.ConfigChange),
 		configStateCh:  make(chan raftpb.ConfigState),
 
-		nodeReadyCh: make(chan NodeReady),
-		advanceCh:   make(chan struct{}),
+		readyCh:   make(chan Ready),
+		advanceCh: make(chan struct{}),
 
 		stopCh: make(chan struct{}),
 		doneCh: make(chan struct{}),
@@ -248,8 +248,8 @@ func (nd *node) Stop() {
 }
 
 // (etcd raft.node.Ready)
-func (nd *node) NodeReady() <-chan NodeReady {
-	return nd.nodeReadyCh
+func (nd *node) Ready() <-chan Ready {
+	return nd.readyCh
 }
 
 // (etcd raft.node.Advance)
@@ -306,8 +306,8 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 
 		advanceCh chan struct{}
 
-		nodeReady   NodeReady
-		nodeReadyCh chan NodeReady
+		rd      Ready
+		readyCh chan Ready
 
 		hasPrevLastUnstableIndex bool
 		prevLastUnstableIndex    uint64
@@ -319,16 +319,16 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 
 	for {
 		// Advance notifies the Node that the application has saved the progress
-		// up to the last NodeReady state. And it prepares the Node to return the
-		// next point-in-time state, NodeReady.
+		// up to the last Ready state. And it prepares the Node to return the
+		// next point-in-time state, Ready.
 		if advanceCh != nil {
-			nodeReadyCh = nil
+			readyCh = nil
 		} else {
-			nodeReady = newNodeReady(rnd, prevSoftState, prevHardState)
-			if nodeReady.ContainsUpdates() {
-				nodeReadyCh = nd.nodeReadyCh
+			rd = newReady(rnd, prevSoftState, prevHardState)
+			if rd.ContainsUpdates() {
+				readyCh = nd.readyCh
 			} else {
-				nodeReadyCh = nil
+				readyCh = nil
 			}
 		}
 
@@ -360,26 +360,26 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 				rnd.Step(msg)
 			}
 
-		case nodeReadyCh <- nodeReady: // case readyc <- rd:
-			// NodeReady returns a channel that receives point-in-time state of Node.
-			// Advance() method must be followed, after applying the state in NodeReady.
+		case readyCh <- rd: // case readyc <- rd:
+			// Ready returns a channel that receives point-in-time state of Node.
+			// Advance() method must be followed, after applying the state in Ready.
 
-			if nodeReady.SoftState != nil {
-				prevSoftState = nodeReady.SoftState
+			if rd.SoftState != nil {
+				prevSoftState = rd.SoftState
 			}
 
-			if len(nodeReady.EntriesToSave) > 0 {
+			if len(rd.EntriesToSave) > 0 {
 				hasPrevLastUnstableIndex = true
-				prevLastUnstableIndex = nodeReady.EntriesToSave[len(nodeReady.EntriesToSave)-1].Index
-				prevLastUnstableTerm = nodeReady.EntriesToSave[len(nodeReady.EntriesToSave)-1].Term
+				prevLastUnstableIndex = rd.EntriesToSave[len(rd.EntriesToSave)-1].Index
+				prevLastUnstableTerm = rd.EntriesToSave[len(rd.EntriesToSave)-1].Term
 			}
 
-			if !raftpb.IsEmptyHardState(nodeReady.HardStateToSave) {
-				prevHardState = nodeReady.HardStateToSave
+			if !raftpb.IsEmptyHardState(rd.HardStateToSave) {
+				prevHardState = rd.HardStateToSave
 			}
 
-			if !raftpb.IsEmptySnapshot(nodeReady.SnapshotToSave) {
-				prevSnapshotIndex = nodeReady.SnapshotToSave.Metadata.Index
+			if !raftpb.IsEmptySnapshot(rd.SnapshotToSave) {
+				prevSnapshotIndex = rd.SnapshotToSave.Metadata.Index
 			}
 
 			rnd.mailbox = nil
