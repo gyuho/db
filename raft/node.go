@@ -184,7 +184,7 @@ func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
 func (nd *node) Step(ctx context.Context, msg raftpb.Message) error {
 	if raftpb.IsInternalMessage(msg.Type) {
 		// ignore unexpected local messages received over network
-		raftLogger.Warningf("Step received internal message %q from network", msg.Type)
+		raftLogger.Warningf("node.Step got %q from network (so ignores)", msg.Type)
 		return nil
 	}
 	return nd.step(ctx, msg)
