@@ -346,8 +346,8 @@ func Test_raft_snapshot_restore_ignore(t *testing.T) {
 func Test_raft_snapshot_restore_leader(t *testing.T) {
 	snap := raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{
-			Index:       1,
-			Term:        1,
+			Index:       11,
+			Term:        11,
 			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
 		},
 	}
@@ -380,8 +380,34 @@ func Test_raft_snapshot_restore_leader(t *testing.T) {
 }
 
 // (etcd raft.TestIgnoreProvidingSnap)
-func Test_raft_snapshot_restore_leader_ignore(t *testing.T) {
+func Test_raft_snapshot_restore_leader_cancel_snapshot(t *testing.T) {
+	snap := raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       11,
+			Term:        11,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	}
 
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.restoreSnapshot(snap)
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	// force set the next index of 2
+	// to make it need snapshot from leader
+	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex() - 1
+	rnd.allProgresses[2].RecentActive = false
+	// now node 1 does not send snapshot to 2
+
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+	// if !followerProgress.RecentActive { return }
+
+	msgs := rnd.readAndClearMailbox()
+	if len(msgs) != 0 {
+		t.Fatalf("len(msgs) expected 0, got %d", len(msgs))
+	}
 }
 
 // (etcd raft.TestRestoreFromSnapMsg)
