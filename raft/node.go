@@ -276,7 +276,7 @@ func (nd *node) ReportUnreachable(targetID uint64) {
 func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 	select {
 	case nd.incomingMessageCh <- raftpb.Message{
-		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
 		From:   targetID,
 		Reject: status == raftpb.SNAPSHOT_STATUS_FAILED,
 	}:

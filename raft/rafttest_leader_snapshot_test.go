@@ -77,9 +77,9 @@ func Test_raft_snapshot_heartbeat(t *testing.T) {
 }
 
 // (etcd raft.TestSendingSnapshotSetPendingSnapshot)
-func Test_raft_snapshot_followerRestoreSnapshot_pending_snapshot(t *testing.T) {
+func Test_raft_snapshot_restoreSnapshot_pending_snapshot(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
-	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+	rnd.restoreSnapshot(raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{
 			Index:       11,
 			Term:        11,
@@ -96,7 +96,7 @@ func Test_raft_snapshot_followerRestoreSnapshot_pending_snapshot(t *testing.T) {
 	// to force 1 to send snapshot to 2
 	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex()
 	rnd.Step(raftpb.Message{
-		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 		From:     2,
 		To:       1,
 		LogIndex: rnd.allProgresses[2].NextIndex - 1,
@@ -111,7 +111,7 @@ func Test_raft_snapshot_followerRestoreSnapshot_pending_snapshot(t *testing.T) {
 // (etcd raft.TestPendingSnapshotPauseReplication)
 func Test_raft_snapshot_pause_replication(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
-	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+	rnd.restoreSnapshot(raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{
 			Index:       11,
 			Term:        11,
@@ -147,7 +147,7 @@ func Test_raft_snapshot_pause_replication(t *testing.T) {
 // (etcd raft.TestSnapshotFailure)
 func Test_raft_snapshot_failure(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
-	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+	rnd.restoreSnapshot(raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{
 			Index:       11,
 			Term:        11,
@@ -162,7 +162,7 @@ func Test_raft_snapshot_failure(t *testing.T) {
 	rnd.allProgresses[2].becomeSnapshot(11)
 
 	rnd.Step(raftpb.Message{
-		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
 		From:   2,
 		To:     1,
 		Reject: true,
@@ -185,7 +185,7 @@ func Test_raft_snapshot_failure(t *testing.T) {
 // (etcd raft.TestSnapshotSucceed)
 func Test_raft_snapshot_succeed(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
-	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+	rnd.restoreSnapshot(raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{
 			Index:       11,
 			Term:        11,
@@ -200,7 +200,7 @@ func Test_raft_snapshot_succeed(t *testing.T) {
 	rnd.allProgresses[2].becomeSnapshot(11)
 
 	rnd.Step(raftpb.Message{
-		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER,
+		Type:   raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT,
 		From:   2,
 		To:     1,
 		Reject: false,
@@ -230,7 +230,7 @@ func Test_raft_snapshot_succeed(t *testing.T) {
 // (etcd raft.TestSnapshotAbort)
 func Test_raft_snapshot_abort(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
-	rnd.followerRestoreSnapshot(raftpb.Snapshot{
+	rnd.restoreSnapshot(raftpb.Snapshot{
 		Metadata: raftpb.SnapshotMetadata{
 			Index:       11,
 			Term:        11,
@@ -245,7 +245,7 @@ func Test_raft_snapshot_abort(t *testing.T) {
 	rnd.allProgresses[2].becomeSnapshot(11)
 
 	rnd.Step(raftpb.Message{
-		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 		From:     2,
 		To:       1,
 		LogIndex: 11,
@@ -279,8 +279,8 @@ func Test_raft_snapshot_restore(t *testing.T) {
 	}
 
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
-	if ok := rnd.followerRestoreSnapshot(snap); !ok {
-		t.Fatalf("followerRestoreSnapshot expected true, got %v", ok)
+	if ok := rnd.restoreSnapshot(snap); !ok {
+		t.Fatalf("restoreSnapshot expected true, got %v", ok)
 	}
 
 	if !reflect.DeepEqual(rnd.allNodeIDs(), snap.Metadata.ConfigState.IDs) {
@@ -299,8 +299,8 @@ func Test_raft_snapshot_restore(t *testing.T) {
 		t.Fatalf("term expected %d, got %d", snap.Metadata.Term, term)
 	}
 
-	if ok := rnd.followerRestoreSnapshot(snap); ok {
-		t.Fatalf("followerRestoreSnapshot expected false, got %v", ok)
+	if ok := rnd.restoreSnapshot(snap); ok {
+		t.Fatalf("restoreSnapshot expected false, got %v", ok)
 	}
 	//
 	// if rnd.storageRaftLog.committedIndex >= snap.Metadata.Index {
@@ -325,7 +325,7 @@ func Test_raft_snapshot_restore_ignore(t *testing.T) {
 	}
 
 	// ignore snapshot
-	if ok := rnd.followerRestoreSnapshot(snap); ok {
+	if ok := rnd.restoreSnapshot(snap); ok {
 		t.Fatalf("restore expected false, got %v", ok)
 	}
 	if rnd.storageRaftLog.committedIndex != 1 {
@@ -334,7 +334,7 @@ func Test_raft_snapshot_restore_ignore(t *testing.T) {
 
 	// ignore snapshot and fast-forward commit
 	snap.Metadata.Index = 2
-	if ok := rnd.followerRestoreSnapshot(snap); ok {
+	if ok := rnd.restoreSnapshot(snap); ok {
 		t.Fatalf("restore expected false, got %v", ok)
 	}
 	if rnd.storageRaftLog.committedIndex != 2 {
@@ -343,9 +343,53 @@ func Test_raft_snapshot_restore_ignore(t *testing.T) {
 }
 
 // (etcd raft.TestProvideSnap)
+func Test_raft_snapshot_restore_leader(t *testing.T) {
+	snap := raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			Index:       1,
+			Term:        1,
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+		},
+	}
+
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.restoreSnapshot(snap)
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	// force set the next index of 2
+	// to make it need snapshot from leader
+	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex()
+
+	rnd.Step(raftpb.Message{
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
+		From:     2,
+		To:       1,
+		LogIndex: rnd.allProgresses[2].NextIndex - 1,
+		Reject:   true,
+	})
+
+	msgs := rnd.readAndClearMailbox()
+	if len(msgs) != 1 {
+		t.Fatalf("len(msgs) expected 1, got %d", len(msgs))
+	}
+	if msgs[0].Type != raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT {
+		t.Fatalf("msgs[0].Type expected %q, got %q", raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT, msgs[0].Type)
+	}
+}
 
 // (etcd raft.TestIgnoreProvidingSnap)
+func Test_raft_snapshot_restore_leader_ignore(t *testing.T) {
+
+}
 
 // (etcd raft.TestRestoreFromSnapMsg)
+func Test_raft_snapshot_restore_msg_snap(t *testing.T) {
+
+}
 
 // (etcd raft.TestSlowNodeRestore)
+func Test_raft_snapshot_restore_slow_node(t *testing.T) {
+
+}

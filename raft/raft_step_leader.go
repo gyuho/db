@@ -162,7 +162,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 	entries, errEntries := rnd.storageRaftLog.entries(followerProgress.NextIndex, rnd.maxEntryNumPerMsg)
 
 	if errTerm == nil && errEntries == nil {
-		msg.Type = raftpb.MESSAGE_TYPE_APPEND_FROM_LEADER
+		msg.Type = raftpb.MESSAGE_TYPE_LEADER_APPEND
 		msg.LogIndex = followerProgress.NextIndex - 1
 		msg.LogTerm = term
 		msg.Entries = entries
@@ -187,7 +187,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 		}
 
 	} else { // error if entries had been compacted in leader's logs
-		msg.Type = raftpb.MESSAGE_TYPE_SNAPSHOT_FROM_LEADER
+		msg.Type = raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT
 
 		raftLogger.Infof(`
 
@@ -458,7 +458,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			rnd.leaderSendAppendOrSnapshot(msg.From)
 		}
 
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER: // pb.MsgAppResp
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND: // pb.MsgAppResp
 		followerProgress.RecentActive = true
 
 		switch msg.Reject {
@@ -467,12 +467,19 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	RECEIVED %s
-	(leader append request is REJECTED!)
+	(LEADER APPEND-REQUEST is REJECTED!)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg))
 
 			if followerProgress.maybeDecreaseAndResume(msg.LogIndex, msg.RejectHintFollowerLogLastIndex) {
-				raftLogger.Infof("%s decreased the progress of follower %x to %s", rnd.describe(), msg.From, followerProgress)
+				raftLogger.Infof(`
+
+	%s
+	decreased the progress of follower %x
+	to %s
+
+`, rnd.describeLong(), msg.From, followerProgress)
+
 				if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
 					followerProgress.becomeProbe()
 				}
@@ -513,7 +520,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			}
 		}
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_SNAPSHOT_FROM_LEADER: // pb.MsgSnapStatus
+	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT: // pb.MsgSnapStatus
 		if followerProgress.State != raftpb.PROGRESS_STATE_SNAPSHOT {
 			return
 		}

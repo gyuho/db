@@ -68,7 +68,7 @@ func Test_raft_leader_progress_inflights_move_forward(t *testing.T) {
 	// so start from 2
 	for i := 2; i < rnd.maxInflightMsgNum; i++ {
 		// move forward the progress window
-		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER, From: 2, To: 1, LogIndex: uint64(i)})
+		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND, From: 2, To: 1, LogIndex: uint64(i)})
 
 		// wasPaused is true, so it will resume again
 		/*
@@ -94,7 +94,7 @@ func Test_raft_leader_progress_inflights_move_forward(t *testing.T) {
 
 		// ensure it's full
 		for j := 0; j < i; j++ {
-			rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER, From: 2, To: 1, LogIndex: uint64(j)})
+			rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND, From: 2, To: 1, LogIndex: uint64(j)})
 
 			if !pr2.inflights.full() {
 				t.Fatalf("#%d.%d: inflights.full expected true, got %v", i, j, pr2.inflights.full())
