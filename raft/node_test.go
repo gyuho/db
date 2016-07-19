@@ -197,7 +197,35 @@ func Test_node_Step_propose(t *testing.T) {
 
 // (etcd raft.TestBlockProposal)
 func Test_node_Step_propose_block(t *testing.T) {
+	nd := newNode()
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	go nd.runWithRaftNode(rnd)
+	defer nd.Stop()
 
+	errc := make(chan error, 1)
+	go func() {
+		errc <- nd.Propose(context.TODO(), []byte("testdata"))
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	select {
+	case err := <-errc:
+		t.Fatal(err)
+	default:
+	}
+
+	nd.Campaign(context.TODO())
+
+	select {
+	case err := <-errc:
+		if err != nil {
+			t.Fatal(err)
+		}
+		// otherwise, 'nil' is returned
+	case <-time.After(10 * time.Second):
+		t.Fatal("blocking proposal, want unblocking")
+	}
 }
 
 // (etcd raft.TestNodeTick)
