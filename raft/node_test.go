@@ -51,7 +51,21 @@ func Test_node_soft_state_equal(t *testing.T) {
 
 // (etcd raft.TestIsHardStateEqual)
 func Test_node_hard_state_equal(t *testing.T) {
+	tests := []struct {
+		hardState raftpb.HardState
+		wEqual    bool
+	}{
+		{raftpb.EmptyHardState, true},
+		{raftpb.HardState{VotedFor: 1}, false},
+		{raftpb.HardState{CommittedIndex: 1}, false},
+		{raftpb.HardState{Term: 1}, false},
+	}
 
+	for i, tt := range tests {
+		if tt.hardState.Equal(raftpb.EmptyHardState) != tt.wEqual {
+			t.Errorf("#%d: equal expected %v, got %v", i, tt.wEqual, tt.hardState.Equal(raftpb.EmptyHardState))
+		}
+	}
 }
 
 // (etcd raft.TestNodeStep)
