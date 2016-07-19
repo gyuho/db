@@ -193,23 +193,23 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 
 	%s
 	NOW NEEDS TO SEND %q
-	to follower %x
+	to FOLLOWER %x
 	[term error='%v' | entries error='%v']
 
 `, rnd.describeLong(), msg.Type, targetID, errTerm, errEntries)
 
 		if !followerProgress.RecentActive {
-			raftLogger.Infof("%s cancels snapshotting to follower %x [recent active=%v]", rnd.describe(), targetID, followerProgress.RecentActive)
+			raftLogger.Infof("%s cancels snapshotting to FOLLOWER %x [recent active=%v]", rnd.describe(), targetID, followerProgress.RecentActive)
 			return
 		}
 
 		snapshot, err := rnd.storageRaftLog.snapshot()
 		if err != nil {
 			if err == ErrSnapshotTemporarilyUnavailable {
-				raftLogger.Infof("%s failed to send snapshot to follower %x (%v)", rnd.describe(), targetID, err)
+				raftLogger.Infof("%s failed to send snapshot to FOLLOWER %x (%v)", rnd.describe(), targetID, err)
 				return
 			}
-			raftLogger.Panicf("%s failed to send snapshot to follower %x (%v)", rnd.describe(), targetID, err)
+			raftLogger.Panicf("%s failed to send snapshot to FOLLOWER %x (%v)", rnd.describe(), targetID, err)
 		}
 
 		if raftpb.IsEmptySnapshot(snapshot) {
@@ -223,13 +223,13 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 
 	%s
 	NOW SENDS %q [index=%d | term=%d]
-	to follower %x %s
+	to FOLLOWER %x %s
 
 `, rnd.describeLong(), msg.Type, snapshot.Metadata.Index, snapshot.Metadata.Term, targetID, followerProgress)
 
 	}
 
-	raftLogger.Debugf("%s sends %q to follower %x in mailbox", rnd.describe(), msg.Type, msg.To)
+	raftLogger.Debugf("%s sends %q to FOLLOWER %x in mailbox", rnd.describe(), msg.Type, msg.To)
 	rnd.sendToMailbox(msg)
 }
 
@@ -475,7 +475,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 				raftLogger.Infof(`
 
 	%s
-	decreased the progress of follower %x
+	decreased the progress of FOLLOWER %x
 	to %s
 
 `, rnd.describeLong(), msg.From, followerProgress)
@@ -533,7 +533,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	SENT SNAPSHOT and RECEIVED RESPONSE
-	from follower %x
+	from FOLLOWER %x
 	%s
 
 `, rnd.describeLong(), msg.From, followerProgress)
@@ -549,7 +549,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	SENT SNAPSHOT BUT GOT REJECTED
-	from follower %x
+	from FOLLOWER %x
 	%s
 
 `, rnd.describeLong(), msg.From, followerProgress)
@@ -568,7 +568,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	%s
 	RECEIVED %s
-	(leader FAILED TO SEND message to follower %x)
+	(LEADER FAILED TO SEND message to FOLLOWER %x)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 
@@ -591,8 +591,8 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			raftLogger.Infof(`
 
 	%s
-	CANCELLED leadership transfer to follower %x
-	(%x got a new leadership transfer request to follower %x)
+	CANCELLED leadership transfer to FOLLOWER %x
+	(%x got a new leadership transfer request to FOLLOWER %x)
 
 `, rnd.describeLong(), lastLeaderTransfereeID, rnd.id, leaderTransfereeID)
 		}
