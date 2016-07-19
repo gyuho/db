@@ -9,6 +9,21 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
+// (etcd raft.TestReadyContainUpdates)
+func Test_node_Ready_contains_updates(t *testing.T) {
+
+}
+
+// (etcd raft.TestSoftStateEqual)
+func Test_node_soft_state_equal(t *testing.T) {
+
+}
+
+// (etcd raft.TestIsHardStateEqual)
+func Test_node_hard_state_equal(t *testing.T) {
+
+}
+
 // (etcd raft.TestNodeStep)
 func Test_node_Step(t *testing.T) {
 	for i := range raftpb.MESSAGE_TYPE_name {
@@ -137,21 +152,36 @@ func Test_node_Step_propose(t *testing.T) {
 }
 
 // (etcd raft.TestBlockProposal)
+func Test_node_Step_propose_block(t *testing.T) {
+
+}
 
 // (etcd raft.TestNodeTick)
+func Test_node_tick(t *testing.T) {
+
+}
 
 // (etcd raft.TestNodeStop)
+func Test_node_stop(t *testing.T) {
 
-// (etcd raft.TestReadyContainUpdates)
+}
 
 // (etcd raft.TestNodeStart)
+func Test_node_start(t *testing.T) {
+
+}
 
 // (etcd raft.TestNodeRestart)
+func Test_node_restart(t *testing.T) {
+
+}
 
 // (etcd raft.TestNodeRestartFromSnapshot)
+func Test_node_restart_from_snapshot(t *testing.T) {
+
+}
 
 // (etcd raft.TestNodeAdvance)
+func Test_node_Advance(t *testing.T) {
 
-// (etcd raft.TestSoftStateEqual)
-
-// (etcd raft.TestIsHardStateEqual)
+}
