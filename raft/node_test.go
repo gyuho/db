@@ -3,6 +3,7 @@ package raft
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/gyuho/db/raft/raftpb"
 )
@@ -43,6 +44,53 @@ func Test_node_Step(t *testing.T) {
 }
 
 // (etcd raft.TestNodeStepUnblock)
+func Test_node_Step_unblock(t *testing.T) {
+	nd := &node{
+		incomingProposalMessageCh: make(chan raftpb.Message),
+		doneCh: make(chan struct{}),
+	}
+
+	stopFunc := func() { close(nd.doneCh) }
+	ctx, cancel := context.WithCancel(context.Background())
+
+	tests := []struct {
+		unblockFunc func()
+		wErr        error
+	}{
+		{stopFunc, ErrStopped},
+		{cancel, context.Canceled},
+	}
+
+	for i, tt := range tests {
+		errc := make(chan error, 1)
+		go func() {
+			err := nd.Step(ctx, raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER})
+			errc <- err
+		}()
+		tt.unblockFunc()
+
+		select {
+		case err := <-errc:
+			if err != tt.wErr {
+				t.Fatalf("#%d: error expected %v, got %v", i, tt.wErr, err)
+			}
+
+			// clean up side-effect
+			if ctx.Err() != nil {
+				ctx = context.TODO()
+			}
+
+			select {
+			case <-nd.doneCh:
+				nd.doneCh = make(chan struct{})
+			default:
+			}
+
+		case <-time.After(1 * time.Second):
+			t.Fatalf("#%d: failed to unblock", i)
+		}
+	}
+}
 
 // (etcd raft.TestNodePropose)
 
