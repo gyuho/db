@@ -1,4 +1,4 @@
-package walpb
+package raftwalpb
 
 const (
 	// RECORD_TYPE_METADATA contains the metadata of the record.

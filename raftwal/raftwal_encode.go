@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"bufio"
@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/gyuho/db/pkg/crcutil"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 var (
@@ -20,7 +20,7 @@ type encoder struct {
 
 	crc hash.Hash32
 
-	// recordBuf pre-allocates bytes for walpb.Record Marshal.
+	// recordBuf pre-allocates bytes for raftwalpb.Record Marshal.
 	// etcd pre-allocates gogo/protobuf/proto.MarshalTo(make([]byte, 1024 * 1024))
 	recordBuf []byte
 	wordBuf   []byte
@@ -40,7 +40,7 @@ func newEncoder(w io.Writer, prevCRC uint32) *encoder {
 	}
 }
 
-func (e *encoder) encode(rec *walpb.Record) error {
+func (e *encoder) encode(rec *raftwalpb.Record) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

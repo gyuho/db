@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"bytes"
@@ -9,15 +9,15 @@ import (
 
 	"github.com/gyuho/db/pkg/crcutil"
 	"github.com/gyuho/db/raft/raftpb"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 var (
-	ErrMetadataConflict = errors.New("wal: conflicting metadata found")
-	ErrFileNotFound     = errors.New("wal: file not found")
-	ErrCRCMismatch      = errors.New("wal: crc mismatch")
-	ErrSnapshotMismatch = errors.New("wal: snapshot mismatch")
-	ErrSnapshotNotFound = errors.New("wal: snapshot not found")
+	ErrMetadataConflict = errors.New("walpb: conflicting metadata found")
+	ErrFileNotFound     = errors.New("walpb: file not found")
+	ErrCRCMismatch      = errors.New("walpb: crc mismatch")
+	ErrSnapshotMismatch = errors.New("walpb: snapshot mismatch")
+	ErrSnapshotNotFound = errors.New("walpb: snapshot not found")
 )
 
 // ReadAll reads out records of the current WAL file.
@@ -36,13 +36,13 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 	defer w.mu.Unlock()
 
 	var (
-		rec   = &walpb.Record{}
+		rec   = &raftwalpb.Record{}
 		dec   = w.dec
 		match bool
 	)
 	for err = dec.decode(rec); err == nil; err = dec.decode(rec) {
 		switch rec.Type {
-		case walpb.RECORD_TYPE_CRC:
+		case raftwalpb.RECORD_TYPE_CRC:
 			cv := dec.crc.Sum32()
 			// if 0, the decoder is new
 			if cv != 0 && rec.Validate(cv) != nil {
@@ -52,15 +52,15 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 			// update the CRC of the decoder when needed
 			dec.crc = crcutil.New(rec.CRC, crcTable)
 
-		case walpb.RECORD_TYPE_METADATA:
+		case raftwalpb.RECORD_TYPE_METADATA:
 			if metadata != nil && !bytes.Equal(metadata, rec.Data) {
 				hardstate.Reset()
 				return nil, hardstate, nil, ErrMetadataConflict
 			}
 			metadata = rec.Data
 
-		case walpb.RECORD_TYPE_SNAPSHOT:
-			var snap walpb.Snapshot
+		case raftwalpb.RECORD_TYPE_SNAPSHOT:
+			var snap raftwalpb.Snapshot
 			if err = (&snap).Unmarshal(rec.Data); err != nil {
 				logger.Panicf("unmarshal should never fail (%v)", err)
 			}
@@ -73,7 +73,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 				match = true
 			}
 
-		case walpb.RECORD_TYPE_ENTRY:
+		case raftwalpb.RECORD_TYPE_ENTRY:
 			var ent raftpb.Entry
 			if err = (&ent).Unmarshal(rec.Data); err != nil {
 				logger.Panicf("unmarshal should never fail (%v)", err)
@@ -83,7 +83,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 			}
 			w.lastIndex = ent.Index
 
-		case walpb.RECORD_TYPE_HARDSTATE:
+		case raftwalpb.RECORD_TYPE_HARDSTATE:
 			if err = (&hardstate).Unmarshal(rec.Data); err != nil {
 				logger.Panicf("unmarshal should never fail (%v)", err)
 			}
@@ -122,7 +122,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 		w.decoderReaderCloser()
 		w.decoderReaderCloser = nil
 	}
-	w.readStartSnapshot = walpb.Snapshot{}
+	w.readStartSnapshot = raftwalpb.Snapshot{}
 	w.metadata = metadata
 
 	if w.UnsafeLastFile() != nil { // write mode

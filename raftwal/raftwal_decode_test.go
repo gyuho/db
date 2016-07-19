@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 var (
@@ -24,12 +24,12 @@ func TestRecordDecode(t *testing.T) {
 	tests := []struct {
 		data []byte
 
-		expectedRecord *walpb.Record
+		expectedRecord *raftwalpb.Record
 		expectedError  error
 	}{
 		{
 			infoRecord,
-			&walpb.Record{
+			&raftwalpb.Record{
 				Type: 1,
 				CRC:  crc32.Checksum(infoData, crcTable),
 				Data: infoData,
@@ -38,33 +38,33 @@ func TestRecordDecode(t *testing.T) {
 		},
 		{
 			[]byte(""),
-			&walpb.Record{},
+			&raftwalpb.Record{},
 			io.EOF,
 		},
 		{
 			infoRecord[:8],
-			&walpb.Record{},
+			&raftwalpb.Record{},
 			io.ErrUnexpectedEOF,
 		},
 		{
 			infoRecord[:len(infoRecord)-len(infoData)-8],
-			&walpb.Record{},
+			&raftwalpb.Record{},
 			io.ErrUnexpectedEOF,
 		},
 		{
 			infoRecord[:len(infoRecord)-len(infoData)],
-			&walpb.Record{},
+			&raftwalpb.Record{},
 			io.ErrUnexpectedEOF,
 		},
 		{
 			infoRecord[:len(infoRecord)-8],
-			&walpb.Record{},
+			&raftwalpb.Record{},
 			io.ErrUnexpectedEOF,
 		},
 		{
 			badInfoRecord,
-			&walpb.Record{},
-			walpb.ErrCRCMismatch,
+			&raftwalpb.Record{},
+			raftwalpb.ErrCRCMismatch,
 		},
 	}
 
@@ -72,7 +72,7 @@ func TestRecordDecode(t *testing.T) {
 		rc := ioutil.NopCloser(bytes.NewBuffer(tt.data))
 		dec := newDecoder(rc)
 
-		rec := &walpb.Record{}
+		rec := &raftwalpb.Record{}
 		err := dec.decode(rec)
 
 		if !reflect.DeepEqual(rec, tt.expectedRecord) {

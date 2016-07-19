@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"fmt"

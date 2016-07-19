@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"io"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/raft/raftpb"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 // WAL is the logical representation of the stable storage.
@@ -37,7 +37,7 @@ type WAL struct {
 
 	dec                 *decoder
 	decoderReaderCloser func() error
-	readStartSnapshot   walpb.Snapshot
+	readStartSnapshot   raftwalpb.Snapshot
 }
 
 // Lock locks the WAL.
@@ -111,7 +111,7 @@ func openLastWALFile(dir string) (*fileutil.LockedFile, error) {
 }
 
 // openWAL opens a WAL file with given snapshot.
-func openWAL(dir string, snap walpb.Snapshot, write bool) (*WAL, error) {
+func openWAL(dir string, snap raftwalpb.Snapshot, write bool) (*WAL, error) {
 	names, err := readWALNames(dir)
 	if err != nil {
 		return nil, err
@@ -185,12 +185,12 @@ func openWAL(dir string, snap walpb.Snapshot, write bool) (*WAL, error) {
 // The returned WAL is ready for reads, and appends only after reading out
 // all of its previous records.
 // The first record will be the one after the given snapshot.
-func OpenWALWrite(dir string, snap walpb.Snapshot) (*WAL, error) {
+func OpenWALWrite(dir string, snap raftwalpb.Snapshot) (*WAL, error) {
 	return openWAL(dir, snap, true)
 }
 
 // OpenWALRead opens the WAL file for reads.
-func OpenWALRead(dir string, snap walpb.Snapshot) (*WAL, error) {
+func OpenWALRead(dir string, snap raftwalpb.Snapshot) (*WAL, error) {
 	return openWAL(dir, snap, false)
 }
 

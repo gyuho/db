@@ -7,8 +7,8 @@ go get -v github.com/golang/protobuf/protoc-gen-go
 printf "generating proto in raft/raftpb\n"
 protoc --go_out=. raft/raftpb/*.proto
 
-printf "generating proto in wal/walpb\n"
-protoc --go_out=. wal/walpb/*.proto
+printf "generating proto in raftwal/raftwalpb\n"
+protoc --go_out=. raftwal/raftwalpb/*.proto
 COMMENT
 
 # for now, be conservative about what version of protoc we expect
@@ -32,7 +32,7 @@ protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
 	raft/raftpb/*.proto;
 
-printf "Generating wal/walpb\n"
+printf "Generating raftwal/raftwalpb\n"
 protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
-	wal/walpb/*.proto;
+	raftwal/raftwalpb/*.proto;

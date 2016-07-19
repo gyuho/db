@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/gyuho/db/raft/raftpb"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 type corruptFunc func(string, int64) error
@@ -46,7 +46,7 @@ func testRepair(t *testing.T, expectedEntriesN int, entries [][]raftpb.Entry, co
 	}
 
 	// verify the data is now corrupted
-	w, err = OpenWALWrite(dir, walpb.Snapshot{})
+	w, err = OpenWALWrite(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func testRepair(t *testing.T, expectedEntriesN int, entries [][]raftpb.Entry, co
 	}
 
 	// read the repaired WAL
-	w, err = OpenWALWrite(dir, walpb.Snapshot{})
+	w, err = OpenWALWrite(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func testRepair(t *testing.T, expectedEntriesN int, entries [][]raftpb.Entry, co
 	w.Close()
 
 	// read WAL again to ensure all writes are successful
-	w, err = OpenWALRead(dir, walpb.Snapshot{})
+	w, err = OpenWALRead(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}

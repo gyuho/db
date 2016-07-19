@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/raft/raftpb"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 // createEmptyEntries creates empty slice of entries for testing.
@@ -83,29 +83,29 @@ func TestCreate(t *testing.T) {
 	enc := newEncoder(emptyBuf, 0)
 
 	// 1. encode CRC
-	if err = enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_CRC,
+	if err = enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_CRC,
 		CRC:  0,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// 2. encode metadata
-	if err = enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_METADATA,
+	if err = enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_METADATA,
 		Data: data,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// 3. encode empty snapshot
-	snap := &walpb.Snapshot{}
+	snap := &raftwalpb.Snapshot{}
 	snapData, err := snap.Marshal()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_SNAPSHOT,
+	if err = enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_SNAPSHOT,
 		Data: snapData,
 	}); err != nil {
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func TestCreateInterrupted(t *testing.T) {
 		t.Fatalf("%q should have been renamed (should not exist)", tmpDir)
 	}
 
-	w, err = OpenWALRead(dir, walpb.Snapshot{})
+	w, err = OpenWALRead(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestSave(t *testing.T) {
 	}
 
 	// save snapshot
-	if err = w.UnsafeEncodeSnapshotAndFdatasync(&walpb.Snapshot{}); err != nil {
+	if err = w.UnsafeEncodeSnapshotAndFdatasync(&raftwalpb.Snapshot{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,7 +214,7 @@ func TestSave(t *testing.T) {
 	}
 	w.Close()
 
-	w, err = OpenWALRead(dir, walpb.Snapshot{})
+	w, err = OpenWALRead(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestUnsafeCutCurrent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	snapshot := walpb.Snapshot{Term: 1, Index: 2}
+	snapshot := raftwalpb.Snapshot{Term: 1, Index: 2}
 	if err = w.UnsafeEncodeSnapshotAndFdatasync(&snapshot); err != nil {
 		t.Fatal(err)
 	} // this does fsync
@@ -317,7 +317,7 @@ func TestUnsafeCutCurrentRecover(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		if err = w.UnsafeEncodeSnapshotAndFdatasync(&walpb.Snapshot{Index: uint64(i)}); err != nil {
+		if err = w.UnsafeEncodeSnapshotAndFdatasync(&raftwalpb.Snapshot{Index: uint64(i)}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -339,7 +339,7 @@ func TestUnsafeCutCurrentRecover(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		wr, err := OpenWALRead(dir, walpb.Snapshot{Index: uint64(i)})
+		wr, err := OpenWALRead(dir, raftwalpb.Snapshot{Index: uint64(i)})
 		if err != nil {
 			if i <= 4 {
 				if err != ErrFileNotFound {
@@ -402,7 +402,7 @@ func TestTailWritesUnused(t *testing.T) {
 	}
 	w.Close()
 
-	w, err = OpenWALWrite(dir, walpb.Snapshot{})
+	w, err = OpenWALWrite(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +426,7 @@ func TestTailWritesUnused(t *testing.T) {
 	w.Close()
 
 	// verify the writes
-	w, err = OpenWALRead(dir, walpb.Snapshot{})
+	w, err = OpenWALRead(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}

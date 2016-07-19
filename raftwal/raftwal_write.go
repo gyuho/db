@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/raft/raftpb"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 const (
@@ -78,7 +78,7 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	}
 
 	// 3. encode snapshot
-	if err := w.UnsafeEncodeSnapshotAndFdatasync(&walpb.Snapshot{Term: 0, Index: 0}); err != nil {
+	if err := w.UnsafeEncodeSnapshotAndFdatasync(&raftwalpb.Snapshot{Term: 0, Index: 0}); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +104,7 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	}
 
 	// reopen and relock
-	newWAL, oerr := OpenWALWrite(dir, walpb.Snapshot{})
+	newWAL, oerr := OpenWALWrite(dir, raftwalpb.Snapshot{})
 	if oerr != nil {
 		return nil, oerr
 	}
@@ -135,29 +135,29 @@ func (w *WAL) UnsafeFdatasync() error {
 
 // UnsafeEncodeCRC encodes the CRC record.
 func (w *WAL) UnsafeEncodeCRC(crc uint32) error {
-	return w.enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_CRC,
+	return w.enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_CRC,
 		CRC:  crc,
 	})
 }
 
 // UnsafeEncodeMetadata encodes metadata to the record.
 func (w *WAL) UnsafeEncodeMetadata(meatadata []byte) error {
-	return w.enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_METADATA,
+	return w.enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_METADATA,
 		Data: meatadata,
 	})
 }
 
-// UnsafeEncodeSnapshotAndFdatasync encodes walpb.Snapshot to the record.
-func (w *WAL) UnsafeEncodeSnapshotAndFdatasync(snap *walpb.Snapshot) error {
+// UnsafeEncodeSnapshotAndFdatasync encodes raftwalpb.Snapshot to the record.
+func (w *WAL) UnsafeEncodeSnapshotAndFdatasync(snap *raftwalpb.Snapshot) error {
 	data, err := snap.Marshal()
 	if err != nil {
 		return err
 	}
 
-	if err := w.enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_SNAPSHOT,
+	if err := w.enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_SNAPSHOT,
 		Data: data,
 	}); err != nil {
 		return err
@@ -178,8 +178,8 @@ func (w *WAL) UnsafeEncodeEntry(ent *raftpb.Entry) error {
 		return err
 	}
 
-	if err := w.enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_ENTRY,
+	if err := w.enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_ENTRY,
 		Data: data,
 	}); err != nil {
 		return err
@@ -200,8 +200,8 @@ func (w *WAL) UnsafeEncodeHardState(state *raftpb.HardState) error {
 		return err
 	}
 
-	if err := w.enc.encode(&walpb.Record{
-		Type: walpb.RECORD_TYPE_HARDSTATE,
+	if err := w.enc.encode(&raftwalpb.Record{
+		Type: raftwalpb.RECORD_TYPE_HARDSTATE,
 		Data: data,
 	}); err != nil {
 		return err

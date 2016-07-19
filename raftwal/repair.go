@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"io"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/gyuho/db/pkg/crcutil"
 	"github.com/gyuho/db/pkg/fileutil"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 // Repair repairs the last WAL file by truncating
@@ -20,14 +20,14 @@ func Repair(dir string) bool {
 	defer f.Close()
 
 	dec := newDecoder(f)
-	rec := &walpb.Record{}
+	rec := &raftwalpb.Record{}
 	for {
 		lastValidOffSet := dec.lastValidOffset
 		err := dec.decode(rec)
 		switch err {
 		case nil:
 			switch rec.Type {
-			case walpb.RECORD_TYPE_CRC:
+			case raftwalpb.RECORD_TYPE_CRC:
 				cv := dec.crc.Sum32()
 				// current CRC of decoder must match
 				// CRC of the record.

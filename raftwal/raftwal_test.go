@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"io/ioutil"
@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/gyuho/db/raft/raftpb"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 func TestOpenWAL(t *testing.T) {
@@ -23,7 +23,7 @@ func TestOpenWAL(t *testing.T) {
 	}
 	f.Close()
 
-	w, err := openWAL(dir, walpb.Snapshot{}, true)
+	w, err := openWAL(dir, raftwalpb.Snapshot{}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestOpenWAL(t *testing.T) {
 	}
 	defer os.Remove(emptyDir)
 
-	if _, err = openWAL(emptyDir, walpb.Snapshot{}, true); err != ErrFileNotFound {
+	if _, err = openWAL(emptyDir, raftwalpb.Snapshot{}, true); err != ErrFileNotFound {
 		t.Fatalf("expected %v, got %v", ErrFileNotFound, err)
 	}
 }

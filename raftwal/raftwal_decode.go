@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"bufio"
@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/gyuho/db/pkg/crcutil"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 type decoder struct {
@@ -34,7 +34,7 @@ func newDecoder(r ...io.Reader) *decoder {
 }
 
 // decode decodes data in decoder and save in rec.
-func (d *decoder) decode(rec *walpb.Record) error {
+func (d *decoder) decode(rec *raftwalpb.Record) error {
 	rec.Reset()
 
 	d.mu.Lock()
@@ -44,7 +44,7 @@ func (d *decoder) decode(rec *walpb.Record) error {
 	return err
 }
 
-func (d *decoder) decodeRecord(rec *walpb.Record) error {
+func (d *decoder) decodeRecord(rec *raftwalpb.Record) error {
 	if len(d.bufioReaders) == 0 {
 		return io.EOF
 	}
@@ -91,8 +91,8 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 		return err
 	}
 
-	// skip CRC checking if the record is walpb.RECORD_TYPE_CRC
-	if rec.Type != walpb.RECORD_TYPE_CRC {
+	// skip CRC checking if the record is raftwalpb.RECORD_TYPE_CRC
+	if rec.Type != raftwalpb.RECORD_TYPE_CRC {
 		d.crc.Write(rec.Data)
 		if err = rec.Validate(d.crc.Sum32()); err != nil { // double-check CRC
 			if d.isTornEntry(data) {

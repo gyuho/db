@@ -1,4 +1,4 @@
-package wal
+package raftwal
 
 import (
 	"io/ioutil"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gyuho/db/raft/raftpb"
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 func TestOpenWALRead(t *testing.T) {
@@ -40,7 +40,7 @@ func TestOpenWALRead(t *testing.T) {
 	w.ReleaseLocks(uint64(5))
 
 	// all are still readable despite flocks
-	w2, err := OpenWALRead(dir, walpb.Snapshot{})
+	w2, err := OpenWALRead(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,12 +67,12 @@ func TestReadAllEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = w.UnsafeEncodeSnapshotAndFdatasync(&walpb.Snapshot{}); err != nil {
+	if err = w.UnsafeEncodeSnapshotAndFdatasync(&raftwalpb.Snapshot{}); err != nil {
 		t.Fatal(err)
 	}
 	w.Close()
 
-	w, err = OpenWALRead(dir, walpb.Snapshot{})
+	w, err = OpenWALRead(dir, raftwalpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}

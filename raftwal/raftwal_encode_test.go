@@ -1,11 +1,11 @@
-package wal
+package raftwal
 
 import (
 	"bytes"
 	"io/ioutil"
 	"testing"
 
-	"github.com/gyuho/db/wal/walpb"
+	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
 func TestRecordEncode(t *testing.T) {
@@ -16,14 +16,14 @@ func TestRecordEncode(t *testing.T) {
 
 		tp = int64(0xABCDE)
 	)
-	enc.encode(&walpb.Record{
+	enc.encode(&raftwalpb.Record{
 		Type: tp,
 		Data: data,
 	})
 	enc.flush()
 
 	dec := newDecoder(ioutil.NopCloser(buf))
-	rec := &walpb.Record{}
+	rec := &raftwalpb.Record{}
 	if err := dec.decode(rec); err != nil {
 		t.Fatal(err)
 	}
