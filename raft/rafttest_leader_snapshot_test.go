@@ -433,5 +433,39 @@ func Test_raft_snapshot_restore_msg_snap(t *testing.T) {
 
 // (etcd raft.TestSlowNodeRestore)
 func Test_raft_snapshot_restore_slow_node(t *testing.T) {
+	fn := newFakeNetwork(nil, nil, nil)
 
+	// make 1 leader
+	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+
+	// to make 3 fall behind
+	fn.isolate(3)
+	for i := 0; i < 100; i++ {
+		fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+	}
+
+	// to trigger snapshot
+	rndLeader := fn.allStateMachines[1].(*raftNode)
+	persistALlUnstableAndApplyNextEntries(rndLeader, fn.allStableStorageInMemory[1])
+	fn.allStableStorageInMemory[1].CreateSnapshot(rndLeader.storageRaftLog.appliedIndex, &raftpb.ConfigState{IDs: rndLeader.allNodeIDs()}, nil)
+	fn.allStableStorageInMemory[1].Compact(rndLeader.storageRaftLog.appliedIndex)
+
+	fn.recoverAll()
+	for {
+		fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1})
+		if rndLeader.allProgresses[3].RecentActive {
+			break
+		}
+	}
+
+	// trigger snapshot
+	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+
+	// trigger commit?
+	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+
+	rndFollower := fn.allStateMachines[3].(*raftNode)
+	if rndFollower.storageRaftLog.committedIndex != rndLeader.storageRaftLog.committedIndex {
+		t.Fatalf("follower committed index expected %d, got %d", rndLeader.storageRaftLog.committedIndex, rndFollower.storageRaftLog.committedIndex)
+	}
 }

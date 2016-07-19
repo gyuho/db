@@ -157,11 +157,7 @@ func Test_raft_leader_election(t *testing.T) {
 func Test_raft_leader_election_single_node(t *testing.T) {
 	fn := newFakeNetwork(nil)
 
-	fn.stepFirstFrontMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
-		From: 1,
-		To:   1,
-	})
+	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 
 	rnd1 := fn.allStateMachines[1].(*raftNode)
 	if rnd1.state != raftpb.NODE_STATE_LEADER {
