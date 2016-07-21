@@ -518,7 +518,7 @@ func StartNode(config *Config, peers []Peer) Node {
 		}
 		entry := raftpb.Entry{
 			Type:  raftpb.ENTRY_TYPE_CONFIG_CHANGE,
-			Index: rnd.storageRaftLog.lastIndex(),
+			Index: rnd.storageRaftLog.lastIndex() + 1,
 			Term:  1,
 			Data:  configChangeData,
 		}
