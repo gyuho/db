@@ -356,7 +356,7 @@ func Test_node_Start(t *testing.T) {
 	}
 
 	st.Append(rd2.EntriesToSave...)
-	nd.Advance()
+	nd.Advance() // apply, commit
 
 	select {
 	case rd := <-nd.Ready():

@@ -266,10 +266,10 @@ func (nd *node) Advance() {
 }
 
 // ReadState provides the state of read-only query.
-// The application must send raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX
+// The application must send raftpb.MESSAGE_TYPE_READ_INDEX
 // first, before it reads ReadState from NodeReady.
 //
-// READ_LEADER_CURRENT_COMMITTED_INDEX is used to serve clients' read-only queries without
+// READ_INDEX is used to serve clients' read-only queries without
 // going through Raft, but still with 'quorum-get' on. It bypasses the Raft log, but
 // still preserves the linearizability of reads, with lower costs.
 //
