@@ -3,6 +3,8 @@ package raft
 import (
 	"bytes"
 	"context"
+	"math"
+	"reflect"
 	"testing"
 	"time"
 
@@ -297,6 +299,44 @@ func Test_node_Start(t *testing.T) {
 	configChangeData, err := configChange.Marshal()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	st := NewStorageStableInMemory()
+	nd := StartNode(&Config{
+		ID:                      1,
+		ElectionTickNum:         10,
+		HeartbeatTimeoutTickNum: 1,
+		StorageStable:           st,
+		MaxEntryNumPerMsg:       math.MaxUint64,
+		MaxInflightMsgNum:       256,
+	}, []Peer{{ID: 1}})
+	defer nd.Stop()
+
+	nd.Campaign(ctx)
+
+	rd1 := <-nd.Ready()
+	wrd1 := Ready{
+		SoftState: &raftpb.SoftState{
+			LeaderID:  1,
+			NodeState: raftpb.NODE_STATE_LEADER,
+		},
+		HardStateToSave: raftpb.HardState{CommittedIndex: 2, Term: 2, VotedFor: 1},
+		EntriesToSave: []raftpb.Entry{
+			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
+			{Index: 2, Term: 2},
+		},
+		EntriesToCommit: []raftpb.Entry{
+			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
+			{Index: 2, Term: 2},
+		},
+	}
+	if !reflect.DeepEqual(rd1, wrd1) {
+		t.Fatalf(`ready expected
+%+v,
+
+got
+%+v
+`, wrd1, rd1)
 	}
 }
 

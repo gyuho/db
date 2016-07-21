@@ -497,6 +497,8 @@ var (
 	ErrIntOverflowRaftwalpb   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() { proto.RegisterFile("raftwal/raftwalpb/raftwalpb.proto", fileDescriptorRaftwalpb) }
+
 var fileDescriptorRaftwalpb = []byte{
 	// 217 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x52, 0x2c, 0x4a, 0x4c, 0x2b,

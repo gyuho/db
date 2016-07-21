@@ -411,13 +411,13 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		})
 		return
 
-	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndex
+	case raftpb.MESSAGE_TYPE_READ_INDEX: // pb.MsgReadIndex
 		logIndex := uint64(0)
 		if rnd.checkQuorum {
 			logIndex = rnd.storageRaftLog.committedIndex
 		}
 		rnd.sendToMailbox(raftpb.Message{
-			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX,
+			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_INDEX,
 			LogIndex: logIndex,
 			Entries:  msg.Entries,
 		})
