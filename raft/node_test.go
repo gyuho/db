@@ -232,14 +232,17 @@ func Test_node_Step_propose_block(t *testing.T) {
 func Test_node_Tick(t *testing.T) {
 	nd := newNode()
 	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+
 	go nd.runWithRaftNode(rnd)
 
 	elapsed := rnd.electionTimeoutElapsedTickNum
+
 	nd.Tick()
 
 	time.Sleep(10 * time.Millisecond)
 
 	nd.Stop()
+
 	if rnd.electionTimeoutElapsedTickNum != elapsed+1 {
 		t.Fatalf("elapsed tick expected %d, got %d", elapsed+1, rnd.electionTimeoutElapsedTickNum)
 	}
@@ -247,11 +250,46 @@ func Test_node_Tick(t *testing.T) {
 
 // (etcd raft.TestNodeStop)
 func Test_node_Stop(t *testing.T) {
+	nd := newNode()
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
 
+	donec := make(chan struct{})
+	go func() {
+		nd.runWithRaftNode(rnd)
+		close(donec)
+	}()
+
+	elapsed := rnd.electionTimeoutElapsedTickNum
+
+	nd.Tick()
+
+	time.Sleep(10 * time.Millisecond)
+
+	nd.Stop()
+
+	select {
+	case <-donec:
+	case <-time.After(time.Second):
+		t.Fatal("'runWithRaftNode' should have been closed after 'nd.Stop()' (took too long)")
+	}
+
+	if rnd.electionTimeoutElapsedTickNum != elapsed+1 {
+		t.Fatalf("elapsed tick expected %d, got %d", elapsed+1, rnd.electionTimeoutElapsedTickNum)
+	}
+
+	// tick should have no effect
+	nd.Tick()
+
+	if rnd.electionTimeoutElapsedTickNum != elapsed+1 {
+		t.Fatalf("elapsed tick expected %d, got %d", elapsed+1, rnd.electionTimeoutElapsedTickNum)
+	}
+
+	// should have no effect
+	nd.Stop()
 }
 
 // (etcd raft.TestNodeStart)
-func Test_node_start(t *testing.T) {
+func Test_node_Start(t *testing.T) {
 
 }
 
