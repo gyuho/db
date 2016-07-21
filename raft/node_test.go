@@ -372,6 +372,10 @@ func Test_node_RestartNode(t *testing.T) {
 		{Index: 1, Term: 1},
 		{Index: 1, Term: 2, Data: []byte("testdata")},
 	}
+	wrd := Ready{
+		HardStateToSave: hardState,
+		EntriesToCommit: entriesToCommit[:hardState.CommittedIndex],
+	}
 
 	st := NewStorageStableInMemory()
 	st.SetHardState(hardState)
@@ -389,10 +393,6 @@ func Test_node_RestartNode(t *testing.T) {
 	defer nd.Stop()
 
 	rd := <-nd.Ready()
-	wrd := Ready{
-		HardStateToSave: hardState,
-		EntriesToCommit: entriesToCommit[:hardState.CommittedIndex],
-	}
 	if !reflect.DeepEqual(rd, wrd) {
 		t.Fatalf("ready expected %+v, got %+v", wrd, rd)
 	}
@@ -407,8 +407,52 @@ func Test_node_RestartNode(t *testing.T) {
 }
 
 // (etcd raft.TestNodeRestartFromSnapshot)
-func Test_node_restart_from_snapshot(t *testing.T) {
+func Test_node_RestartNode_from_snapshot(t *testing.T) {
+	snap := raftpb.Snapshot{
+		Metadata: raftpb.SnapshotMetadata{
+			ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2}},
+			Index:       2,
+			Term:        1,
+		},
+	}
+	entriesToCommit := []raftpb.Entry{
+		{Index: 3, Term: 1, Data: []byte("testdata")},
+	}
+	hardState := raftpb.HardState{CommittedIndex: 3, Term: 1}
 
+	wrd := Ready{
+		HardStateToSave: hardState,
+		EntriesToCommit: entriesToCommit,
+	}
+
+	st := NewStorageStableInMemory()
+	st.SetHardState(hardState)
+	st.ApplySnapshot(snap)
+	st.Append(entriesToCommit...)
+
+	nd := RestartNode(&Config{
+		ID:                      1,
+		ElectionTickNum:         10,
+		HeartbeatTimeoutTickNum: 1,
+		StorageStable:           st,
+		MaxEntryNumPerMsg:       math.MaxUint64,
+		MaxInflightMsgNum:       256,
+	})
+
+	defer nd.Stop()
+
+	rd := <-nd.Ready()
+	if !reflect.DeepEqual(rd, wrd) {
+		t.Fatalf("ready expected %+v, got %+v", wrd, rd)
+	}
+
+	nd.Advance()
+
+	select {
+	case rd := <-nd.Ready():
+		t.Fatalf("unexpected ready %+v", rd)
+	case <-time.After(time.Millisecond):
+	}
 }
 
 // (etcd raft.TestNodeAdvance)
