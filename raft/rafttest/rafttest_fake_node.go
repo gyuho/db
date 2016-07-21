@@ -24,18 +24,18 @@ type fakeNode struct {
 	pausec chan bool
 }
 
+// (etcd raft.rafttest.startNode)
 func startFakeNode(id uint64, peers []raft.Peer, iface iface) *fakeNode {
 	st := raft.NewStorageStableInMemory()
-	config := &raft.Config{
+
+	nd := raft.StartNode(&raft.Config{
 		ID:                      id,
 		ElectionTickNum:         10,
 		HeartbeatTimeoutTickNum: 1,
 		StorageStable:           st,
 		MaxEntryNumPerMsg:       1024 * 1024,
 		MaxInflightMsgNum:       256,
-	}
-
-	nd := raft.StartNode(config, peers)
+	}, peers)
 
 	fnd := &fakeNode{
 		Node: nd,
