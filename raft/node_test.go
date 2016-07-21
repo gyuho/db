@@ -365,6 +365,78 @@ func Test_node_StartNode(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestNodeAdvance)
+func Test_node_StartNode_Advance(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	configChange := raftpb.ConfigChange{Type: raftpb.CONFIG_CHANGE_TYPE_ADD_NODE, NodeID: 1}
+	configChangeData, err := configChange.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	st := NewStorageStableInMemory()
+
+	nd := StartNode(&Config{
+		ID:                      1,
+		ElectionTickNum:         10,
+		HeartbeatTimeoutTickNum: 1,
+		StorageStable:           st,
+		MaxEntryNumPerMsg:       math.MaxUint64,
+		MaxInflightMsgNum:       256,
+	}, []Peer{{ID: 1}})
+
+	defer nd.Stop()
+
+	nd.Campaign(ctx)
+
+	rd1 := <-nd.Ready()
+	wrd1 := Ready{
+		SoftState: &raftpb.SoftState{
+			LeaderID:  1,
+			NodeState: raftpb.NODE_STATE_LEADER,
+		},
+		HardStateToSave: raftpb.HardState{CommittedIndex: 2, Term: 2, VotedFor: 1},
+		EntriesToSave: []raftpb.Entry{
+			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
+			{Index: 2, Term: 2},
+		},
+		EntriesToCommit: []raftpb.Entry{
+			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
+			{Index: 2, Term: 2},
+		},
+	}
+	if !reflect.DeepEqual(rd1, wrd1) {
+		t.Fatalf("ready expected %+v, got %+v", wrd1, rd1)
+	}
+
+	nd.Propose(ctx, []byte("testdata"))
+
+	select {
+	case rd := <-nd.Ready():
+		t.Fatalf("unexpected ready %+v before advance", rd)
+	case <-time.After(time.Millisecond):
+	}
+
+	nd.Advance()
+
+	wrd2 := Ready{
+		HardStateToSave: raftpb.HardState{CommittedIndex: 3, Term: 2, VotedFor: 1},
+		EntriesToSave:   []raftpb.Entry{{Index: 3, Term: 2, Data: []byte("testdata")}},
+		EntriesToCommit: []raftpb.Entry{{Index: 3, Term: 2, Data: []byte("testdata")}},
+	}
+	select {
+	case rd2 := <-nd.Ready():
+		if !reflect.DeepEqual(rd2, wrd2) {
+			t.Fatalf("ready expected %+v, got %+v", wrd2, rd2)
+		}
+
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected ready but didn't get one")
+	}
+}
+
 // (etcd raft.TestNodeRestart)
 func Test_node_RestartNode(t *testing.T) {
 	hardState := raftpb.HardState{CommittedIndex: 1, Term: 1}
@@ -453,9 +525,4 @@ func Test_node_RestartNode_from_snapshot(t *testing.T) {
 		t.Fatalf("unexpected ready %+v", rd)
 	case <-time.After(time.Millisecond):
 	}
-}
-
-// (etcd raft.TestNodeAdvance)
-func Test_node_Advance(t *testing.T) {
-
 }
