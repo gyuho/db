@@ -314,6 +314,12 @@ func Test_node_Start(t *testing.T) {
 
 	nd.Campaign(ctx)
 
+	// rd := Ready{
+	// 	EntriesToSave:   rnd.storageRaftLog.unstableEntries(),
+	// 	EntriesToCommit: rnd.storageRaftLog.nextEntriesToApply(),
+	//
+	// Ready returns a channel that receives point-in-time state of Node.
+	// 'Advance' method MUST be followed, AFTER APPLYING the state in Ready.
 	rd1 := <-nd.Ready()
 	wrd1 := Ready{
 		SoftState: &raftpb.SoftState{
@@ -331,12 +337,31 @@ func Test_node_Start(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(rd1, wrd1) {
-		t.Fatalf(`ready expected
-%+v,
+		t.Fatalf("ready expected %+v, got %+v", wrd1, rd1)
+	}
 
-got
-%+v
-`, wrd1, rd1)
+	st.Append(rd1.EntriesToSave...)
+	nd.Advance()
+
+	nd.Propose(ctx, []byte("testdata"))
+
+	rd2 := <-nd.Ready()
+	wrd2 := Ready{
+		HardStateToSave: raftpb.HardState{CommittedIndex: 3, Term: 2, VotedFor: 1},
+		EntriesToSave:   []raftpb.Entry{{Index: 3, Term: 2, Data: []byte("testdata")}},
+		EntriesToCommit: []raftpb.Entry{{Index: 3, Term: 2, Data: []byte("testdata")}},
+	}
+	if !reflect.DeepEqual(rd2, wrd2) {
+		t.Fatalf("ready expected %+v, got %+v", wrd2, rd2)
+	}
+
+	st.Append(rd2.EntriesToSave...)
+	nd.Advance()
+
+	select {
+	case rd := <-nd.Ready():
+		t.Fatalf("unexpected ready %+v", rd)
+	case <-time.After(time.Millisecond):
 	}
 }
 
