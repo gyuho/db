@@ -6,6 +6,11 @@ import (
 	"github.com/gyuho/db/pkg/xlog"
 )
 
+func init() {
+	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+	// raftLogger.SetLogger(xlog.NewLogger("raft", xlog.DEBUG))
+}
+
 // Logger defines logging interface for Raft.
 type Logger interface {
 	Panic(v ...interface{})
@@ -65,11 +70,6 @@ func SetLogger(l Logger) {
 
 func GetLogger() Logger {
 	return raftLogger.GetLogger()
-}
-
-func init() {
-	// raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
-	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.DEBUG))
 }
 
 func (s *settableLogger) Panic(v ...interface{})                 { s.GetLogger().Panic(v...) }
