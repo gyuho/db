@@ -1,4 +1,4 @@
-package raft
+package rafttest
 
 // (etcd raft.rafttest.TestNetworkDrop)
 
