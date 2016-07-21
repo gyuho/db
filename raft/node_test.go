@@ -229,12 +229,24 @@ func Test_node_Step_propose_block(t *testing.T) {
 }
 
 // (etcd raft.TestNodeTick)
-func Test_node_tick(t *testing.T) {
+func Test_node_Tick(t *testing.T) {
+	nd := newNode()
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	go nd.runWithRaftNode(rnd)
 
+	elapsed := rnd.electionTimeoutElapsedTickNum
+	nd.Tick()
+
+	time.Sleep(10 * time.Millisecond)
+
+	nd.Stop()
+	if rnd.electionTimeoutElapsedTickNum != elapsed+1 {
+		t.Fatalf("elapsed tick expected %d, got %d", elapsed+1, rnd.electionTimeoutElapsedTickNum)
+	}
 }
 
 // (etcd raft.TestNodeStop)
-func Test_node_stop(t *testing.T) {
+func Test_node_Stop(t *testing.T) {
 
 }
 
