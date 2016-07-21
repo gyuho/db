@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gyuho/db/raft"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
@@ -124,54 +123,4 @@ func (fn *fakeNetwork) recvFrom(from uint64) chan raftpb.Message {
 	fn.mu.Unlock()
 
 	return fromc
-}
-
-// (etcd raft.rafttest.iface)
-type iface interface {
-	send(msg raftpb.Message)
-	recv() chan raftpb.Message
-
-	connect()
-	disconnect()
-}
-
-func (fn *fakeNetwork) nodeFakeNetwork(id uint64) iface {
-	return &nodeFakeNetwork{id: id, fakeNetwork: fn}
-}
-
-// (etcd raft.rafttest.nodeNetwork)
-type nodeFakeNetwork struct {
-	id uint64
-	*fakeNetwork
-}
-
-func (nt *nodeFakeNetwork) send(msg raftpb.Message) {
-	nt.fakeNetwork.send(msg)
-}
-
-func (nt *nodeFakeNetwork) recv() chan raftpb.Message {
-	return nt.fakeNetwork.recvFrom(nt.id)
-}
-
-func (nt *nodeFakeNetwork) connect() {
-	nt.fakeNetwork.connect(nt.id)
-}
-
-func (nt *nodeFakeNetwork) disconnect() {
-	nt.fakeNetwork.disconnect(nt.id)
-}
-
-// (etcd raft.rafttest.node)
-type testNode struct {
-	raftNode raft.Node
-	id       uint64
-
-	iface iface
-
-	stopc  chan struct{}
-	pausec chan bool
-
-	// stable
-	stableStorageInMemory *raft.StorageStableInMemory
-	hardState             raftpb.HardState
 }
