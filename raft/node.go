@@ -538,3 +538,15 @@ func StartNode(config *Config, peers []Peer) Node {
 	go nd.runWithRaftNode(rnd)
 	return &nd
 }
+
+// RestartNode returns a new Node with given configuration.
+// It appends raftpb.CONFIG_CHANGE_TYPE_ADD_NODE to its initial log.
+//
+// (etcd raft.RestartNode)
+func RestartNode(config *Config) Node {
+	nd := newNode()
+
+	go nd.runWithRaftNode(newRaftNode(config))
+
+	return &nd
+}

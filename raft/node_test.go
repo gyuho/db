@@ -291,7 +291,7 @@ func Test_node_Stop(t *testing.T) {
 }
 
 // (etcd raft.TestNodeStart)
-func Test_node_Start(t *testing.T) {
+func Test_node_StartNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -366,8 +366,44 @@ func Test_node_Start(t *testing.T) {
 }
 
 // (etcd raft.TestNodeRestart)
-func Test_node_restart(t *testing.T) {
+func Test_node_RestartNode(t *testing.T) {
+	hardState := raftpb.HardState{CommittedIndex: 1, Term: 1}
+	entriesToCommit := []raftpb.Entry{
+		{Index: 1, Term: 1},
+		{Index: 1, Term: 2, Data: []byte("testdata")},
+	}
 
+	st := NewStorageStableInMemory()
+	st.SetHardState(hardState)
+	st.Append(entriesToCommit...)
+
+	nd := RestartNode(&Config{
+		ID:                      1,
+		ElectionTickNum:         10,
+		HeartbeatTimeoutTickNum: 1,
+		StorageStable:           st,
+		MaxEntryNumPerMsg:       math.MaxUint64,
+		MaxInflightMsgNum:       256,
+	})
+
+	defer nd.Stop()
+
+	rd := <-nd.Ready()
+	wrd := Ready{
+		HardStateToSave: hardState,
+		EntriesToCommit: entriesToCommit[:hardState.CommittedIndex],
+	}
+	if !reflect.DeepEqual(rd, wrd) {
+		t.Fatalf("ready expected %+v, got %+v", wrd, rd)
+	}
+
+	nd.Advance()
+
+	select {
+	case rd := <-nd.Ready():
+		t.Fatalf("unexpected ready %+v", rd)
+	case <-time.After(time.Millisecond):
+	}
 }
 
 // (etcd raft.TestNodeRestartFromSnapshot)
