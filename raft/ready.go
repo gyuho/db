@@ -49,11 +49,11 @@ type Ready struct {
 	// ReportSnapshot.
 	MessagesToSend []raftpb.Message
 
-	// LeaderReadState is updated when Raft receives raftpb.LEADER_CURRENT_COMMITTED_INDEX_REQUEST,
+	// ReadState is updated when Raft receives raftpb.MESSAGE_TYPE_READ_INDEX,
 	// only valid for the requested read-request.
-	// LeaderReadState is used to serve linearized read-only quorum-get requests without going
-	// through Raft log appends, when the Node's applied index is greater than the index in LeaderReadState.
-	LeaderReadState LeaderReadState
+	// ReadState is used to serve linearized read-only quorum-get requests without going
+	// through Raft log appends, when the Node's applied index is greater than the index in ReadState.
+	ReadState ReadState
 }
 
 // ContainsUpdates returns true if Ready contains any updates.
@@ -66,7 +66,7 @@ func (rd Ready) ContainsUpdates() bool {
 		len(rd.EntriesToSave) > 0 ||
 		len(rd.EntriesToCommit) > 0 ||
 		len(rd.MessagesToSend) > 0 ||
-		rd.LeaderReadState.Index != 0
+		rd.ReadState.Index != 0
 }
 
 // (etcd raft.newReady)
@@ -89,12 +89,12 @@ func newReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState raft
 		rd.SnapshotToSave = *rnd.storageRaftLog.storageUnstable.snapshot
 	}
 
-	if rnd.leaderReadState.Index != uint64(0) {
-		copied := make([]byte, len(rnd.leaderReadState.RequestCtx))
-		copy(copied, rnd.leaderReadState.RequestCtx)
+	if rnd.readState.Index != uint64(0) {
+		copied := make([]byte, len(rnd.readState.RequestCtx))
+		copy(copied, rnd.readState.RequestCtx)
 
-		rd.LeaderReadState.Index = rnd.leaderReadState.Index
-		rd.LeaderReadState.RequestCtx = copied
+		rd.ReadState.Index = rnd.readState.Index
+		rd.ReadState.RequestCtx = copied
 	}
 
 	return rd

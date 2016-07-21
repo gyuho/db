@@ -85,6 +85,11 @@ type Node interface {
 	// (etcd raft.Node.Advance)
 	Advance()
 
+	// ReadIndex requests a read state, set in the Ready.
+	//
+	// (etcd raft.Node.ReadIndex)
+	ReadIndex(ctx context.Context, rctx []byte) error
+
 	// ReportUnreachable reports that Node with the given ID is not reachable for the last send.
 	//
 	// (etcd raft.Node.ReportUnreachable)
@@ -260,6 +265,55 @@ func (nd *node) Advance() {
 	}
 }
 
+// ReadState provides the state of read-only query.
+// The application must send raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX
+// first, before it reads ReadState from NodeReady.
+//
+// READ_LEADER_CURRENT_COMMITTED_INDEX is used to serve clients' read-only queries without
+// going through Raft, but still with 'quorum-get' on. It bypasses the Raft log, but
+// still preserves the linearizability of reads, with lower costs.
+//
+// If a request goes through Raft log, it needs replication, which requires synchronous
+// disk writes in order to append those request entries to its log. Since read-only requests
+// do not change any state of replicated state machine, these writes can be time- and
+// resource-consuming.
+//
+// (Raft §6.4 Processing read-only queries more efficiently, p.72)
+// To bypass the Raft log with linearizable reads:
+//
+//   1. If Leader has not yet committed an entry from SenderCurrentTerm, it waits until it has done so.
+//
+//   2. Leader saves its SenderCurrentCommittedIndex in a local variable 'readIndex', which is used
+//      as a lower bound for the version of the state that read-only queries operate against.
+//
+//   3. Leader must ensure that it hasn't been superseded by a newer Leader,
+//      by issuing a new round of heartbeats and waiting for responses from cluster quorum.
+//
+//   4. These responses from Followers acknowledging the Leader indicates that
+//      there was no other Leader at the moment Leader sent out heartbeats.
+//
+//   5. Therefore, Leader's 'readIndex' was, at the time, the largest committed index,
+//      ever seen by any node in the cluster.
+//
+//   6. Leader now waits for its state machine to advance at least as far as the 'readIndex'.
+//      And this is current enought to satisfy linearizability.
+//
+//   7. Leader can now respond to those read-only client requests.
+//
+// (etcd raft.ReadState)
+type ReadState struct {
+	Index      uint64
+	RequestCtx []byte
+}
+
+// (etcd raft.node.ReadIndex)
+func (nd *node) ReadIndex(ctx context.Context, rctx []byte) error {
+	return nd.step(ctx, raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_READ_INDEX,
+		Entries: []raftpb.Entry{{Data: rctx}},
+	})
+}
+
 // (etcd raft.node.ReportUnreachable)
 func (nd *node) ReportUnreachable(targetID uint64) {
 	select {
@@ -283,15 +337,6 @@ func (nd *node) ReportSnapshot(targetID uint64, status raftpb.SNAPSHOT_STATUS) {
 
 	case <-nd.doneCh:
 	}
-}
-
-// (etcd raft.node.ReadIndex)
-func (nd *node) RequestReadLeaderCurrentCommittedIndex(ctx context.Context, fromID uint64, data []byte) error {
-	return nd.step(ctx, raftpb.Message{
-		Type:    raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX,
-		From:    fromID,
-		Entries: []raftpb.Entry{{Data: data}},
-	})
 }
 
 // (etcd raft.node.run)
@@ -383,8 +428,8 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 			}
 
 			rnd.mailbox = nil
-			rnd.leaderReadState.Index = uint64(0)
-			rnd.leaderReadState.RequestCtx = nil
+			rnd.readState.Index = uint64(0)
+			rnd.readState.RequestCtx = nil
 			advanceCh = nd.advanceCh
 
 		case <-advanceCh: // case <-advancec:
@@ -441,4 +486,55 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 			}
 		}
 	}
+}
+
+// Peer contains peer ID and context data.
+//
+// (etcd raft.Peer)
+type Peer struct {
+	ID      uint64
+	Context []byte
+}
+
+// StartNode returns a new Node with given configuration.
+// It appends raftpb.CONFIG_CHANGE_TYPE_ADD_NODE to its initial log.
+//
+// (etcd raft.StartNode)
+func StartNode(config *Config, peers []Peer) Node {
+	rnd := newRaftNode(config)
+
+	// start with term 1, no leader
+	rnd.becomeFollower(1, NoNodeID)
+
+	for _, peer := range peers {
+		configChange := raftpb.ConfigChange{
+			Type:    raftpb.CONFIG_CHANGE_TYPE_ADD_NODE,
+			NodeID:  peer.ID,
+			Context: peer.Context,
+		}
+		configChangeData, err := configChange.Marshal()
+		if err != nil {
+			raftLogger.Panicf("StartNode configChange.Marshal (%v)", err)
+		}
+		entry := raftpb.Entry{
+			Type:  raftpb.ENTRY_TYPE_CONFIG_CHANGE,
+			Index: rnd.storageRaftLog.lastIndex(),
+			Term:  1,
+			Data:  configChangeData,
+		}
+		rnd.storageRaftLog.appendToStorageUnstable(entry)
+	}
+
+	// mark these initial entries as committed
+	// (still unstable)
+	rnd.storageRaftLog.commitTo(rnd.storageRaftLog.lastIndex())
+
+	// now apply them, so that application can call Campaign right afterwards
+	for _, peer := range peers {
+		rnd.addNode(peer.ID)
+	}
+
+	nd := newNode()
+	go nd.runWithRaftNode(rnd)
+	return &nd
 }

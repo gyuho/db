@@ -290,7 +290,14 @@ func Test_node_Stop(t *testing.T) {
 
 // (etcd raft.TestNodeStart)
 func Test_node_Start(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
+	configChange := raftpb.ConfigChange{Type: raftpb.CONFIG_CHANGE_TYPE_ADD_NODE, NodeID: 1}
+	configChangeData, err := configChange.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // (etcd raft.TestNodeRestart)

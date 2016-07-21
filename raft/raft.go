@@ -91,7 +91,7 @@ type raftNode struct {
 	leaderTransfereeID uint64
 
 	// (etcd raft.raft.readState)
-	leaderReadState LeaderReadState
+	readState ReadState
 }
 
 // newRaftNode creates a new raftNode with the given Config.
@@ -122,7 +122,7 @@ func newRaftNode(c *Config) *raftNode {
 
 		checkQuorum: c.CheckQuorum,
 
-		leaderReadState: LeaderReadState{Index: uint64(0), RequestCtx: nil},
+		readState: ReadState{Index: uint64(0), RequestCtx: nil},
 	}
 
 	hardState, configState, err := c.StorageStable.GetState()

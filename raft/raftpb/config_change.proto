@@ -22,6 +22,5 @@ message ConfigChange {
 
 	uint64 ID     = 2;
 	uint64 NodeID = 3;
-
-	bytes Data = 4;
+	bytes Context = 4;
 }

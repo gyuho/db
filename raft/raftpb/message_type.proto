@@ -32,6 +32,6 @@ enum MESSAGE_TYPE {
 	INTERNAL_TRANSFER_LEADER = 13; // (etcd raft.raftpb.MsgTransferLeader)
 	FORCE_ELECTION_TIMEOUT   = 14; // (etcd raft.raftpb.MsgTimeoutNow)
 	
-	READ_LEADER_CURRENT_COMMITTED_INDEX             = 15; // (etcd raft.raftpb.MsgReadIndex)
-	RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX = 16; // (etcd raft.raftpb.MsgReadIndexResp)
+	READ_INDEX             = 15; // (etcd raft.raftpb.MsgReadIndex)
+	RESPONSE_TO_READ_INDEX = 16; // (etcd raft.raftpb.MsgReadIndexResp)
 }
