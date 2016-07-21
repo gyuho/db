@@ -322,7 +322,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		raftLogger.Infof("%s received %q, so now campaign to get leadership", rnd.describe(), msg.Type)
 		rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
 
-	case raftpb.MESSAGE_TYPE_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndex
+	case raftpb.MESSAGE_TYPE_READ_INDEX: // pb.MsgReadIndex
 		if rnd.leaderID == NoNodeID {
 			raftLogger.Infof("%s has no leader (dropping read index message)", rnd.describe())
 			return
@@ -330,14 +330,14 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		msg.To = rnd.leaderID
 		rnd.sendToMailbox(msg)
 
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_LEADER_CURRENT_COMMITTED_INDEX: // pb.MsgReadIndexResp
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_INDEX: // pb.MsgReadIndexResp
 		if len(msg.Entries) != 1 {
 			raftLogger.Errorf("%s received invalid ReadIndex response from %x (entries count %d)", rnd.describe(), msg.From, len(msg.Entries))
 			return
 		}
 
-		rnd.leaderReadState.Index = msg.LogIndex
-		rnd.leaderReadState.RequestCtx = msg.Entries[0].Data
+		rnd.readState.Index = msg.LogIndex
+		rnd.readState.RequestCtx = msg.Entries[0].Data
 
 	default:
 		raftLogger.Infof("%s ignores %q from %x", rnd.describe(), msg.Type, msg.From)

@@ -652,6 +652,8 @@ var (
 	ErrIntOverflowSnapshot   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() { proto.RegisterFile("raft/raftpb/snapshot.proto", fileDescriptorSnapshot) }
+
 var fileDescriptorSnapshot = []byte{
 	// 310 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x92, 0x2a, 0x4a, 0x4c, 0x2b,

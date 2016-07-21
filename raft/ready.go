@@ -2,14 +2,14 @@ package raft
 
 import "github.com/gyuho/db/raft/raftpb"
 
-// NodeReady represents entries and messages that are ready to read,
+// Ready represents entries and messages that are ready to read,
 // ready to save to stable storage, ready to commit, ready to be
-// sent to other peers. NodeReady is point-in-time state of a Node.
+// sent to other peers. Ready is point-in-time state of a Node.
 //
 // All fields in Ready are read-only.
 //
 // (etcd raft.Ready)
-type NodeReady struct {
+type Ready struct {
 	// SoftState provides state that is useful for logging and debugging.
 	// The state is volatile and does not need to be persisted to the WAL.
 	//
@@ -49,53 +49,53 @@ type NodeReady struct {
 	// ReportSnapshot.
 	MessagesToSend []raftpb.Message
 
-	// LeaderReadState is updated when Raft receives raftpb.LEADER_CURRENT_COMMITTED_INDEX_REQUEST,
+	// ReadState is updated when Raft receives raftpb.MESSAGE_TYPE_READ_INDEX,
 	// only valid for the requested read-request.
-	// LeaderReadState is used to serve linearized read-only quorum-get requests without going
-	// through Raft log appends, when the Node's applied index is greater than the index in LeaderReadState.
-	LeaderReadState LeaderReadState
+	// ReadState is used to serve linearized read-only quorum-get requests without going
+	// through Raft log appends, when the Node's applied index is greater than the index in ReadState.
+	ReadState ReadState
 }
 
-// ContainsUpdates returns true if NodeReady contains any updates.
+// ContainsUpdates returns true if Ready contains any updates.
 //
 // (etcd raft.Ready.containsUpdates)
-func (nr NodeReady) ContainsUpdates() bool {
-	return nr.SoftState != nil ||
-		!raftpb.IsEmptyHardState(nr.HardStateToSave) ||
-		!raftpb.IsEmptySnapshot(nr.SnapshotToSave) ||
-		len(nr.EntriesToSave) > 0 ||
-		len(nr.EntriesToCommit) > 0 ||
-		len(nr.MessagesToSend) > 0 ||
-		nr.LeaderReadState.Index != 0
+func (rd Ready) ContainsUpdates() bool {
+	return rd.SoftState != nil ||
+		!raftpb.IsEmptyHardState(rd.HardStateToSave) ||
+		!raftpb.IsEmptySnapshot(rd.SnapshotToSave) ||
+		len(rd.EntriesToSave) > 0 ||
+		len(rd.EntriesToCommit) > 0 ||
+		len(rd.MessagesToSend) > 0 ||
+		rd.ReadState.Index != 0
 }
 
 // (etcd raft.newReady)
-func newNodeReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState raftpb.HardState) NodeReady {
-	nodeReady := NodeReady{
+func newReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState raftpb.HardState) Ready {
+	rd := Ready{
 		EntriesToSave:   rnd.storageRaftLog.unstableEntries(),
 		EntriesToCommit: rnd.storageRaftLog.nextEntriesToApply(),
 		MessagesToSend:  rnd.mailbox,
 	}
 
 	if softState := rnd.softState(); !softState.Equal(prevSoftState) {
-		nodeReady.SoftState = softState
+		rd.SoftState = softState
 	}
 
 	if hardState := rnd.hardState(); !hardState.Equal(prevHardState) {
-		nodeReady.HardStateToSave = hardState
+		rd.HardStateToSave = hardState
 	}
 
 	if rnd.storageRaftLog.storageUnstable.snapshot != nil {
-		nodeReady.SnapshotToSave = *rnd.storageRaftLog.storageUnstable.snapshot
+		rd.SnapshotToSave = *rnd.storageRaftLog.storageUnstable.snapshot
 	}
 
-	if rnd.leaderReadState.Index != uint64(0) {
-		copied := make([]byte, len(rnd.leaderReadState.RequestCtx))
-		copy(copied, rnd.leaderReadState.RequestCtx)
+	if rnd.readState.Index != uint64(0) {
+		copied := make([]byte, len(rnd.readState.RequestCtx))
+		copy(copied, rnd.readState.RequestCtx)
 
-		nodeReady.LeaderReadState.Index = rnd.leaderReadState.Index
-		nodeReady.LeaderReadState.RequestCtx = copied
+		rd.ReadState.Index = rnd.readState.Index
+		rd.ReadState.RequestCtx = copied
 	}
 
-	return nodeReady
+	return rd
 }
