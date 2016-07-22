@@ -67,6 +67,16 @@ func Test_raft_paper_leader_update_term_from_Message(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestStartAsFollower)
+//
+// (Raft §3.3 Raft basics, p.14)
+func Test_raft_paper_start_as_follower(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
+		t.Fatalf("state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd.state)
+	}
+}
+
 // (etcd raft.TestRejectStaleTermMessage)
 //
 // (Raft §3.3 Raft basics, p.15)
@@ -86,8 +96,6 @@ func Test_raft_paper_reject_stale_term_message(t *testing.T) {
 		t.Fatal("message should have been rejected not calling stepFunc")
 	}
 }
-
-// (etcd raft.TestStartAsFollower)
 
 // (etcd raft.TestLeaderBcastBeat)
 
