@@ -27,8 +27,45 @@ func Test_raft_paper_follower_update_term_from_Message(t *testing.T) {
 }
 
 // (etcd raft.TestCandidateUpdateTermFromMessage)
+func Test_raft_paper_candidate_update_term_from_Message(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd.becomeCandidate()
+
+	// case msg.SenderCurrentTerm > rnd.term:
+	//
+	// func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
+	//   msg.From = rnd.id
+	//
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: 2})
+
+	if rnd.term != 2 {
+		t.Fatalf("term expected 2, got %d", rnd.term)
+	}
+	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
+		t.Fatalf("node state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd.state)
+	}
+}
 
 // (etcd raft.TestLeaderUpdateTermFromMessage)
+func Test_raft_paper_leader_update_term_from_Message(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	// case msg.SenderCurrentTerm > rnd.term:
+	//
+	// func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
+	//   msg.From = rnd.id
+	//
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: 2})
+
+	if rnd.term != 2 {
+		t.Fatalf("term expected 2, got %d", rnd.term)
+	}
+	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
+		t.Fatalf("node state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd.state)
+	}
+}
 
 // (etcd raft.TestRejectStaleTermMessage)
 
