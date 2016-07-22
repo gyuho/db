@@ -68,6 +68,24 @@ func Test_raft_paper_leader_update_term_from_Message(t *testing.T) {
 }
 
 // (etcd raft.TestRejectStaleTermMessage)
+//
+// (Raft §3.3 Raft basics, p.15)
+func Test_raft_paper_reject_stale_term_message(t *testing.T) {
+	called := false
+	stepFuncTest := func(rnd *raftNode, msg raftpb.Message) {
+		called = true
+	}
+
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd.stepFunc = stepFuncTest
+	rnd.loadHardState(raftpb.HardState{Term: 2})
+
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: rnd.term - 1})
+
+	if called {
+		t.Fatal("message should have been rejected not calling stepFunc")
+	}
+}
 
 // (etcd raft.TestStartAsFollower)
 
