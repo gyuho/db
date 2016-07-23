@@ -851,7 +851,91 @@ func Test_raft_paper_follower_append_entries(t *testing.T) {
 
 // (etcd raft.TestLeaderSyncFollowerLog)
 func Test_raft_paper_leader_sync_follower_log(t *testing.T) {
+	ents := []raftpb.Entry{
+		{},
+		{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1},
+		{Index: 4, Term: 4}, {Index: 5, Term: 4},
+		{Index: 6, Term: 5}, {Index: 7, Term: 5},
+		{Index: 8, Term: 6}, {Index: 9, Term: 6}, {Index: 10, Term: 6},
+	}
 
+	term := uint64(8)
+
+	tests := [][]raftpb.Entry{
+		{
+			{},
+			{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1},
+			{Index: 4, Term: 4}, {Index: 5, Term: 4},
+			{Index: 6, Term: 5}, {Index: 7, Term: 5},
+			{Index: 8, Term: 6}, {Index: 9, Term: 6},
+		},
+		{
+			{},
+			{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1},
+			{Index: 4, Term: 4},
+		},
+		{
+			{},
+			{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1},
+			{Index: 4, Term: 4}, {Index: 5, Term: 4},
+			{Index: 6, Term: 5}, {Index: 7, Term: 5},
+			{Index: 8, Term: 6}, {Index: 9, Term: 6}, {Index: 10, Term: 6}, {Index: 11, Term: 6},
+		},
+		{
+			{},
+			{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1},
+			{Index: 4, Term: 4}, {Index: 5, Term: 4},
+			{Index: 6, Term: 5}, {Index: 7, Term: 5},
+			{Index: 8, Term: 6}, {Index: 9, Term: 6}, {Index: 10, Term: 6},
+			{Index: 11, Term: 7}, {Index: 12, Term: 7},
+		},
+		{
+			{},
+			{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1},
+			{Index: 4, Term: 4}, {Index: 5, Term: 4}, {Index: 6, Term: 4}, {Index: 7, Term: 4},
+		},
+		{
+			{},
+			{Index: 1, Term: 1}, {Index: 2, Term: 1}, {Index: 3, Term: 1},
+			{Index: 4, Term: 2}, {Index: 5, Term: 2}, {Index: 6, Term: 2},
+			{Index: 7, Term: 3}, {Index: 8, Term: 3}, {Index: 9, Term: 3}, {Index: 10, Term: 3}, {Index: 11, Term: 3},
+		},
+	}
+	for i, tt := range tests {
+		stLeader := NewStorageStableInMemory()
+		stLeader.Append(ents...)
+		rndLeader := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, stLeader)
+		rndLeader.loadHardState(raftpb.HardState{CommittedIndex: rndLeader.storageRaftLog.lastIndex(), Term: term})
+
+		stFollower := NewStorageStableInMemory()
+		stFollower.Append(tt...)
+		rndFollower := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, stFollower)
+		rndFollower.loadHardState(raftpb.HardState{Term: term - 1})
+
+		fn := newFakeNetwork(rndLeader, rndFollower, noOpBlackHole)
+
+		fn.stepFirstFrontMessage(raftpb.Message{
+			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+			From: 1,
+			To:   1,
+		})
+		fn.stepFirstFrontMessage(raftpb.Message{
+			Type:              raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
+			From:              3,
+			To:                1,
+			SenderCurrentTerm: 1,
+		})
+		fn.stepFirstFrontMessage(raftpb.Message{
+			Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+			From:    1,
+			To:      1,
+			Entries: []raftpb.Entry{{}},
+		})
+
+		if g := diffu(ltoa(rndLeader.storageRaftLog), ltoa(rndFollower.storageRaftLog)); g != "" {
+			t.Fatalf("#%d: log diff:\n%s", i, g)
+		}
+	}
 }
 
 // (etcd raft.TestVoteRequest)
