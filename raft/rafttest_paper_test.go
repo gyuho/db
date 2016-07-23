@@ -289,6 +289,33 @@ func Test_raft_paper_follower_votes(t *testing.T) {
 }
 
 // (etcd raft.TestCandidateFallback)
+func Test_raft_paper_candidate_revert_to_follower(t *testing.T) {
+	tests := []raftpb.Message{
+		{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, From: 2, To: 1, SenderCurrentTerm: 1}, // same term
+		{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, From: 2, To: 1, SenderCurrentTerm: 2}, // bigger term
+	}
+
+	for i, msg := range tests {
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+		// trigger election in node 1
+		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+
+		rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
+
+		if rnd.term != 1 {
+			t.Fatalf("#%d: term expected 1, got %d", i, rnd.term)
+		}
+
+		rnd.Step(msg)
+
+		rnd.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+
+		if rnd.term != msg.SenderCurrentTerm {
+			t.Fatalf("#%d: term expected %d, got %d", i, msg.SenderCurrentTerm, rnd.term)
+		}
+	}
+}
 
 // (etcd raft.TestFollowerElectionTimeoutRandomized)
 
