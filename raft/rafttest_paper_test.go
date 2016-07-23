@@ -940,7 +940,63 @@ func Test_raft_paper_leader_sync_follower_log(t *testing.T) {
 
 // (etcd raft.TestVoteRequest)
 func Test_raft_paper_vote_request(t *testing.T) {
+	tests := []struct {
+		ents  []raftpb.Entry
+		wTerm uint64
+	}{
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}},
+			2,
+		},
+		{
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Term: 2, Index: 2}},
+			3,
+		},
+	}
 
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+		rnd.Step(raftpb.Message{
+			Type:              raftpb.MESSAGE_TYPE_LEADER_APPEND,
+			From:              2,
+			To:                1,
+			SenderCurrentTerm: tt.wTerm - 1,
+			LogIndex:          0,
+			LogTerm:           0,
+			Entries:           tt.ents,
+		})
+		rnd.readAndClearMailbox()
+
+		for j := 0; j < 2*rnd.electionTimeoutTickNum; j++ {
+			rnd.tickFunc()
+		}
+
+		msgs := rnd.readAndClearMailbox()
+		sort.Sort(messageSlice(msgs))
+		if len(msgs) != 2 {
+			t.Fatalf("#%d: len(msg) expected %d, want %d", i, 2, len(msgs))
+		}
+
+		for j, msg := range msgs {
+			if msg.Type != raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
+				t.Fatalf("#%d: msg type expected %q, got %q", j, raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE, msg.Type)
+			}
+			if msg.To != uint64(j+2) {
+				t.Fatalf("#%d: to expected %d, got %d", j, j+2, msg.To)
+			}
+			if msg.SenderCurrentTerm != tt.wTerm {
+				t.Fatalf("#%d: SenderCurrentTerm expected %d, got %d", j, tt.wTerm, msg.SenderCurrentTerm)
+			}
+
+			wLogIndex, wLogTerm := tt.ents[len(tt.ents)-1].Index, tt.ents[len(tt.ents)-1].Term
+			if msg.LogIndex != wLogIndex {
+				t.Fatalf("#%d: index expected %d, got %d", j, wLogIndex, msg.LogIndex)
+			}
+			if msg.LogTerm != wLogTerm {
+				t.Fatalf("#%d: logterm expected %d, got %d", j, wLogTerm, msg.LogTerm)
+			}
+		}
+	}
 }
 
 // (etcd raft.TestVoter)
