@@ -784,7 +784,69 @@ func Test_raft_paper_follower_check_leader_append(t *testing.T) {
 
 // (etcd raft.TestFollowerAppendEntries)
 func Test_raft_paper_follower_append_entries(t *testing.T) {
+	tests := []struct {
+		logIndex, logTerm uint64
+		ents              []raftpb.Entry
 
+		wAllEnts         []raftpb.Entry
+		wUnstableEntries []raftpb.Entry
+	}{
+		{
+			2, 2,
+			[]raftpb.Entry{{Index: 3, Term: 3}},
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}},
+			[]raftpb.Entry{{Index: 3, Term: 3}},
+		},
+		{
+			1, 1,
+			[]raftpb.Entry{{Index: 2, Term: 3}, {Index: 3, Term: 4}},
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 3}, {Index: 3, Term: 4}},
+			[]raftpb.Entry{{Index: 2, Term: 3}, {Index: 3, Term: 4}},
+		},
+		{
+			0, 0,
+			[]raftpb.Entry{{Index: 1, Term: 1}},
+
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+			nil,
+		},
+		{
+			0, 0,
+			[]raftpb.Entry{{Index: 1, Term: 3}},
+
+			[]raftpb.Entry{{Index: 1, Term: 3}},
+			[]raftpb.Entry{{Index: 1, Term: 3}},
+		},
+	}
+	for i, tt := range tests {
+		st := NewStorageStableInMemory()
+		st.Append([]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}}...)
+
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, st)
+		rnd.becomeFollower(2, 2)
+
+		rnd.Step(raftpb.Message{
+			From:              2,
+			To:                1,
+			Type:              raftpb.MESSAGE_TYPE_LEADER_APPEND,
+			SenderCurrentTerm: 2,
+			LogIndex:          tt.logIndex,
+			LogTerm:           tt.logTerm,
+			Entries:           tt.ents,
+		})
+
+		allEnts := rnd.storageRaftLog.allEntries()
+		if !reflect.DeepEqual(allEnts, tt.wAllEnts) {
+			t.Fatalf("#%d: all entries expected %+v, got %+v", i, tt.wAllEnts, allEnts)
+		}
+
+		unstableEnts := rnd.storageRaftLog.unstableEntries()
+		if !reflect.DeepEqual(unstableEnts, tt.wUnstableEntries) {
+			t.Fatalf("#%d: unstable entries expected %+v, got %+v", i, tt.wUnstableEntries, unstableEnts)
+		}
+	}
 }
 
 // (etcd raft.TestLeaderSyncFollowerLog)
