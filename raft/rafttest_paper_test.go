@@ -569,6 +569,59 @@ func Test_raft_paper_leader_commit_entry(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderAcknowledgeCommit)
+func Test_raft_paper_leader_acknowledge_commit(t *testing.T) {
+	tests := []struct {
+		clusterSize  int
+		idsToRespond map[uint64]bool
+
+		wAck bool
+	}{
+		{1, nil, true},
+
+		{3, nil, false},
+		{3, map[uint64]bool{2: true}, true},
+		{3, map[uint64]bool{2: true, 3: true}, true},
+
+		{5, nil, false},
+		{5, map[uint64]bool{2: true}, false},
+		{5, map[uint64]bool{2: true, 3: true}, true},
+		{5, map[uint64]bool{2: true, 3: true, 4: true}, true},
+		{5, map[uint64]bool{2: true, 3: true, 4: true, 5: true}, true},
+	}
+
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, generateIDs(tt.clusterSize), 10, 1, NewStorageStableInMemory())
+		rnd.becomeCandidate()
+		rnd.becomeLeader()
+
+		rnd.commitAll()
+		lastIndex1 := rnd.storageRaftLog.lastIndex()
+
+		rnd.Step(raftpb.Message{
+			Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+			From:    1,
+			To:      1,
+			Entries: []raftpb.Entry{{Data: []byte("testdata")}},
+		})
+
+		lastIndex2 := rnd.storageRaftLog.lastIndex()
+
+		if lastIndex2 != lastIndex1+1 {
+			t.Fatalf("#%d: last index expected %d, got %d", i, lastIndex1+1, lastIndex2)
+		}
+
+		for _, msg := range rnd.readAndClearMailbox() {
+			if tt.idsToRespond[msg.To] {
+				rnd.Step(createAppendResponseMessage(msg))
+			}
+		}
+
+		ack := rnd.storageRaftLog.committedIndex > lastIndex1
+		if ack != tt.wAck {
+			t.Fatalf("#%d: ack expected %v, got %v", i, tt.wAck, ack)
+		}
+	}
+}
 
 // (etcd raft.TestLeaderCommitPrecedingEntries)
 
