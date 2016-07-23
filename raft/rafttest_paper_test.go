@@ -949,7 +949,7 @@ func Test_raft_paper_vote_request(t *testing.T) {
 			2,
 		},
 		{
-			[]raftpb.Entry{{Index: 1, Term: 1}, {Term: 2, Index: 2}},
+			[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
 			3,
 		},
 	}
@@ -1001,7 +1001,57 @@ func Test_raft_paper_vote_request(t *testing.T) {
 
 // (etcd raft.TestVoter)
 func Test_raft_paper_voter(t *testing.T) {
+	tests := []struct {
+		ents     []raftpb.Entry
+		logTerm  uint64
+		logIndex uint64
 
+		wReject bool
+	}{
+		// same logterm
+		{[]raftpb.Entry{{Index: 1, Term: 1}}, 1, 1, false},
+		{[]raftpb.Entry{{Index: 1, Term: 1}}, 1, 2, false},
+		{[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 1}}, 1, 1, true},
+
+		// candidate higher logterm
+		{[]raftpb.Entry{{Index: 1, Term: 1}}, 2, 1, false},
+		{[]raftpb.Entry{{Index: 1, Term: 1}}, 2, 2, false},
+		{[]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 1}}, 2, 1, false},
+
+		// voter higher logterm
+		{[]raftpb.Entry{{Index: 1, Term: 2}}, 1, 1, true},
+		{[]raftpb.Entry{{Index: 1, Term: 2}}, 1, 2, true},
+		{[]raftpb.Entry{{Index: 1, Term: 2}, {Index: 2, Term: 1}}, 1, 1, true},
+	}
+
+	for i, tt := range tests {
+		st := NewStorageStableInMemory()
+		st.Append(tt.ents...)
+		rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, st)
+
+		rnd.Step(raftpb.Message{
+			Type:              raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE,
+			From:              2,
+			To:                1,
+			SenderCurrentTerm: 3,
+			LogIndex:          tt.logIndex,
+			LogTerm:           tt.logTerm,
+		})
+
+		msgs := rnd.readAndClearMailbox()
+		if len(msgs) != 1 {
+			t.Fatalf("#%d: len(msg) expected 1, got %d", i, len(msgs))
+		}
+
+		msg := msgs[0]
+		if msg.Type != raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE {
+			t.Fatalf("#%d: msg type expected %q, got %q", i, raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE, msg.Type)
+		}
+
+		if msg.Reject != tt.wReject {
+			t.Fatalf("#%d: reject expected %v, got %v", i, tt.wReject, msg.Reject)
+		}
+	}
 }
 
 // (etcd raft.TestLeaderOnlyCommitsLogFromCurrentTerm)
