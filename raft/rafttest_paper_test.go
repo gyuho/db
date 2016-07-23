@@ -318,8 +318,50 @@ func Test_raft_paper_candidate_revert_to_follower(t *testing.T) {
 }
 
 // (etcd raft.TestFollowerElectionTimeoutRandomized)
+func Test_raft_paper_follower_election_timeout_randomized(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+	electionTimedoutTick := make(map[int]bool)
+	for i := 0; i < 50*rnd.electionTimeoutTickNum; i++ {
+		rnd.becomeFollower(rnd.term+1, 2) // leader is 2
+
+		time := 0
+		for (len(rnd.readAndClearMailbox())) == 0 { // till election timeout
+			rnd.tickFunc()
+			time++
+		}
+		electionTimedoutTick[time] = true
+	}
+
+	for i := rnd.electionTimeoutTickNum + 1; i < 2*rnd.electionTimeoutTickNum; i++ {
+		if !electionTimedoutTick[i] {
+			t.Fatalf("tick %d does not exist", i)
+		}
+	}
+}
 
 // (etcd raft.TestCandidateElectionTimeoutRandomized)
+func Test_raft_paper_candidate_election_timeout_randomized(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+	electionTimedoutTick := make(map[int]bool)
+	for i := 0; i < 50*rnd.electionTimeoutTickNum; i++ {
+		rnd.becomeCandidate()
+
+		time := 0
+		for (len(rnd.readAndClearMailbox())) == 0 { // till election timeout
+			rnd.tickFunc()
+			time++
+		}
+		electionTimedoutTick[time] = true
+	}
+
+	for i := rnd.electionTimeoutTickNum + 1; i < 2*rnd.electionTimeoutTickNum; i++ {
+		if !electionTimedoutTick[i] {
+			t.Fatalf("tick %d does not exist", i)
+		}
+	}
+}
 
 // (etcd raft.TestFollowersElectioinTimeoutNonconflict)
 
