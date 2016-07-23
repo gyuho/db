@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/gyuho/db/pkg/xlog"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
@@ -364,8 +365,86 @@ func Test_raft_paper_candidate_election_timeout_randomized(t *testing.T) {
 }
 
 // (etcd raft.TestFollowersElectioinTimeoutNonconflict)
+func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
+	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
+	defer func() {
+		raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+	}()
+
+	raftNodes := make([]*raftNode, 5)
+	ids := generateIDs(5)
+	for i := range raftNodes {
+		raftNodes[i] = newTestRaftNode(ids[i], ids, 10, 1, NewStorageStableInMemory())
+	}
+
+	timeoutConflict := 0
+
+	for i := 0; i < 1000; i++ {
+		for _, rnd := range raftNodes {
+			rnd.becomeFollower(rnd.term+1, NoNodeID)
+		}
+
+		electionTimedout := 0
+		for electionTimedout == 0 {
+			for _, rnd := range raftNodes {
+				rnd.tickFunc()
+				if len(rnd.readAndClearMailbox()) > 0 { // election timed out
+					electionTimedout++
+				}
+			}
+		}
+
+		if electionTimedout > 1 {
+			timeoutConflict++
+		}
+	}
+
+	prob := float64(timeoutConflict) / 1000
+	if prob > 0.3 {
+		t.Fatalf("too much timeout conflicts, got %f (conflicts %d)", prob, timeoutConflict)
+	}
+}
 
 // (etcd raft.TestCandidatesElectionTimeoutNonconflict)
+func Test_raft_paper_candidate_election_timeout_no_conflict(t *testing.T) {
+	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
+	defer func() {
+		raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+	}()
+
+	raftNodes := make([]*raftNode, 5)
+	ids := generateIDs(5)
+	for i := range raftNodes {
+		raftNodes[i] = newTestRaftNode(ids[i], ids, 10, 1, NewStorageStableInMemory())
+	}
+
+	timeoutConflict := 0
+
+	for i := 0; i < 1000; i++ {
+		for _, rnd := range raftNodes {
+			rnd.becomeCandidate()
+		}
+
+		electionTimedout := 0
+		for electionTimedout == 0 {
+			for _, rnd := range raftNodes {
+				rnd.tickFunc()
+				if len(rnd.readAndClearMailbox()) > 0 { // election timed out
+					electionTimedout++
+				}
+			}
+		}
+
+		if electionTimedout > 1 {
+			timeoutConflict++
+		}
+	}
+
+	prob := float64(timeoutConflict) / 1000
+	if prob > 0.3 {
+		t.Fatalf("too much timeout conflicts, got %f (conflicts %d)", prob, timeoutConflict)
+	}
+}
 
 // (etcd raft.TestLeaderStartReplication)
 
