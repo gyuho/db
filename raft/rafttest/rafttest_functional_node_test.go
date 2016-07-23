@@ -1,35 +1,41 @@
 package rafttest
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/gyuho/db/raft"
+)
 
 // (etcd raft.rafttest.TestBasicProgress)
 func Test_basic_progress(t *testing.T) {
-	// TODO
+	peers := []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}}
+	fn := newFakeNetwork(1, 2, 3, 4, 5)
 
-	// peers := []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}}
-	// fn := newFakeNetwork(1, 2, 3, 4, 5)
+	var fakeNodes []*fakeNode
+	for i := 1; i < 6; i++ {
+		nd := startFakeNode(uint64(i), peers, fn.fakeNetworkNode(uint64(i)))
+		fakeNodes = append(fakeNodes, nd)
+	}
 
-	// var fakeNodes []*fakeNode
-	// for i := 1; i <= 5; i++ {
-	// 	nd := startFakeNode(uint64(i), peers, fn.fakeNetworkNode(uint64(i)))
-	// 	fakeNodes = append(fakeNodes, nd)
-	// }
+	time.Sleep(500 * time.Millisecond)
 
-	// time.Sleep(10 * time.Millisecond)
+	propN := 10
 
-	// for i := 0; i < 10000; i++ {
-	// 	fakeNodes[0].Propose(context.TODO(), []byte("testdata"))
-	// }
+	for i := 0; i < propN; i++ {
+		fakeNodes[0].Propose(context.TODO(), []byte("testdata"))
+	}
 
-	// time.Sleep(500 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
-	// for _, nd := range fakeNodes {
-	// 	nd.stop()
+	for _, nd := range fakeNodes {
+		nd.stop()
 
-	// 	if nd.hardState.CommittedIndex != 10006 {
-	// 		t.Fatalf("CommittedIndex expected 10006, got %d", nd.hardState.CommittedIndex)
-	// 	}
-	// }
+		if nd.hardState.CommittedIndex != uint64(propN+6) {
+			t.Fatalf("CommittedIndex expected %d, got %d", propN+6, nd.hardState.CommittedIndex)
+		}
+	}
 }
 
 // (etcd raft.rafttest.TestRestart)
