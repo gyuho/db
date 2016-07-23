@@ -727,13 +727,82 @@ func Test_raft_paper_follower_commit_entries(t *testing.T) {
 }
 
 // (etcd raft.TestFollowerCheckMsgApp)
+func Test_raft_paper_follower_check_leader_append(t *testing.T) {
+	ents := []raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}}
+
+	tests := []struct {
+		term  uint64
+		index uint64
+
+		wLogIndex   uint64
+		wReject     bool
+		wRejectHint uint64
+	}{
+
+		{0, 0, 1, false, 0}, // match with committed entries
+		{ents[0].Term, ents[0].Index, 1, false, 0},
+		{ents[1].Term, ents[1].Index, 2, false, 0}, // match with uncommitted entries
+
+		{ents[0].Term, ents[1].Index, ents[1].Index, true, 2},             // unmatch with existing entry
+		{ents[1].Term + 1, ents[1].Index + 1, ents[1].Index + 1, true, 2}, // unexisting entry
+	}
+
+	for i, tt := range tests {
+		st := NewStorageStableInMemory()
+		st.Append(ents...)
+
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, st)
+		rnd.loadHardState(raftpb.HardState{CommittedIndex: 1})
+		rnd.becomeFollower(2, 2)
+
+		rnd.Step(raftpb.Message{
+			From:              2,
+			To:                1,
+			Type:              raftpb.MESSAGE_TYPE_LEADER_APPEND,
+			SenderCurrentTerm: 2,
+			LogIndex:          tt.index,
+			LogTerm:           tt.term,
+		})
+
+		msgs := rnd.readAndClearMailbox()
+		wmsgs := []raftpb.Message{
+			{
+				From:              1,
+				To:                2,
+				Type:              raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
+				SenderCurrentTerm: 2,
+				LogIndex:          tt.wLogIndex,
+				Reject:            tt.wReject,
+				RejectHintFollowerLogLastIndex: tt.wRejectHint,
+			},
+		}
+		if !reflect.DeepEqual(msgs, wmsgs) {
+			t.Fatalf("#%d: messages expected %+v, got %+v", i, wmsgs, msgs)
+		}
+	}
+}
 
 // (etcd raft.TestFollowerAppendEntries)
+func Test_raft_paper_follower_append_entries(t *testing.T) {
+
+}
 
 // (etcd raft.TestLeaderSyncFollowerLog)
+func Test_raft_paper_leader_sync_follower_log(t *testing.T) {
+
+}
 
 // (etcd raft.TestVoteRequest)
+func Test_raft_paper_vote_request(t *testing.T) {
+
+}
 
 // (etcd raft.TestVoter)
+func Test_raft_paper_voter(t *testing.T) {
+
+}
 
 // (etcd raft.TestLeaderOnlyCommitsLogFromCurrentTerm)
+func Test_raft_paper_leader_commits_from_current_term(t *testing.T) {
+
+}
