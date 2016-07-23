@@ -666,6 +666,65 @@ func Test_raft_paper_leader_commit_preceding_entries(t *testing.T) {
 }
 
 // (etcd raft.TestFollowerCommitEntry)
+func Test_raft_paper_follower_commit_entries(t *testing.T) {
+	tests := []struct {
+		ents           []raftpb.Entry
+		committedIndex uint64
+	}{
+		{
+			[]raftpb.Entry{
+				{Index: 1, Term: 1, Data: []byte("testdata")},
+			},
+			1,
+		},
+		{
+			[]raftpb.Entry{
+				{Index: 1, Term: 1, Data: []byte("testdata")},
+				{Index: 2, Term: 1, Data: []byte("testdata2")},
+			},
+			2,
+		},
+		{
+			[]raftpb.Entry{
+				{Index: 1, Term: 1, Data: []byte("testdata2")},
+				{Index: 2, Term: 1, Data: []byte("testdata")},
+			},
+			2,
+		},
+		{
+			[]raftpb.Entry{
+				{Index: 1, Term: 1, Data: []byte("testdata")},
+				{Index: 2, Term: 1, Data: []byte("testdata2")},
+			},
+			1,
+		},
+	}
+
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+		rnd.becomeFollower(1, 2)
+
+		rnd.Step(raftpb.Message{
+			From: 2,
+			To:   1,
+			Type: raftpb.MESSAGE_TYPE_LEADER_APPEND,
+			SenderCurrentCommittedIndex: tt.committedIndex,
+			SenderCurrentTerm:           1,
+			Entries:                     tt.ents,
+		})
+
+		if rnd.storageRaftLog.committedIndex != tt.committedIndex {
+			t.Fatalf("#%d: committed index expected %d, got %d", i, tt.committedIndex, rnd.storageRaftLog.committedIndex)
+		}
+
+		nextEntsToApply := rnd.storageRaftLog.nextEntriesToApply()
+		wents := tt.ents[:int(tt.committedIndex)]
+
+		if !reflect.DeepEqual(nextEntsToApply, wents) {
+			t.Fatalf("#%d: entries to apply expected %+v, got %+v", i, wents, nextEntsToApply)
+		}
+	}
+}
 
 // (etcd raft.TestFollowerCheckMsgApp)
 
