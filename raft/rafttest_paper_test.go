@@ -624,6 +624,46 @@ func Test_raft_paper_leader_acknowledge_commit(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderCommitPrecedingEntries)
+func Test_raft_paper_leader_commit_preceding_entries(t *testing.T) {
+	tests := [][]raftpb.Entry{
+		{},
+		{{Index: 1, Term: 2}},
+		{{Index: 1, Term: 1}, {Index: 2, Term: 2}},
+		{{Index: 1, Term: 1}},
+	}
+
+	for i, tt := range tests {
+		st := NewStorageStableInMemory()
+		st.Append(tt...)
+
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, st)
+		rnd.loadHardState(raftpb.HardState{Term: 2})
+
+		rnd.becomeCandidate()
+		rnd.becomeLeader()
+
+		rnd.Step(raftpb.Message{
+			Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+			From:    1,
+			To:      1,
+			Entries: []raftpb.Entry{{Data: []byte("testdata")}},
+		})
+
+		for _, msg := range rnd.readAndClearMailbox() {
+			rnd.Step(createAppendResponseMessage(msg))
+		}
+
+		nextEntsToApply := rnd.storageRaftLog.nextEntriesToApply()
+
+		entriesN := uint64(len(tt))
+
+		wents := append(tt, raftpb.Entry{Index: entriesN + 1, Term: 3}, raftpb.Entry{Index: entriesN + 2, Term: 3, Data: []byte("testdata")})
+
+		if !reflect.DeepEqual(nextEntsToApply, wents) {
+			t.Fatalf("#%d: entries to apply expected %+v, got %+v", i, wents, nextEntsToApply)
+		}
+	}
+}
 
 // (etcd raft.TestFollowerCommitEntry)
 
