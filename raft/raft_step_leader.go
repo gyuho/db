@@ -44,9 +44,6 @@ func (rnd *raftNode) checkQuorumActive() bool {
 //
 // (etcd raft.raft.tickHeartbeat)
 func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd.assertCalledByLeader()
-
 	rnd.heartbeatTimeoutElapsedTickNum++
 	rnd.electionTimeoutElapsedTickNum++
 
@@ -225,9 +222,6 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 //
 // (etcd raft.raft.bcastAppend)
 func (rnd *raftNode) leaderReplicateAppendRequests() {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd.assertCalledByLeader()
-
 	for id := range rnd.allProgresses {
 		if id == rnd.id { // OR rnd.leaderID
 			continue
@@ -238,8 +232,6 @@ func (rnd *raftNode) leaderReplicateAppendRequests() {
 
 // (etcd raft.raft.appendEntry)
 func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-
 	storageLastIndex := rnd.storageRaftLog.lastIndex()
 
 	for idx := range entries {
@@ -259,9 +251,6 @@ func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 
 // (etcd raft.raft.sendTimeoutNow)
 func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd.assertCalledByLeader()
-
 	rnd.sendToMailbox(raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT,
 		To:   targetID,

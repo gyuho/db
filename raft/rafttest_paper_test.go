@@ -1,6 +1,8 @@
 package raft
 
 import (
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/gyuho/db/raft/raftpb"
@@ -98,6 +100,41 @@ func Test_raft_paper_reject_stale_term_message(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderBcastBeat)
+func Test_raft_paper_leader_broadcast_heartbeat(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory()) // heartbeat tick is 1
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	for i := 0; i < 10; i++ {
+		rnd.leaderAppendEntriesToLeader(raftpb.Entry{Index: uint64(i) + 1})
+	}
+
+	// to trigger leader to send heartbeat
+	for i := 0; i < rnd.heartbeatTimeoutTickNum; i++ {
+		rnd.tickFunc()
+	}
+	// tickFunc
+	//
+	// if rnd.heartbeatTimeoutElapsedTickNum >= rnd.heartbeatTimeoutTickNum {
+	// 	rnd.heartbeatTimeoutElapsedTickNum = 0
+	// 	rnd.Step(raftpb.Message{
+	// 		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT,
+	// 		From: rnd.id,
+	// 	})
+	// }
+
+	msgs := rnd.readAndClearMailbox()
+	sort.Sort(messageSlice(msgs))
+
+	wmsgs := []raftpb.Message{
+		{Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT, From: 1, To: 2, SenderCurrentTerm: 1},
+		{Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT, From: 1, To: 3, SenderCurrentTerm: 1},
+	}
+
+	if !reflect.DeepEqual(msgs, wmsgs) {
+		t.Fatalf("messages expected %+v, got %+v", wmsgs, msgs)
+	}
+}
 
 // (etcd raft.TestFollowerStartElection)
 
