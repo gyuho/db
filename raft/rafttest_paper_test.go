@@ -209,6 +209,51 @@ func Test_raft_paper_candidate_start_election(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderElectionInOneRoundRPC)
+func Test_raft_paper_election(t *testing.T) {
+	tests := []struct {
+		clusterSize  int
+		voterToVoted map[uint64]bool
+
+		wState raftpb.NODE_STATE
+	}{
+		{1, map[uint64]bool{}, raftpb.NODE_STATE_LEADER},                                   // 1 node cluster, so the one node becomes leader
+		{3, map[uint64]bool{2: true, 3: true}, raftpb.NODE_STATE_LEADER},                   // voted by all
+		{3, map[uint64]bool{2: true}, raftpb.NODE_STATE_LEADER},                            // voted by quorum
+		{5, map[uint64]bool{2: true, 3: true, 4: true, 5: true}, raftpb.NODE_STATE_LEADER}, // voted by all
+		{5, map[uint64]bool{2: true, 3: true, 4: true}, raftpb.NODE_STATE_LEADER},          // voted by quorum
+		{5, map[uint64]bool{2: true, 3: true}, raftpb.NODE_STATE_LEADER},                   // voted by quorum
+
+		{3, map[uint64]bool{2: false, 3: false}, raftpb.NODE_STATE_FOLLOWER}, // return to follower
+		{5, map[uint64]bool{2: false, 3: false, 4: false, 5: false}, raftpb.NODE_STATE_FOLLOWER},
+		{5, map[uint64]bool{2: true, 3: false, 4: false, 5: false}, raftpb.NODE_STATE_FOLLOWER},
+
+		// stay in candidate
+		{3, map[uint64]bool{}, raftpb.NODE_STATE_CANDIDATE},
+		{5, map[uint64]bool{}, raftpb.NODE_STATE_CANDIDATE},
+		{5, map[uint64]bool{2: true}, raftpb.NODE_STATE_CANDIDATE},
+		{5, map[uint64]bool{2: true, 3: false}, raftpb.NODE_STATE_CANDIDATE},
+	}
+
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, generateIDs(tt.clusterSize), 10, 1, NewStorageStableInMemory())
+		oldTerm := rnd.term
+
+		// trigger election in node 1
+		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+
+		for voterID, voted := range tt.voterToVoted {
+			rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE, From: voterID, To: 1, Reject: !voted})
+		}
+
+		if rnd.state != tt.wState {
+			t.Fatalf("#%d: node state expected %q, got %q", i, tt.wState, rnd.state)
+		}
+
+		if rnd.term != oldTerm+1 {
+			t.Fatalf("#%d: term should have increased to %d, got %d", i, oldTerm+1, rnd.term)
+		}
+	}
+}
 
 // (etcd raft.TestFollowerVote)
 
