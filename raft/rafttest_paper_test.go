@@ -256,6 +256,37 @@ func Test_raft_paper_election(t *testing.T) {
 }
 
 // (etcd raft.TestFollowerVote)
+func Test_raft_paper_follower_votes(t *testing.T) {
+	tests := []struct {
+		votedFor uint64
+		voterTo1 uint64
+
+		wReject bool
+	}{
+		{NoNodeID, 1, false},
+		{NoNodeID, 2, false},
+		{1, 1, false},
+		{2, 2, false},
+		{1, 2, true},
+		{2, 1, true},
+	}
+
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+		rnd.loadHardState(raftpb.HardState{Term: 1, VotedFor: tt.votedFor})
+
+		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE, From: tt.voterTo1, To: 1, SenderCurrentTerm: 1})
+
+		msgs := rnd.readAndClearMailbox()
+		wmsgs := []raftpb.Message{
+			{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE, From: 1, To: tt.voterTo1, SenderCurrentTerm: 1, Reject: tt.wReject},
+		}
+
+		if !reflect.DeepEqual(msgs, wmsgs) {
+			t.Fatalf("#%d: messages expected %+v, got %+v", i, wmsgs, msgs)
+		}
+	}
+}
 
 // (etcd raft.TestCandidateFallback)
 
