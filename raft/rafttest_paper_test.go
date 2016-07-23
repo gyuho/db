@@ -503,6 +503,70 @@ func Test_raft_paper_leader_start_replication(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderCommitEntry)
+func Test_raft_paper_leader_commit_entry(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	rnd.commitAll()
+	lastIndex1 := rnd.storageRaftLog.lastIndex()
+
+	rnd.Step(raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+		From:    1,
+		To:      1,
+		Entries: []raftpb.Entry{{Data: []byte("testdata")}},
+	})
+
+	msgs := rnd.readAndClearMailbox()
+	for _, msg := range msgs { // MsgApp
+		rnd.Step(createAppendResponseMessage(msg))
+	}
+	// MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND increments index
+
+	lastIndex2 := rnd.storageRaftLog.lastIndex()
+
+	if lastIndex2 != lastIndex1+1 {
+		t.Fatalf("last index expected %d, got %d", lastIndex1+1, lastIndex2)
+	}
+	if rnd.storageRaftLog.committedIndex != lastIndex2 { // after commit
+		t.Fatalf("committed index expected %d, got %d", lastIndex2, rnd.storageRaftLog.committedIndex)
+	}
+
+	nextEntsToApply := rnd.storageRaftLog.nextEntriesToApply()
+	wents := []raftpb.Entry{{Index: lastIndex2, Term: 1, Data: []byte("testdata")}}
+	if !reflect.DeepEqual(nextEntsToApply, wents) {
+		t.Fatalf("entries to apply expected %+v, got %+v", wents, nextEntsToApply)
+	}
+
+	msgs = rnd.readAndClearMailbox()
+	sort.Sort(messageSlice(msgs))
+
+	wmsgs := []raftpb.Message{
+		{
+			Type:                        raftpb.MESSAGE_TYPE_LEADER_APPEND,
+			From:                        1,
+			To:                          2,
+			LogIndex:                    lastIndex2,
+			LogTerm:                     1,
+			SenderCurrentCommittedIndex: lastIndex2,
+			SenderCurrentTerm:           1,
+		},
+		{
+			Type:                        raftpb.MESSAGE_TYPE_LEADER_APPEND,
+			From:                        1,
+			To:                          3,
+			LogIndex:                    lastIndex2,
+			LogTerm:                     1,
+			SenderCurrentCommittedIndex: lastIndex2,
+			SenderCurrentTerm:           1,
+		},
+	}
+
+	if !reflect.DeepEqual(msgs, wmsgs) {
+		t.Fatalf("messages expected %+v, got %+v", wmsgs, msgs)
+	}
+}
 
 // (etcd raft.TestLeaderAcknowledgeCommit)
 
