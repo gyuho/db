@@ -28,13 +28,12 @@ func createAppendResponseMessage(msg raftpb.Message) raftpb.Message {
 }
 
 // (etcd raft.commitNoopEntry)
-func (rnd *raftNode) commitNoopEntry() {
+func (rnd *raftNode) commitAll() {
 	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	rnd.leaderReplicateAppendRequests()
 
 	msgs := rnd.readAndClearMailbox()
-
 	for _, msg := range msgs {
 		if msg.Type != raftpb.MESSAGE_TYPE_LEADER_APPEND || len(msg.Entries) != 1 || msg.Entries[0].Data != nil {
 			raftLogger.Panicf("expected noop entry, got %+v", msg)
