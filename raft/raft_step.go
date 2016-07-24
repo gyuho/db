@@ -30,7 +30,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	switch {
 	case msg.SenderCurrentTerm == 0: // local message (e.g. msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER)
 
-	case msg.SenderCurrentTerm > rnd.term: // message with higher term
+	case msg.SenderCurrentTerm > rnd.currentTerm: // message with higher term
 
 		leaderID := msg.From
 		if msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
@@ -89,7 +89,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	(IGNORES VOTE-REQUEST from CANDIDATE with "HIGHER" term!)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg),
-					msg.SenderCurrentTerm, rnd.term,
+					msg.SenderCurrentTerm, rnd.currentTerm,
 					rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum)
 
 				return nil
@@ -106,12 +106,12 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	(GOT VOTE-REQUEST from CANDIDATE with HIGHER term, so need to BECOME FOLLOWER with sender term '%d')
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg),
-			msg.SenderCurrentTerm, rnd.term,
+			msg.SenderCurrentTerm, rnd.currentTerm,
 			rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum, msg.SenderCurrentTerm)
 
 		rnd.becomeFollower(msg.SenderCurrentTerm, leaderID)
 
-	case msg.SenderCurrentTerm < rnd.term: // message with lower term
+	case msg.SenderCurrentTerm < rnd.currentTerm: // message with lower term
 
 		// checkQuorum is true, and message from leader with lower term
 		if rnd.checkQuorum &&
@@ -129,7 +129,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 				Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 				To:   msg.From, // to leader
 			})
-			// this will update msg.SenderCurrentTerm with rnd.term
+			// this will update msg.SenderCurrentTerm with rnd.currentTerm
 			// and the leader will match with the previous 'case'
 			// and reverts back to follower
 
@@ -142,7 +142,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	whic has LOWER term (sender current log term '%d' < node current term '%d')
 	(IGNORES VOTE-REQUEST from candidate with LOWER term!)
 
-`, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.SenderCurrentTerm, rnd.term)
+`, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.SenderCurrentTerm, rnd.currentTerm)
 
 		}
 		return nil

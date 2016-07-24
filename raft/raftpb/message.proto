@@ -15,21 +15,21 @@ import "raft/raftpb/snapshot.proto";
 
 // (etcd raft.raftpb.Message)
 message Message {
-	MESSAGE_TYPE Type = 1; // (etcd raft.raftpb.Message.type)
-	uint64       From = 2; // (etcd raft.raftpb.Message.from)
-	uint64       To   = 3; // (etcd raft.raftpb.Message.to)
+	MESSAGE_TYPE Type = 1; // (etcd raft.raftpb.Message.Type)
+	uint64       From = 2; // (etcd raft.raftpb.Message.From)
+	uint64       To   = 3; // (etcd raft.raftpb.Message.To)
 
-	uint64 SenderCurrentCommittedIndex = 4; // (etcd raft.raftpb.Message.commit)
-	uint64 SenderCurrentTerm           = 5; // (etcd raft.raftpb.Message.term)
+	uint64 SenderCurrentCommittedIndex = 4; // (etcd raft.raftpb.Message.Commit)
+	uint64 SenderCurrentTerm           = 5; // (etcd raft.raftpb.Message.Term)
 
-	uint64 LogIndex = 6; // (etcd raft.raftpb.Message.index)
-	uint64 LogTerm  = 7; // (etcd raft.raftpb.Message.logTerm)
+	uint64 LogIndex = 6; // (etcd raft.raftpb.Message.Index)
+	uint64 LogTerm  = 7; // (etcd raft.raftpb.Message.LogTerm)
 	
-	repeated Entry Entries = 8 [(gogoproto.nullable) = false]; // to generate without pointer (etcd raft.raftpb.Message.entries)
-	Snapshot Snapshot      = 9 [(gogoproto.nullable) = false]; // to generate without pointer (etcd raft.raftpb.Message.snapshot)
+	repeated Entry Entries = 8 [(gogoproto.nullable) = false]; // to generate without pointer (etcd raft.raftpb.Message.Entries)
+	Snapshot Snapshot      = 9 [(gogoproto.nullable) = false]; // to generate without pointer (etcd raft.raftpb.Message.Snapshot)
 
-	bool   Reject                         = 10; // (etcd raft.raftpb.Message.reject)
-	uint64 RejectHintFollowerLogLastIndex = 11; // (etcd raft.raftpb.Message.rejectHint)
+	bool   Reject                         = 10; // (etcd raft.raftpb.Message.Reject)
+	uint64 RejectHintFollowerLogLastIndex = 11; // (etcd raft.raftpb.Message.RejectHint)
 
-	bytes context = 12; // (etcd raft.raftpb.Message.context)
+	bytes context = 12; // (etcd raft.raftpb.Message.Context)
 }

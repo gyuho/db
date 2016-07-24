@@ -19,7 +19,7 @@ func Test_raft_snapshot_heartbeat(t *testing.T) {
 	st := NewStorageStableInMemory()
 	st.ApplySnapshot(snap)
 	rnd := newTestRaftNode(1, nil, 10, 1, st)
-	rnd.term = snap.Metadata.Term
+	rnd.currentTerm = snap.Metadata.Term
 
 	if !reflect.DeepEqual(rnd.allNodeIDs(), []uint64{1, 2, 3}) {
 		t.Fatalf("node ids expected %+v, got %+v", []uint64{1, 2, 3}, rnd.allNodeIDs())
@@ -426,8 +426,8 @@ func Test_raft_snapshot_restore_msg_snap(t *testing.T) {
 	if rnd.leaderID != uint64(1) {
 		t.Fatalf("leaderID expected 1, got %d", rnd.leaderID)
 	}
-	if rnd.term != uint64(2) {
-		t.Fatalf("term expected 2, got %d", rnd.term)
+	if rnd.currentTerm != uint64(2) {
+		t.Fatalf("term expected 2, got %d", rnd.currentTerm)
 	}
 }
 

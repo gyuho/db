@@ -122,7 +122,7 @@ func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
 
 	// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
 	// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
-	return rnd.storageRaftLog.maybeCommit(indexToCommit, rnd.term)
+	return rnd.storageRaftLog.maybeCommit(indexToCommit, rnd.currentTerm)
 }
 
 // leaderSendAppendOrSnapshot sends:
@@ -236,7 +236,7 @@ func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 
 	for idx := range entries {
 		entries[idx].Index = storageLastIndex + 1 + uint64(idx)
-		entries[idx].Term = rnd.term
+		entries[idx].Term = rnd.currentTerm
 	}
 
 	rnd.storageRaftLog.appendToStorageUnstable(entries...)
@@ -264,7 +264,7 @@ func (rnd *raftNode) becomeLeader() {
 
 	oldState := rnd.state
 
-	rnd.resetWithTerm(rnd.term)
+	rnd.resetWithTerm(rnd.currentTerm)
 	rnd.leaderID = rnd.id
 	rnd.state = raftpb.NODE_STATE_LEADER
 
@@ -341,7 +341,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM: // pb.MsgCheckQuorum
 		if !rnd.checkQuorumActive() {
 			raftLogger.Warningf("%s steps down to %q, because quorum is not active", rnd.describe(), raftpb.NODE_STATE_FOLLOWER)
-			rnd.becomeFollower(rnd.term, NoNodeID) // becomeFollower(term, leader)
+			rnd.becomeFollower(rnd.currentTerm, NoNodeID) // becomeFollower(term, leader)
 		}
 		return
 

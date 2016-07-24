@@ -69,9 +69,9 @@ type raftNode struct {
 	// (etcd raft.raft.checkQuorum)
 	checkQuorum bool
 
-	term      uint64          // (etcd raft.raft.Term)
-	votedFor  uint64          // (etcd raft.raft.Vote)
-	votedFrom map[uint64]bool // (etcd raft.raft.votes)
+	currentTerm uint64          // (etcd raft.raft.Term)
+	votedFor    uint64          // (etcd raft.raft.Vote)
+	votedFrom   map[uint64]bool // (etcd raft.raft.votes)
 
 	// mailbox contains a slice of messages to be filtered and processed by each step method.
 	//
@@ -98,19 +98,21 @@ type raftNode struct {
 // newRaftNode creates a new raftNode with the given Config.
 func newRaftNode(c *Config) *raftNode {
 	if err := c.validate(); err != nil {
-		raftLogger.Panicf("invalid raft.Config %+v (%v)", c, err)
+		raftLogger.Panicf("invalid raft.Config %v (%+v)", err, c)
 	}
 
 	if c.Logger != nil { // set the Logger
 		raftLogger.SetLogger(c.Logger)
-	} // otherwise use default logger
+	}
+	// otherwise use default logger
 
 	rnd := &raftNode{
 		id:    c.ID,
 		state: raftpb.NODE_STATE_FOLLOWER, // 0
 
-		leaderID:       NoNodeID,
-		allProgresses:  make(map[uint64]*Progress),
+		leaderID:      NoNodeID,
+		allProgresses: make(map[uint64]*Progress),
+
 		storageRaftLog: newStorageRaftLog(c.StorageStable),
 
 		rand: rand.New(rand.NewSource(int64(c.ID))),
@@ -154,7 +156,7 @@ func newRaftNode(c *Config) *raftNode {
 		rnd.storageRaftLog.appliedTo(c.LastAppliedIndex)
 	}
 
-	rnd.becomeFollower(rnd.term, rnd.leaderID)
+	rnd.becomeFollower(rnd.currentTerm, rnd.leaderID)
 
 	var nodeSlice []string
 	for _, id := range rnd.allNodeIDs() {
@@ -184,8 +186,8 @@ func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	// by setting msg.LogTerm as 0
 	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
 		// (X)
-		// msg.LogTerm = rnd.term
-		msg.SenderCurrentTerm = rnd.term
+		// msg.LogTerm = rnd.currentTerm
+		msg.SenderCurrentTerm = rnd.currentTerm
 	}
 
 	rnd.mailbox = append(rnd.mailbox, msg)
@@ -219,8 +221,8 @@ func (rnd *raftNode) resetPendingConfigExist() {
 
 // (etcd raft.raft.reset)
 func (rnd *raftNode) resetWithTerm(term uint64) {
-	if rnd.term != term {
-		rnd.term = term
+	if rnd.currentTerm != term {
+		rnd.currentTerm = term
 		rnd.votedFor = NoNodeID
 	}
 
@@ -276,7 +278,7 @@ func (rnd *raftNode) hardState() raftpb.HardState {
 	return raftpb.HardState{
 		VotedFor:       rnd.votedFor,
 		CommittedIndex: rnd.storageRaftLog.committedIndex,
-		Term:           rnd.term,
+		Term:           rnd.currentTerm,
 	}
 }
 
@@ -289,7 +291,7 @@ func (rnd *raftNode) loadHardState(state raftpb.HardState) {
 
 	rnd.votedFor = state.VotedFor
 	rnd.storageRaftLog.committedIndex = state.CommittedIndex
-	rnd.term = state.Term
+	rnd.currentTerm = state.Term
 }
 
 // (etcd raft.raft.nodes)
@@ -329,13 +331,13 @@ func (rnd *raftNode) deleteNode(id uint64) {
 }
 
 func (rnd *raftNode) describe() string {
-	return fmt.Sprintf("%q %x [term=%d | leader id=%x]", rnd.state, rnd.id, rnd.term, rnd.leaderID)
+	return fmt.Sprintf("%q %x [term=%d | leader id=%x]", rnd.state, rnd.id, rnd.currentTerm, rnd.leaderID)
 }
 
 func (rnd *raftNode) describeLong() string {
 	return fmt.Sprintf(`%q %x [node current term=%d | voted for %x | leader id=%x]
 	[first log index=%d | committed index=%d | applied index=%d | last log index=%d | last log term=%d]`,
-		rnd.state, rnd.id, rnd.term, rnd.votedFor, rnd.leaderID,
+		rnd.state, rnd.id, rnd.currentTerm, rnd.votedFor, rnd.leaderID,
 		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.appliedIndex,
 		rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm())
 }

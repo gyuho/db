@@ -14,8 +14,8 @@ func Test_raft_trigger_campaign_and_candidate(t *testing.T) {
 	rnd.Step(msg)
 
 	rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
-	if rnd.term != 1 {
-		t.Fatalf("term expected 1, got %d", rnd.term)
+	if rnd.currentTerm != 1 {
+		t.Fatalf("term expected 1, got %d", rnd.currentTerm)
 	}
 }
 
@@ -76,7 +76,7 @@ func Test_raft_Step_trigger_leader_heartbeat(t *testing.T) {
 		rnd.storageRaftLog = &storageRaftLog{
 			storageStable: &StorageStableInMemory{snapshotEntries: []raftpb.Entry{{}, {Index: 1, Term: 0}, {Index: 2, Term: 1}}},
 		}
-		rnd.term = 1
+		rnd.currentTerm = 1
 
 		rnd.state = tt.currentState
 		rnd.stepFunc = tt.stepFunc
@@ -103,12 +103,12 @@ func Test_raft_Step_trigger_campaign_while_leader(t *testing.T) {
 	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
 
-	oldTerm := rnd.term
+	oldTerm := rnd.currentTerm
 
 	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rnd.term != oldTerm {
-		t.Fatalf("term should not be increased (expected %d, got %d)", oldTerm, rnd.term)
+	if rnd.currentTerm != oldTerm {
+		t.Fatalf("term should not be increased (expected %d, got %d)", oldTerm, rnd.currentTerm)
 	}
 }
 
@@ -136,8 +136,8 @@ func Test_raft_leader_election(t *testing.T) {
 
 	for i, tt := range tests {
 		stepNode := tt.fakeNetwork.allStateMachines[1].(*raftNode)
-		if stepNode.term != 0 {
-			t.Fatalf("#%d: term expected 0, got %d", i, stepNode.term)
+		if stepNode.currentTerm != 0 {
+			t.Fatalf("#%d: term expected 0, got %d", i, stepNode.currentTerm)
 		}
 
 		// to trigger election to 1
@@ -147,8 +147,8 @@ func Test_raft_leader_election(t *testing.T) {
 			t.Fatalf("#%d: node state expected %q, got %q", i, tt.wNodeState, stepNode.state)
 		}
 
-		if stepNode.term != 1 { // should have increased
-			t.Fatalf("#%d: term expected 1, got %d", i, stepNode.term)
+		if stepNode.currentTerm != 1 { // should have increased
+			t.Fatalf("#%d: term expected 1, got %d", i, stepNode.currentTerm)
 		}
 	}
 }
@@ -346,8 +346,8 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
-	if rnd2.term+1 != rnd3.term {
-		t.Fatalf("rnd2 expected term increase %d, got %d", rnd2.term+1, rnd3.term)
+	if rnd2.currentTerm+1 != rnd3.currentTerm {
+		t.Fatalf("rnd2 expected term increase %d, got %d", rnd2.currentTerm+1, rnd3.currentTerm)
 	}
 
 	// trigger election from 3, again for safety
@@ -355,8 +355,8 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
-	if rnd2.term+2 != rnd3.term {
-		t.Fatalf("rnd2 expected term increase %d, got %d", rnd2.term+2, rnd3.term)
+	if rnd2.currentTerm+2 != rnd3.currentTerm {
+		t.Fatalf("rnd2 expected term increase %d, got %d", rnd2.currentTerm+2, rnd3.currentTerm)
 	}
 
 	// recover all dropped connections
@@ -374,8 +374,8 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
-	if rnd3.term != rnd1.term {
-		t.Fatalf("rnd2 term expected %d, got %d", rnd1.term, rnd3.term)
+	if rnd3.currentTerm != rnd1.currentTerm {
+		t.Fatalf("rnd2 term expected %d, got %d", rnd1.currentTerm, rnd3.currentTerm)
 	}
 }
 

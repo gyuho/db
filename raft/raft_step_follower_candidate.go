@@ -352,7 +352,7 @@ func (rnd *raftNode) becomeCandidate() {
 	oldState := rnd.state
 
 	rnd.state = raftpb.NODE_STATE_CANDIDATE
-	rnd.resetWithTerm(rnd.term + 1)
+	rnd.resetWithTerm(rnd.currentTerm + 1)
 
 	rnd.stepFunc = stepCandidate
 	rnd.tickFunc = rnd.tickFuncFollowerElectionTimeout
@@ -390,12 +390,12 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 
 	case raftpb.MESSAGE_TYPE_LEADER_APPEND: // pb.MsgApp
 		raftLogger.Infof("%s steps down to %q, because it received %q from leader %x", rnd.describe(), raftpb.NODE_STATE_FOLLOWER, msg.Type, msg.From)
-		rnd.becomeFollower(rnd.term, msg.From)
+		rnd.becomeFollower(rnd.currentTerm, msg.From)
 		rnd.followerHandleAppendFromLeader(msg)
 
 	case raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT: // pb.MsgHeartbeat
 		raftLogger.Infof("%s steps down to %q, because it received %q from leader %x", rnd.describe(), raftpb.NODE_STATE_FOLLOWER, msg.Type, msg.From)
-		rnd.becomeFollower(rnd.term, msg.From)
+		rnd.becomeFollower(rnd.currentTerm, msg.From)
 		rnd.followerRespondToLeaderHeartbeat(msg)
 
 	case raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT: // pb.MsgSnap
@@ -438,7 +438,7 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 			rnd.leaderReplicateAppendRequests()
 
 		case rejectedNum:
-			rnd.becomeFollower(rnd.term, NoNodeID)
+			rnd.becomeFollower(rnd.currentTerm, NoNodeID)
 		}
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
