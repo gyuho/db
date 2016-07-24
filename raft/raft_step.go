@@ -75,7 +75,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			//
 			// So it shouldn't increase its term.
 			//
-			// So it's ok to to reject vote-request
+			// So it's ok to to reject vote-request.
 			lastQuorumChecked := rnd.checkQuorum && rnd.electionTimeoutTickNum > rnd.electionTimeoutElapsedTickNum
 
 			ignoreHigherTermVoteRequest := notLeaderTransfer && notCandidate && lastQuorumChecked

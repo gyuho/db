@@ -327,9 +327,9 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	// will respond to these requests with reject hints of its last index, if needed.
 	//
 	//
-	// If checkQuorum is true, leader checks if quorum of cluster are active for every election timeout
-	// (if rnd.allProgresses[id].RecentActive {activeN++}).
-	// And leader maintains 'Progress.RecentActive' for every incoming message from follower.
+	// If checkQuorum is true, leader checks if quorum of cluster are active for every election timeout.
+	// Leader sends internal check-quorum message to trigger quorum-check
+	// for every election timeout (raftNode.tickFuncLeaderHeartbeatTimeout).
 	// Now, if quorum is not active, leader reverts back to follower.
 
 	// leader to take action, or receive response

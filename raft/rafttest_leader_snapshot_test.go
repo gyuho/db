@@ -359,7 +359,7 @@ func Test_raft_snapshot_restore_leader(t *testing.T) {
 	rnd.becomeLeader()
 
 	// force set the next index of 2
-	// to make it need snapshot from leader
+	// to trigger snapshot from leader
 	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex()
 
 	rnd.Step(raftpb.Message{
@@ -396,7 +396,7 @@ func Test_raft_snapshot_restore_leader_cancel_snapshot(t *testing.T) {
 	rnd.becomeLeader()
 
 	// force set the next index of 2
-	// to make it need snapshot from leader
+	// to trigger snapshot from leader
 	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex() - 1
 	rnd.allProgresses[2].RecentActive = false
 	// now node 1 does not send snapshot to 2
