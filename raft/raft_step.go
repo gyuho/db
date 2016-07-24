@@ -12,18 +12,20 @@ import (
 // (etcd raft.raft.Step)
 func (rnd *raftNode) Step(msg raftpb.Message) error {
 	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN { // m.Type == pb.MsgHup
-		if rnd.state != raftpb.NODE_STATE_LEADER {
-			raftLogger.Infof("%s starts a new election", rnd.describe())
-			rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_ELECTION)
-		} else {
-			raftLogger.Infof("%s ignores %q from %x", rnd.describe(), msg.Type, msg.From)
+		if rnd.state == raftpb.NODE_STATE_LEADER {
+			raftLogger.Infof("%s is already leader, so ignores %q from %x", rnd.describe(), msg.Type, msg.From)
+			return nil
 		}
+
+		raftLogger.Infof("%s starts a new election", rnd.describe())
+		rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_ELECTION)
 		return nil
 	}
 
 	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_TRANSFER_LEADER {
 		if rnd.state != raftpb.NODE_STATE_LEADER {
 			raftLogger.Infof("%s ignores %q to %x because it's not a leader", rnd.describe(), msg.Type, msg.From)
+			return nil // ???
 		}
 	}
 
@@ -34,22 +36,23 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 
 		leaderID := msg.From
 		if msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
-			// if the vote was requested for leadership transfer
-			// this node should not ignore this vote-request so that
-			// it can revert back to follower
-			isLeaderTransfer := bytes.Equal(msg.Context, []byte(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER.String()))
+			// if the vote was requested for leadership transfer,
+			// current node should not ignore this vote-request,
+			// so that it can revert back to follower
+			notLeaderTransfer := !bytes.Equal(msg.Context, []byte(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER.String()))
 
 			// WHEN candidate receives a vote-request with higher term,
-			// it SHOULD NOT IGNORE the vote-request and SHOULD revert back to follower
+			// it SHOULD revert back to follower, no matter what.
+			// (it SHOULD NOT IGNORE the vote-request)
 			//
 			// WHEN leader receives a vote-request with higher term,
-			// and checkQuorum is true and election timeout hasn't passed,
 			// it SHOULD IGNORE the vote-request
+			// iff checkQuorum is true and election timeout hasn't passed,
 			// because it guarantees that the leader is still in lease
 			//
 			// WHEN follower receives a vote-request with higher term,
-			// and checkQuorum is true and election timeout hasn't passed,
 			// it SHOULD IGNORE the vote-request
+			// iff checkQuorum is true and election timeout hasn't passed,
 			// because it has been in contact with leader for the last election timeout
 			//
 			notCandidate := rnd.state != raftpb.NODE_STATE_CANDIDATE
@@ -61,30 +64,28 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			//
 			// this helps avoid disruptions from servers with old configuration
 			//
-			// If checkQuorum is true, leader checks if quorum of cluster are active for every election timeout
-			// (if rnd.allProgresses[id].RecentActive {activeN++}).
-			// And leader maintains 'Progress.RecentActive' for every incoming message from follower.
-			// Now, if quorum is not active, leader reverts back to follower.
-			//
+			// If checkQuorum is true, leader checks if quorum of cluster are active for every election timeout.
 			// Leader sends internal check-quorum message to trigger quorum-check
 			// for every election timeout (raftNode.tickFuncLeaderHeartbeatTimeout).
+			// Now, if quorum is not active, leader reverts back to follower.
 			//
 			// So if checkQuorum is true and election timeout has not happened yet,
-			// then leader is guaranteed to have been in contact with quorum within
+			// leader is guaranteed to have been in contact with quorum within
 			// the last election timeout, as a valid leader.
+			//
 			// So it shouldn't increase its term.
 			//
-			// SO, it's ok to to reject vote-request
+			// So it's ok to to reject vote-request
 			lastQuorumChecked := rnd.checkQuorum && rnd.electionTimeoutTickNum > rnd.electionTimeoutElapsedTickNum
 
-			ignoreHigherTermVoteRequest := !isLeaderTransfer && notCandidate && lastQuorumChecked
+			ignoreHigherTermVoteRequest := notLeaderTransfer && notCandidate && lastQuorumChecked
 
 			if ignoreHigherTermVoteRequest {
 				raftLogger.Infof(`
 
 	%s
 	IGNORES %s
-	which has HIGHER term (sender current log term '%d' > node current term '%d')
+	which has HIGHER term (sender current term '%d' > node current term '%d')
 	(elapsed election timeout ticks: %d out of %d)
 	(IGNORES VOTE-REQUEST from CANDIDATE with "HIGHER" term!)
 
@@ -94,6 +95,8 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 
 				return nil
 			}
+
+			// leader should revert back to follower
 			leaderID = NoNodeID
 		}
 
@@ -101,9 +104,9 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 
 	%s
 	RECEIVED %s
-	which has HIGHER term (sender current log term '%d' > node current term '%d')
+	which has HIGHER term (sender current term '%d' > node current term '%d')
 	(elapsed election timeout ticks: %d out of %d)
-	(GOT VOTE-REQUEST from CANDIDATE with HIGHER term, so need to BECOME FOLLOWER with sender term '%d')
+	(GOT VOTE-REQUEST from CANDIDATE with HIGHER term, so BECOME FOLLOWER with sender term '%d')
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg),
 			msg.SenderCurrentTerm, rnd.currentTerm,
@@ -121,7 +124,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			// messages from leader with lower term is possible with network delay or network partition.
 			//
 			// If check quorum is not true, the leader will read heartbeat response with higher term,
-			// and reverts back to follower.
+			// and following 'Step' method call will revert the leader back to follower.
 			//
 			// If check quorum is true, we may not advance the term on MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE,
 			// so we need to generate other message to advance the term.
@@ -130,8 +133,6 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 				To:   msg.From, // to leader
 			})
 			// this will update msg.SenderCurrentTerm with rnd.currentTerm
-			// and the leader will match with the previous 'case'
-			// and reverts back to follower
 
 		} else {
 
@@ -139,8 +140,8 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 				
 	%s
 	IGNORES %s
-	whic has LOWER term (sender current log term '%d' < node current term '%d')
-	(IGNORES VOTE-REQUEST from candidate with LOWER term!)
+	whic has LOWER term (sender current term '%d' < node current term '%d')
+	(IGNORES message with LOWER term!)
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.SenderCurrentTerm, rnd.currentTerm)
 
