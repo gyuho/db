@@ -368,7 +368,7 @@ func Test_raft_paper_candidate_election_timeout_randomized(t *testing.T) {
 func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
 	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
 	defer func() {
-		raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+		raftLogger.SetLogger(xlog.NewLogger("raft", defaultLogLevel))
 	}()
 
 	raftNodes := make([]*raftNode, 5)
@@ -409,7 +409,7 @@ func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
 func Test_raft_paper_candidate_election_timeout_no_conflict(t *testing.T) {
 	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
 	defer func() {
-		raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+		raftLogger.SetLogger(xlog.NewLogger("raft", defaultLogLevel))
 	}()
 
 	raftNodes := make([]*raftNode, 5)

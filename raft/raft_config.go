@@ -7,19 +7,16 @@ import (
 
 // Config contains the parameters to start a Raft node.
 type Config struct {
-	// Logger implements system logging for Raft.
-	Logger Logger
-
-	// ID is the id of the Raft node, and 0 when there's no leader.
-	//
-	// (etcd raft.Config.ID)
-	ID uint64
-
 	// allPeerIDs contains the IDs of all peers and the node itself.
 	// It should only be set when starting a new Raft cluster.
 	//
 	// (etcd raft.Config.peers)
 	allPeerIDs []uint64
+
+	// ID is the id of the Raft node, and 0 when there's no leader.
+	//
+	// (etcd raft.Config.ID)
+	ID uint64
 
 	// ElectionTickNum is the number of ticks between elections.
 	// If a follower does not receive any message from a valid leader
@@ -79,6 +76,9 @@ type Config struct {
 	//
 	// (etcd raft.Config.Applied)
 	LastAppliedIndex uint64
+
+	// Logger implements system logging for Raft.
+	Logger Logger
 }
 
 func (c *Config) validate() error {
