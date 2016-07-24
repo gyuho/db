@@ -257,8 +257,8 @@ func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
 		for j := 0; j < 10; j++ {
 			rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: []byte("testdata")})
 			rnd.leaderSendAppendOrSnapshot(2)
-			if msgs := rnd.readAndClearMailbox(); len(msgs) != 0 { // because it's probe and paused
-				t.Fatalf("#%d.%d: len(msgs) expected 0, got %d", i, j, len(msgs))
+			if rmsgs := rnd.readAndClearMailbox(); len(rmsgs) != 0 { // because it's probe and paused
+				t.Fatalf("#%d.%d: len(rmsgs) expected 0, got %d", i, j, len(rmsgs))
 			}
 		}
 

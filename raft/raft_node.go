@@ -352,12 +352,6 @@ func (rnd *raftNode) assertUnexpectedNodeState(unexpected raftpb.NODE_STATE) {
 	}
 }
 
-func (rnd *raftNode) assertCalledByLeader() {
-	if rnd.id != rnd.leaderID {
-		raftLogger.Panicf("MUST BE called by the leader(%x), but called by %q %x", rnd.leaderID, rnd.state, rnd.id)
-	}
-}
-
 func (rnd *raftNode) assertCalledByNoneLeader() {
 	if rnd.id == rnd.leaderID {
 		raftLogger.Panicf("MUST NOT BE called by the leader(%x), but called by %q %x", rnd.leaderID, rnd.state, rnd.id)
