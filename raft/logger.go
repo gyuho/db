@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	defaultLogLevel = xlog.INFO
+	defaultLogLevel = xlog.WARN
+	// defaultLogLevel = xlog.INFO
 	// defaultLogLevel = xlog.DEBUG
 )
 

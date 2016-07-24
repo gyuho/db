@@ -9,15 +9,20 @@ import (
 //
 // (etcd raft.unstable)
 type storageUnstable struct {
+	// (etcd raft.unstable.snapshot)
 	snapshot *raftpb.Snapshot
 
 	// indexOffset may be smaller than the actual higest log
 	// position in Storage, which means the next write to storage
 	// might need truncate the logs before persisting these unstable
 	// log entries.
+	//
+	// (etcd raft.unstable.offset)
 	indexOffset uint64
 
 	// entries[idx]'s raft log index == idx + su.indexOffset
+	//
+	// (etcd raft.unstable.entries)
 	entries []raftpb.Entry
 }
 

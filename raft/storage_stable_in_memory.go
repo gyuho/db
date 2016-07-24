@@ -183,7 +183,7 @@ func (ms *StorageStableInMemory) Append(entries ...raftpb.Entry) error {
 		entries = entries[firstLogIndex-firstEntryIndex:]
 	}
 
-	// Now
+	// ➝ Now
 	//
 	// entries in snapshot = [0,  11, 12]
 	// entries to append   = [11, 12, 13, 14]

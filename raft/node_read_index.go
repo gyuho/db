@@ -7,8 +7,8 @@ import (
 )
 
 // ReadState provides the state of read-only query.
-// The application must send raftpb.MESSAGE_TYPE_READ_INDEX
-// first, before it reads ReadState from NodeReady.
+// The application must send raftpb.MESSAGE_TYPE_READ_INDEX first,
+// before it reads ReadState from Ready.
 //
 // READ_INDEX is used to serve clients' read-only queries without
 // going through Raft, but still with 'quorum-get' on. It bypasses the Raft log, but
@@ -19,7 +19,9 @@ import (
 // do not change any state of replicated state machine, these writes can be time- and
 // resource-consuming.
 //
+//
 // (Raft §6.4 Processing read-only queries more efficiently, p.72)
+//
 // To bypass the Raft log with linearizable reads:
 //
 //   1. If Leader has not yet committed an entry from SenderCurrentTerm, it waits until it has done so.
