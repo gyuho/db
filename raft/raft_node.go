@@ -39,7 +39,7 @@ type raftNode struct {
 	electionTimeoutElapsedTickNum int
 
 	// randomizedElectionTimeoutTickNum is the random number between
-	// [electionTimeoutTickNum, 2 * electionTimeoutTickNum - 1], and gets reset
+	// [electionTimeoutTickNum, 2 * electionTimeoutTickNum), and gets reset
 	// when raftNode state changes to follower or to candidate.
 	//
 	// (etcd raft.raft.randomizedElectionTimeoutTickNum)
@@ -59,19 +59,26 @@ type raftNode struct {
 	tickFunc func()
 	stepFunc func(r *raftNode, msg raftpb.Message)
 
-	maxEntryNumPerMsg uint64 // (etcd raft.raft.maxMsgSize)
-	maxInflightMsgNum int    // (etcd raft.raft.maxInflight)
+	// (etcd raft.raft.maxMsgSize)
+	maxEntryNumPerMsg uint64
 
-	// checkQuorum is true
-	// and quorum of cluster is not active for an election timeout
+	// (etcd raft.raft.maxInflight)
+	maxInflightMsgNum int
+
+	// checkQuorum is true and quorum of cluster is not active for an election timeout,
 	// then the leader steps down to follower.
 	//
 	// (etcd raft.raft.checkQuorum)
 	checkQuorum bool
 
-	currentTerm uint64          // (etcd raft.raft.Term)
-	votedFor    uint64          // (etcd raft.raft.Vote)
-	votedFrom   map[uint64]bool // (etcd raft.raft.votes)
+	// (etcd raft.raft.Term)
+	currentTerm uint64
+
+	// (etcd raft.raft.Vote)
+	votedFor uint64
+
+	// (etcd raft.raft.votes)
+	votedFrom map[uint64]bool
 
 	// mailbox contains a slice of messages to be filtered and processed by each step method.
 	//
@@ -84,9 +91,9 @@ type raftNode struct {
 	// (etcd raft.raft.pendingConf)
 	pendingConfigExist bool
 
-	// (Raft §3.10  Leadership transfer extension, p.28)
-	// leaderTransfereeID is the ID of the leader transfer target
-	// when it's not zero.
+	// leaderTransfereeID is the ID of the leader transfer target.
+	//
+	// (Raft §3.10 Leadership transfer extension, p.28)
 	//
 	// (etcd raft.raft.leadTransferee)
 	leaderTransfereeID uint64
@@ -101,7 +108,8 @@ func newRaftNode(c *Config) *raftNode {
 		raftLogger.Panicf("invalid raft.Config %v (%+v)", err, c)
 	}
 
-	if c.Logger != nil { // set the Logger
+	if c.Logger != nil {
+		// set the Logger
 		raftLogger.SetLogger(c.Logger)
 	}
 	// otherwise use default logger
