@@ -84,7 +84,7 @@ func NewFormatter(cfg Config) (xlog.Formatter, error) {
 		if err != nil {
 			return nil, err
 		}
-		f = &fileutil.LockedFile{tFile}
+		f = &fileutil.LockedFile{File: tFile}
 	}
 
 	if err = os.Rename(logPathTmp, logPath); err != nil {
@@ -160,7 +160,7 @@ func (ft *formatter) unsafeRotate() {
 		if err != nil {
 			panic(err)
 		}
-		fileTmp = &fileutil.LockedFile{tFile}
+		fileTmp = &fileutil.LockedFile{File: tFile}
 	}
 
 	// rename the file to WAL name atomically
@@ -186,7 +186,7 @@ func (ft *formatter) unsafeRotate() {
 		if err != nil {
 			panic(err)
 		}
-		fileTmp = &fileutil.LockedFile{tFile}
+		fileTmp = &fileutil.LockedFile{File: tFile}
 	}
 
 	ft.w = bufio.NewWriter(fileTmp)
