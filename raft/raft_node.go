@@ -139,7 +139,7 @@ func newRaftNode(c *Config) *raftNode {
 	peerIDs := c.allPeerIDs
 	if len(configState.IDs) > 0 {
 		if len(peerIDs) > 0 {
-			raftLogger.Panicf("cannot specify peer IDs both in Config.allPeerIDs and configState.IDs")
+			raftLogger.Panicf("cannot specify peer IDs both in Config.allPeerIDs(%+v) and configState.IDs(%+v)", peerIDs, configState.IDs)
 		}
 		// overwrite peerIDs
 		peerIDs = configState.IDs
@@ -179,11 +179,9 @@ func newRaftNode(c *Config) *raftNode {
 func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	msg.From = rnd.id
 
-	// proposal must go through consensus, which means
-	// proposal is to be forwarded to the leader,
-	// and replicated back to followers.
-	// so it should be treated as local message
-	// by setting msg.LogTerm as 0
+	// proposal must go through consensus, which means proposal is to be
+	// forwarded to the leader, and replicated back to followers.
+	// So it should be treated as local message by setting msg.LogTerm as 0
 	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
 		// (X)
 		// msg.LogTerm = rnd.currentTerm
@@ -200,7 +198,7 @@ func (rnd *raftNode) quorum() int {
 
 // (etcd raft.raft.resetRandomizedElectionTimeout)
 func (rnd *raftNode) randomizeElectionTickTimeout() {
-	// [electiontimeout, 2 * electiontimeout - 1].
+	// [electiontimeout, 2 * electiontimeout)
 	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
 }
 
