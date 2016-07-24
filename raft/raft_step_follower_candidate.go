@@ -15,7 +15,9 @@ func (rnd *raftNode) promotableToLeader() bool {
 //
 // (etcd raft.raft.tickElection)
 func (rnd *raftNode) tickFuncFollowerElectionTimeout() {
-	rnd.assertCalledByNoneLeader()
+	if rnd.id == rnd.leaderID {
+		raftLogger.Panicf("MUST NOT BE called by the leader(%x), but called by %q %x", rnd.leaderID, rnd.state, rnd.id)
+	}
 
 	rnd.electionTimeoutElapsedTickNum++
 	if rnd.promotableToLeader() && rnd.pastElectionTimeout() {
@@ -135,7 +137,9 @@ func (rnd *raftNode) followerHandleAppendFromLeader(msg raftpb.Message) {
 
 // (etcd raft.raft.handleSnapshot)
 func (rnd *raftNode) followerRestoreSnapshotFromLeader(msg raftpb.Message) {
-	rnd.assertCalledByNoneLeader()
+	if rnd.id == rnd.leaderID {
+		raftLogger.Panicf("MUST NOT BE called by the leader(%x), but called by %q %x", rnd.leaderID, rnd.state, rnd.id)
+	}
 
 	raftLogger.Infof(`
 
