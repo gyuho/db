@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gyuho/db/pkg/tlsutil"
 )
 
 /*
@@ -24,7 +26,7 @@ func getNetDialer(d time.Duration) *net.Dialer {
 }
 
 // NewTransport creates a new http.Transport.
-func NewTransport(ti TLSInfo, dialTimeout time.Duration) (*http.Transport, error) {
+func NewTransport(ti tlsutil.TLSInfo, dialTimeout time.Duration) (*http.Transport, error) {
 	tlsClientConfig, err := ti.ClientConfig()
 	if err != nil {
 		return nil, err
