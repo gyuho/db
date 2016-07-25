@@ -78,13 +78,53 @@ func Test_raft_config_change_Step_ignore(t *testing.T) {
 }
 
 // (etcd raft.TestRecoverPendingConfig)
+func Test_raft_recover_pending_config(t *testing.T) {
+	tests := []struct {
+		entryTypeToAppend   raftpb.ENTRY_TYPE
+		wPendingConfigExist bool
+	}{
+		{raftpb.ENTRY_TYPE_NORMAL, false},
+		{raftpb.ENTRY_TYPE_CONFIG_CHANGE, true},
+	}
+
+	for i, tt := range tests {
+		rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+
+		rnd.leaderAppendEntriesToLeader(raftpb.Entry{Type: tt.entryTypeToAppend})
+
+		rnd.becomeCandidate()
+		rnd.becomeLeader()
+
+		// (X)
+		// rnd.leaderAppendEntriesToLeader(raftpb.Entry{Type: tt.entryTypeToAppend})
+
+		if rnd.pendingConfigExist != tt.wPendingConfigExist {
+			t.Fatalf("#%d: pendingConfigExist expected %v, got %v", i, tt.wPendingConfigExist, rnd.pendingConfigExist)
+		}
+	}
+}
 
 // (etcd raft.TestRecoverDoublePendingConfig)
+func Test_raft_recover_double_pending_config(t *testing.T) {
+
+}
 
 // (etcd raft.TestAddNode)
+func Test_raft_add_node(t *testing.T) {
+
+}
 
 // (etcd raft.TestRemoveNode)
+func Test_raft_remove_node(t *testing.T) {
+
+}
 
 // (etcd raft.TestCommitAfterRemoveNode)
+func Test_raft_commit_after_remove_node(t *testing.T) {
+
+}
 
 // (etcd raft.TestNodeProposeConfig)
+func Test_raft_node_propose_config(t *testing.T) {
+
+}
