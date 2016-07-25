@@ -61,6 +61,39 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestLeaderTransferToSelf)
+func Test_raft_leader_transfer_to_self(t *testing.T) {
+	fn := newFakeNetwork(nil, nil, nil)
+
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+
+	rndLeader1 := fn.allStateMachines[1].(*raftNode)
+
+	// transfer leader from 1 to 1
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		From: 1,
+		To:   1,
+	})
+
+	// now 1 is the leader
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rndLeader1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	}
+	if rndLeader1.leaderTransfereeID != 0 {
+		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	}
+}
+
+// (etcd raft.TestLeaderTransferBack)
+func Test_raft_leader_transfer_back(t *testing.T) {
+}
+
 // (etcd raft.TestLeaderTransferWithCheckQuorum)
 func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 	fn := newFakeNetwork(nil, nil, nil)
@@ -185,21 +218,33 @@ func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderTransferAfterSnapshot)
-
-// (etcd raft.TestLeaderTransferToSelf)
+func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
+}
 
 // (etcd raft.TestLeaderTransferToNonExistingNode)
+func Test_raft_leader_transfer_to_non_existing_node(t *testing.T) {
+}
 
 // (etcd raft.TestLeaderTransferTimeout)
+func Test_raft_leader_transfer_timeout(t *testing.T) {
+}
 
 // (etcd raft.TestLeaderTransferIgnoreProposal)
+func Test_raft_leader_transfer_ignore_proposal(t *testing.T) {
+}
 
 // (etcd raft.TestLeaderTransferReceiveHigherTermVote)
+func Test_raft_leader_transfer_receive_higher_term_vote(t *testing.T) {
+}
 
 // (etcd raft.TestLeaderTransferRemoveNode)
-
-// (etcd raft.TestLeaderTransferBack)
+func Test_raft_leader_transfer_remove_node(t *testing.T) {
+}
 
 // (etcd raft.TestLeaderTransferSecondTransferToAnotherNode)
+func Test_raft_leader_transfer_second_transfer(t *testing.T) {
+}
 
 // (etcd raft.TestLeaderTransferSecondTransferToSameNode)
+func Test_raft_leader_transfer_second_transfer_to_same_node(t *testing.T) {
+}
