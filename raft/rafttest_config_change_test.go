@@ -124,16 +124,50 @@ func Test_raft_recover_double_pending_config(t *testing.T) {
 
 // (etcd raft.TestAddNode)
 func Test_raft_add_node(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+	rnd.pendingConfigExist = true
 
+	rnd.addNode(2)
+
+	if rnd.pendingConfigExist {
+		t.Fatalf("pendingConfigExist expected false, got %v", rnd.pendingConfigExist)
+	}
+
+	nodeIDs := rnd.allNodeIDs()
+	wNodeIDs := []uint64{1, 2}
+	if !reflect.DeepEqual(nodeIDs, wNodeIDs) {
+		t.Fatalf("node ids expected %+v, got %+v", wNodeIDs, nodeIDs)
+	}
 }
 
 // (etcd raft.TestRemoveNode)
-func Test_raft_remove_node(t *testing.T) {
+func Test_raft_delete_node(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd.pendingConfigExist = true
 
+	rnd.deleteNode(2)
+
+	if rnd.pendingConfigExist {
+		t.Fatalf("pendingConfigExist expected false, got %v", rnd.pendingConfigExist)
+	}
+
+	nodeIDs := rnd.allNodeIDs()
+	wNodeIDs := []uint64{1}
+	if !reflect.DeepEqual(nodeIDs, wNodeIDs) {
+		t.Fatalf("node ids expected %+v, got %+v", wNodeIDs, nodeIDs)
+	}
+
+	rnd.deleteNode(1)
+
+	nodeIDs = rnd.allNodeIDs()
+	wNodeIDs = []uint64{}
+	if !reflect.DeepEqual(nodeIDs, wNodeIDs) {
+		t.Fatalf("node ids expected %+v, got %+v", wNodeIDs, nodeIDs)
+	}
 }
 
 // (etcd raft.TestCommitAfterRemoveNode)
-func Test_raft_commit_after_remove_node(t *testing.T) {
+func Test_raft_commit_after_delete_node(t *testing.T) {
 
 }
 

@@ -317,7 +317,9 @@ func (rnd *raftNode) addNode(id uint64) {
 		return
 	}
 
-	rnd.updateProgress(id, 0, rnd.storageRaftLog.lastIndex()+1)
+	matchIndex := uint64(0)
+	rnd.updateProgress(id, matchIndex, rnd.storageRaftLog.lastIndex()+1)
+
 	rnd.pendingConfigExist = false
 }
 
