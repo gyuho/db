@@ -554,11 +554,6 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		lastLeaderTransfereeID := rnd.leaderTransfereeID
 		leaderTransfereeID := msg.From
 
-		if rnd.id == leaderTransfereeID {
-			raftLogger.Infof("%s is already a leader, so ignores leadership transfer request", rnd.describe())
-			return
-		}
-
 		if lastLeaderTransfereeID != NoNodeID {
 			if lastLeaderTransfereeID == leaderTransfereeID {
 				raftLogger.Infof("%s is already transferring its leadership to follower %x (ignores this request)", rnd.describe(), leaderTransfereeID)
@@ -573,6 +568,11 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	(%x got a new leadership transfer request to FOLLOWER %x)
 
 `, rnd.describeLong(), lastLeaderTransfereeID, rnd.id, leaderTransfereeID)
+		}
+
+		if rnd.id == leaderTransfereeID {
+			raftLogger.Infof("%s is already a leader, so ignores leadership transfer request", rnd.describe())
+			return
 		}
 
 		rnd.leaderTransfereeID = leaderTransfereeID

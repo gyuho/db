@@ -132,8 +132,8 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 	if rndLeader1.leaderID != 1 {
 		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 3 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
+	if rndLeader1.leaderTransfereeID != 0 {
+		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 }
 
