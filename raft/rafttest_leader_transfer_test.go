@@ -128,6 +128,61 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderTransferToSlowFollower)
+func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
+	fn := newFakeNetwork(nil, nil, nil)
+
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rndLeader1 := fn.allStateMachines[1].(*raftNode)
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+
+	fn.isolate(3)
+
+	// write some logs
+	fn.stepFirstMessage(raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+		From:    1,
+		To:      1,
+		Entries: []raftpb.Entry{{Data: []byte("testdata")}},
+	})
+
+	fn.recoverAll()
+
+	if rndLeader1.allProgresses[2].MatchIndex != 2 {
+		t.Fatalf("rndLeader1.allProgresses[2].MatchIndex expected 1, got %d", rndLeader1.allProgresses[2].MatchIndex)
+	}
+	if rndLeader1.allProgresses[3].MatchIndex != 1 { // 3 should be fallen behind
+		t.Fatalf("rndLeader1.allProgresses[3].MatchIndex expected 1, got %d", rndLeader1.allProgresses[3].MatchIndex)
+	}
+
+	// transfer leader from 1 to 3
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		From: 3,
+		To:   1,
+	})
+	// now node 3 is the new leader
+	rndLeader3 := fn.allStateMachines[3].(*raftNode)
+
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	if rndLeader1.leaderID != 3 {
+		t.Fatalf("leaderID expected 3, got %d", rndLeader1.leaderID)
+	}
+	if rndLeader1.leaderTransfereeID != 0 {
+		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	}
+
+	rndLeader3.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rndLeader3.leaderID != 3 {
+		t.Fatalf("leaderID expected 3, got %d", rndLeader3.leaderID)
+	}
+	if rndLeader3.leaderTransfereeID != 0 {
+		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader3.leaderTransfereeID)
+	}
+}
 
 // (etcd raft.TestLeaderTransferAfterSnapshot)
 
