@@ -561,7 +561,54 @@ func Test_raft_leader_transfer_delete_node(t *testing.T) {
 
 // (etcd raft.TestLeaderTransferSecondTransferToAnotherNode)
 func Test_raft_leader_transfer_second_transfer(t *testing.T) {
+	fn := newFakeNetwork(nil, nil, nil)
 
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+
+	fn.isolate(3)
+
+	// transfer leader from 1 to 3
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		From: 3,
+		To:   1,
+	})
+
+	// 1 is still the leader
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
+	}
+	if rnd1.leaderTransfereeID != 3 {
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rnd1.leaderTransfereeID)
+	}
+
+	// transfer leader from 1 to 2
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		From: 2,
+		To:   1,
+	})
+
+	// 2 is the new leader
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd2 := fn.allStateMachines[2].(*raftNode)
+	rnd2.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 2 {
+		t.Fatalf("leaderID expected 2, got %d", rnd1.leaderID)
+	}
+	if rnd2.leaderID != 2 {
+		t.Fatalf("leaderID expected 2, got %d", rnd2.leaderID)
+	}
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
+	}
 }
 
 // (etcd raft.TestLeaderTransferSecondTransferToSameNode)
