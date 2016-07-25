@@ -364,10 +364,10 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 				prevSoftState = rd.SoftState
 			}
 
-			if len(rd.EntriesToSave) > 0 {
+			if len(rd.EntriesToAppend) > 0 {
 				hasPrevLastUnstableIndex = true
-				prevLastUnstableIndex = rd.EntriesToSave[len(rd.EntriesToSave)-1].Index
-				prevLastUnstableTerm = rd.EntriesToSave[len(rd.EntriesToSave)-1].Term
+				prevLastUnstableIndex = rd.EntriesToAppend[len(rd.EntriesToAppend)-1].Index
+				prevLastUnstableTerm = rd.EntriesToAppend[len(rd.EntriesToAppend)-1].Term
 			}
 
 			if !raftpb.IsEmptyHardState(rd.HardStateToSave) {

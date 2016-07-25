@@ -1,6 +1,8 @@
 package raft
 
 import (
+	"bytes"
+	"context"
 	"math"
 	"reflect"
 	"testing"
@@ -219,5 +221,52 @@ func Test_raft_commit_after_delete_node(t *testing.T) {
 
 // (etcd raft.TestNodeProposeConfig)
 func Test_raft_node_propose_config(t *testing.T) {
+	var msgs []raftpb.Message
+	stepFuncAppend := func(rnd *raftNode, msg raftpb.Message) {
+		msgs = append(msgs, msg)
+	}
 
+	nd := newNode()
+	st := NewStorageStableInMemory()
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, st)
+
+	go nd.runWithRaftNode(rnd)
+
+	nd.Campaign(context.TODO())
+
+	for {
+		rd := <-nd.Ready()
+		st.Append(rd.EntriesToAppend...)
+
+		// until this raft node becomes leader
+		if rd.SoftState.LeaderID == rnd.id {
+			rnd.stepFunc = stepFuncAppend
+			nd.Advance()
+			break
+		}
+
+		nd.Advance()
+	}
+
+	configChange := raftpb.ConfigChange{
+		Type:   raftpb.CONFIG_CHANGE_TYPE_ADD_NODE,
+		NodeID: 1,
+	}
+	nd.ProposeConfigChange(context.TODO(), configChange)
+	nd.Stop()
+
+	if len(msgs) != 1 {
+		t.Fatalf("len(msgs) expected 1, got %d", len(msgs))
+	}
+	if msgs[0].Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
+		t.Fatalf("message type expected %q, got %q", raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, msgs[0].Type)
+	}
+
+	configChangeData, err := configChange.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(msgs[0].Entries[0].Data, configChangeData) {
+		t.Fatalf("data expected %s, got %s", configChangeData, msgs[0].Entries[0].Data)
+	}
 }
