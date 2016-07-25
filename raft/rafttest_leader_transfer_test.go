@@ -16,10 +16,10 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 		To:   1,
 	})
 
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
 
 	// transfer leader from 1 to 2
@@ -30,12 +30,12 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 	})
 
 	// now node 2 is the new leader
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
-	if rndLeader1.leaderID != 2 {
-		t.Fatalf("leaderID expected 2, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	if rnd1.leaderID != 2 {
+		t.Fatalf("leaderID expected 2, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 
 	// write some logs
@@ -52,12 +52,12 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 		From: 1,
 		To:   2,
 	})
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 }
 
@@ -71,7 +71,7 @@ func Test_raft_leader_transfer_to_self(t *testing.T) {
 		To:   1,
 	})
 
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
 
 	// transfer leader from 1 to 1
 	fn.stepFirstMessage(raftpb.Message{
@@ -81,12 +81,12 @@ func Test_raft_leader_transfer_to_self(t *testing.T) {
 	})
 
 	// now 1 is the leader
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 }
 
@@ -99,8 +99,8 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	fn.isolate(3)
 
@@ -112,12 +112,12 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 	})
 
 	// 1 is still the leader
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 3 {
-		t.Fatalf("leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 3 {
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rnd1.leaderTransfereeID)
 	}
 
 	// transfer leader from 1 to 1
@@ -128,12 +128,12 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 	})
 
 	// 1 is the leader
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 }
 
@@ -158,10 +158,10 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 		To:   1,
 	})
 
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
 
 	// transfer leader from 1 to 2
@@ -172,12 +172,12 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 	})
 
 	// now node 2 is the new leader
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
-	if rndLeader1.leaderID != 2 {
-		t.Fatalf("leaderID expected 2, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	if rnd1.leaderID != 2 {
+		t.Fatalf("leaderID expected 2, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 
 	// write some logs
@@ -194,12 +194,12 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 		From: 1,
 		To:   2,
 	})
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 }
 
@@ -212,8 +212,8 @@ func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	fn.isolate(3)
 
@@ -227,11 +227,11 @@ func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
 
 	fn.recoverAll()
 
-	if rndLeader1.allProgresses[2].MatchIndex != 2 {
-		t.Fatalf("rndLeader1.allProgresses[2].MatchIndex expected 1, got %d", rndLeader1.allProgresses[2].MatchIndex)
+	if rnd1.allProgresses[2].MatchIndex != 2 {
+		t.Fatalf("rnd1.allProgresses[2].MatchIndex expected 2, got %d", rnd1.allProgresses[2].MatchIndex)
 	}
-	if rndLeader1.allProgresses[3].MatchIndex != 1 { // 3 should be fallen behind
-		t.Fatalf("rndLeader1.allProgresses[3].MatchIndex expected 1, got %d", rndLeader1.allProgresses[3].MatchIndex)
+	if rnd1.allProgresses[3].MatchIndex != 1 { // 3 should be fallen behind
+		t.Fatalf("rnd1.allProgresses[3].MatchIndex expected 1, got %d", rnd1.allProgresses[3].MatchIndex)
 	}
 
 	// transfer leader from 1 to 3
@@ -243,12 +243,12 @@ func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
 	// now node 3 is the new leader
 	rndLeader3 := fn.allStateMachines[3].(*raftNode)
 
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
-	if rndLeader1.leaderID != 3 {
-		t.Fatalf("leaderID expected 3, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	if rnd1.leaderID != 3 {
+		t.Fatalf("leaderID expected 3, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 
 	rndLeader3.assertNodeState(raftpb.NODE_STATE_LEADER)
@@ -269,8 +269,8 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	fn.isolate(3)
 
@@ -281,22 +281,22 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 		To:      1,
 		Entries: []raftpb.Entry{{}},
 	})
-	persistALlUnstableAndApplyNextEntries(rndLeader1, fn.allStableStorageInMemory[1])
+	persistALlUnstableAndApplyNextEntries(rnd1, fn.allStableStorageInMemory[1])
 
 	fn.allStableStorageInMemory[1].CreateSnapshot(
-		rndLeader1.storageRaftLog.appliedIndex,
-		&raftpb.ConfigState{IDs: rndLeader1.allNodeIDs()},
+		rnd1.storageRaftLog.appliedIndex,
+		&raftpb.ConfigState{IDs: rnd1.allNodeIDs()},
 		nil,
 	)
-	fn.allStableStorageInMemory[1].Compact(rndLeader1.storageRaftLog.appliedIndex)
+	fn.allStableStorageInMemory[1].Compact(rnd1.storageRaftLog.appliedIndex)
 
 	fn.recoverAll()
 
-	if rndLeader1.allProgresses[2].MatchIndex != 2 {
-		t.Fatalf("rndLeader1.allProgresses[2].MatchIndex expected 1, got %d", rndLeader1.allProgresses[2].MatchIndex)
+	if rnd1.allProgresses[2].MatchIndex != 2 {
+		t.Fatalf("rnd1.allProgresses[2].MatchIndex expected 1, got %d", rnd1.allProgresses[2].MatchIndex)
 	}
-	if rndLeader1.allProgresses[3].MatchIndex != 1 { // 3 should be fallen behind
-		t.Fatalf("rndLeader1.allProgresses[3].MatchIndex expected 1, got %d", rndLeader1.allProgresses[3].MatchIndex)
+	if rnd1.allProgresses[3].MatchIndex != 1 { // 3 should be fallen behind
+		t.Fatalf("rnd1.allProgresses[3].MatchIndex expected 1, got %d", rnd1.allProgresses[3].MatchIndex)
 	}
 
 	// transfer leader from 1 to 3, when node 3 is lack of snapshot
@@ -307,7 +307,7 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 	})
 
 	// 1 is now follower
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 
 	// 3 is the new leader
 	rndLeader3 := fn.allStateMachines[3].(*raftNode)
@@ -327,7 +327,7 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 	})
 
 	// 1 is still follower
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 
 	// 3 is still leader
 	rndLeader3.assertNodeState(raftpb.NODE_STATE_LEADER)
@@ -348,8 +348,8 @@ func Test_raft_leader_transfer_to_non_existing_node(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
@@ -358,12 +358,12 @@ func Test_raft_leader_transfer_to_non_existing_node(t *testing.T) {
 		To:   1,
 	})
 
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 }
 
@@ -376,8 +376,8 @@ func Test_raft_leader_transfer_timeout(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	fn.isolate(3)
 
@@ -389,36 +389,79 @@ func Test_raft_leader_transfer_timeout(t *testing.T) {
 	})
 
 	// 1 is still the leader
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
 	}
-	if rndLeader1.leaderTransfereeID != 3 {
-		t.Fatalf("leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
+	if rnd1.leaderTransfereeID != 3 {
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rnd1.leaderTransfereeID)
 	}
-	for i := 0; i < rndLeader1.heartbeatTimeoutTickNum; i++ {
-		rndLeader1.tickFunc()
+	for i := 0; i < rnd1.heartbeatTimeoutTickNum; i++ {
+		rnd1.tickFunc()
 	}
-	if rndLeader1.leaderTransfereeID != 3 {
-		t.Fatalf("leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
-	}
-
-	for i := 0; i < rndLeader1.electionTimeoutTickNum-rndLeader1.heartbeatTimeoutTickNum; i++ {
-		rndLeader1.tickFunc()
+	if rnd1.leaderTransfereeID != 3 {
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rnd1.leaderTransfereeID)
 	}
 
-	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rndLeader1.leaderID != 1 {
-		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	for i := 0; i < rnd1.electionTimeoutTickNum-rnd1.heartbeatTimeoutTickNum; i++ {
+		rnd1.tickFunc()
 	}
-	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
+	}
+	if rnd1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rnd1.leaderTransfereeID)
 	}
 }
 
 // (etcd raft.TestLeaderTransferIgnoreProposal)
 func Test_raft_leader_transfer_ignore_proposal(t *testing.T) {
+	fn := newFakeNetwork(nil, nil, nil)
 
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rnd1 := fn.allStateMachines[1].(*raftNode)
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+
+	fn.isolate(3)
+
+	// transfer leader from 1 to 3
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		From: 3,
+		To:   1,
+	})
+
+	// 1 is still the leader
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rnd1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rnd1.leaderID)
+	}
+	if rnd1.leaderTransfereeID != 3 {
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rnd1.leaderTransfereeID)
+	}
+
+	// write some logs
+	fn.stepFirstMessage(raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+		From:    1,
+		To:      1,
+		Entries: []raftpb.Entry{{}},
+	})
+	if rnd1.allProgresses[1].MatchIndex != 1 {
+		t.Fatalf("rnd1.allProgresses[1].MatchIndex expected 1, got %d", rnd1.allProgresses[1].MatchIndex)
+	}
+	if rnd1.allProgresses[2].MatchIndex != 1 {
+		t.Fatalf("rnd1.allProgresses[2].MatchIndex expected 1, got %d", rnd1.allProgresses[2].MatchIndex)
+	}
+	if rnd1.allProgresses[3].MatchIndex != 1 {
+		t.Fatalf("rnd1.allProgresses[3].MatchIndex expected 1, got %d", rnd1.allProgresses[3].MatchIndex)
+	}
 }
 
 // (etcd raft.TestLeaderTransferReceiveHigherTermVote)
