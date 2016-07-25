@@ -35,7 +35,7 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 		t.Fatalf("leaderID expected 2, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 
 	// write some logs
@@ -57,7 +57,7 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 }
 
@@ -86,7 +86,7 @@ func Test_raft_leader_transfer_to_self(t *testing.T) {
 		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 }
 
@@ -99,10 +99,10 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
+	rndLeader1 := fn.allStateMachines[1].(*raftNode)
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	fn.isolate(3)
-
-	rndLeader1 := fn.allStateMachines[1].(*raftNode)
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
@@ -117,7 +117,7 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 3 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
 	}
 
 	// transfer leader from 1 to 1
@@ -133,7 +133,7 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 }
 
@@ -177,7 +177,7 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 		t.Fatalf("leaderID expected 2, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 
 	// write some logs
@@ -199,7 +199,7 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 }
 
@@ -248,7 +248,7 @@ func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
 		t.Fatalf("leaderID expected 3, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 
 	rndLeader3.assertNodeState(raftpb.NODE_STATE_LEADER)
@@ -256,7 +256,7 @@ func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
 		t.Fatalf("leaderID expected 3, got %d", rndLeader3.leaderID)
 	}
 	if rndLeader3.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader3.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader3.leaderTransfereeID)
 	}
 }
 
@@ -316,7 +316,7 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 		t.Fatalf("leaderID expected 3, got %d", rndLeader3.leaderID)
 	}
 	if rndLeader3.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader3.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader3.leaderTransfereeID)
 	}
 
 	// heartbeat to be ignored
@@ -335,7 +335,7 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 		t.Fatalf("leaderID expected 3, got %d", rndLeader3.leaderID)
 	}
 	if rndLeader3.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader3.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader3.leaderTransfereeID)
 	}
 }
 
@@ -363,30 +363,80 @@ func Test_raft_leader_transfer_to_non_existing_node(t *testing.T) {
 		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
 	}
 	if rndLeader1.leaderTransfereeID != 0 {
-		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
 	}
 }
 
 // (etcd raft.TestLeaderTransferTimeout)
 func Test_raft_leader_transfer_timeout(t *testing.T) {
+	fn := newFakeNetwork(nil, nil, nil)
+
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rndLeader1 := fn.allStateMachines[1].(*raftNode)
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+
+	fn.isolate(3)
+
+	// transfer leader from 1 to 3
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		From: 3,
+		To:   1,
+	})
+
+	// 1 is still the leader
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rndLeader1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	}
+	if rndLeader1.leaderTransfereeID != 3 {
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
+	}
+	for i := 0; i < rndLeader1.heartbeatTimeoutTickNum; i++ {
+		rndLeader1.tickFunc()
+	}
+	if rndLeader1.leaderTransfereeID != 3 {
+		t.Fatalf("leaderTransfereeID expected 3, got %d", rndLeader1.leaderTransfereeID)
+	}
+
+	for i := 0; i < rndLeader1.electionTimeoutTickNum-rndLeader1.heartbeatTimeoutTickNum; i++ {
+		rndLeader1.tickFunc()
+	}
+
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rndLeader1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	}
+	if rndLeader1.leaderTransfereeID != 0 {
+		t.Fatalf("leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	}
 }
 
 // (etcd raft.TestLeaderTransferIgnoreProposal)
 func Test_raft_leader_transfer_ignore_proposal(t *testing.T) {
+
 }
 
 // (etcd raft.TestLeaderTransferReceiveHigherTermVote)
 func Test_raft_leader_transfer_receive_higher_term_vote(t *testing.T) {
+
 }
 
 // (etcd raft.TestLeaderTransferRemoveNode)
 func Test_raft_leader_transfer_remove_node(t *testing.T) {
+
 }
 
 // (etcd raft.TestLeaderTransferSecondTransferToAnotherNode)
 func Test_raft_leader_transfer_second_transfer(t *testing.T) {
+
 }
 
 // (etcd raft.TestLeaderTransferSecondTransferToSameNode)
 func Test_raft_leader_transfer_second_transfer_to_same_node(t *testing.T) {
+
 }
