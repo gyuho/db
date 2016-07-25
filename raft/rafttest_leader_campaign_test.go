@@ -141,7 +141,7 @@ func Test_raft_leader_election(t *testing.T) {
 		}
 
 		// to trigger election to 1
-		tt.fakeNetwork.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+		tt.fakeNetwork.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 
 		if stepNode.state != tt.wNodeState {
 			t.Fatalf("#%d: node state expected %q, got %q", i, tt.wNodeState, stepNode.state)
@@ -157,7 +157,7 @@ func Test_raft_leader_election(t *testing.T) {
 func Test_raft_leader_election_single_node(t *testing.T) {
 	fn := newFakeNetwork(nil)
 
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 
 	rnd1 := fn.allStateMachines[1].(*raftNode)
 	if rnd1.state != raftpb.NODE_STATE_LEADER {
@@ -202,7 +202,7 @@ func Test_raft_leader_election_checkQuorum_candidate(t *testing.T) {
 	// 	rnd1.tickFunc()
 	// }
 
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 
 	if rnd1.state != raftpb.NODE_STATE_CANDIDATE {
 		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_CANDIDATE, rnd1.state)
@@ -229,7 +229,7 @@ func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	}
 
 	// rnd1 will start campaign and become the leader
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
@@ -247,7 +247,7 @@ func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	}
 
 	// rnd3 will start campaign and become the leader
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
 	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_LEADER)
@@ -274,7 +274,7 @@ func Test_raft_leader_election_checkQuorum_leader_ignore_vote(t *testing.T) {
 	}
 
 	// rnd1 will start campaign and become the leader
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
@@ -282,7 +282,7 @@ func Test_raft_leader_election_checkQuorum_leader_ignore_vote(t *testing.T) {
 	// rnd3 will start campaign
 	// but the vote requests will be rejected by rnd2
 	// not yet timing out its election timeout
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
 
 	// current leader rnd1 should ignore the vote request from rnd2
 	// because it's leader
@@ -302,7 +302,7 @@ func Test_raft_leader_election_checkQuorum_leader_ignore_vote(t *testing.T) {
 	}
 
 	// rnd3 will start campaign and become the leader
-	fn.stepFirstFrontMessage(raftpb.Message{
+	fn.stepFirstMessage(raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
 		From: 3,
 		To:   3,
@@ -333,7 +333,7 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	}
 
 	// rnd1 will start campaign and become the leader
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
@@ -342,7 +342,7 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	fn.isolate(1)
 
 	// trigger election from 3
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
@@ -351,7 +351,7 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	}
 
 	// trigger election from 3, again for safety
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
@@ -363,7 +363,7 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	fn.recoverAll()
 
 	// was-isolated leader now sends heartbeat to now-new-candidate
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT, From: 1, To: 3})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT, From: 1, To: 3})
 
 	// once candidate rnd3 gets the heartbeat from leader,
 	// it must revert back to follower first
@@ -401,7 +401,7 @@ func Test_raft_leader_election_checkQuorum_non_promotable_voter(t *testing.T) {
 	}
 
 	// trigger campaign in rnd1
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	if rnd1.leaderID != 1 {

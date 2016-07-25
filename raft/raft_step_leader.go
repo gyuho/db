@@ -407,6 +407,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		}
 		rnd.sendToMailbox(raftpb.Message{
 			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_INDEX,
+			To:       msg.From,
 			LogIndex: logIndex,
 			Entries:  msg.Entries,
 		})
