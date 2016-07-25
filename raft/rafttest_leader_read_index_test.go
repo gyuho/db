@@ -30,7 +30,6 @@ func Test_raft_read_index_with_check_quorum(t *testing.T) {
 		From: 1,
 		To:   1,
 	})
-
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
 
 	tests := []struct {
@@ -75,7 +74,34 @@ func Test_raft_read_index_with_check_quorum(t *testing.T) {
 
 // (etcd raft.TestReadIndexWithoutCheckQuorum)
 func Test_raft_read_index_without_check_quorum(t *testing.T) {
+	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	rnd3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
+	fn := newFakeNetwork(rnd1, rnd2, rnd3)
+
+	// trigger campaign in rnd1
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
+
+	requestCtxToSend := []byte("testcontext")
+	fn.stepFirstMessage(raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_READ_INDEX,
+		From:    2,
+		To:      2,
+		Entries: []raftpb.Entry{{Data: requestCtxToSend}},
+	})
+
+	if rnd2.readState.Index != 0 {
+		t.Fatalf("rnd2 readState.index expected 0, got %d", rnd2.readState.Index)
+	}
+	if !bytes.Equal(rnd2.readState.RequestCtx, requestCtxToSend) {
+		t.Fatalf("request ctx expected %s, got %s", requestCtxToSend, rnd2.readState.RequestCtx)
+	}
 }
 
 // (etcd raft.TestNodeReadIndex)
