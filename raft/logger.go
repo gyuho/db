@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	// defaultLogLevel = xlog.WARN
+	defaultLogLevel = xlog.WARN
 	// defaultLogLevel = xlog.INFO
-	defaultLogLevel = xlog.DEBUG
+	// defaultLogLevel = xlog.DEBUG
 )
 
 func init() {
