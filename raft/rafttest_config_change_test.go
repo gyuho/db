@@ -168,7 +168,53 @@ func Test_raft_delete_node(t *testing.T) {
 
 // (etcd raft.TestCommitAfterRemoveNode)
 func Test_raft_commit_after_delete_node(t *testing.T) {
+	st := NewStorageStableInMemory()
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, st)
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
 
+	configChange := raftpb.ConfigChange{
+		Type:   raftpb.CONFIG_CHANGE_TYPE_REMOVE_NODE,
+		NodeID: 2,
+	}
+	configChangeData, err := configChange.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rnd.Step(raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+		Entries: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Data: configChangeData}},
+	})
+
+	nextEnts := persistALlUnstableAndApplyNextEntries(rnd, st)
+	if len(nextEnts) > 0 {
+		t.Fatalf("unexpected committed entries %+v", nextEnts)
+	}
+	lastIndex := rnd.storageRaftLog.lastIndex()
+
+	// while config change is pending, make another proposal
+	rnd.Step(raftpb.Message{
+		Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
+		Entries: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_NORMAL, Data: []byte("testdata")}},
+	})
+
+	// node 2 acknowledges the config change and commits it
+	rnd.Step(raftpb.Message{
+		Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
+		From:     2,
+		LogIndex: lastIndex,
+	})
+
+	nextEnts = persistALlUnstableAndApplyNextEntries(rnd, st)
+	if len(nextEnts) != 2 {
+		t.Fatalf("len(nextEnts) expected 2, got %v", len(nextEnts))
+	}
+	if nextEnts[0].Type != raftpb.ENTRY_TYPE_NORMAL || nextEnts[0].Data != nil {
+		t.Fatalf("first entry expected empty, got %+v", nextEnts[0])
+	}
+	if nextEnts[1].Type != raftpb.ENTRY_TYPE_CONFIG_CHANGE {
+		t.Fatalf("nextEnts[1] expected raftpb.ENTRY_TYPE_CONFIG_CHANGE, got %+v", nextEnts[1])
+	}
 }
 
 // (etcd raft.TestNodeProposeConfig)
