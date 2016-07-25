@@ -259,7 +259,7 @@ func Test_raft_node_propose_config(t *testing.T) {
 		t.Fatalf("len(msgs) expected 1, got %d", len(msgs))
 	}
 	if msgs[0].Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
-		t.Fatalf("message type expected %q, got %q", raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, msgs[0].Type)
+		t.Fatalf("msgs[0].Type expected %q, got %q", raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, msgs[0].Type)
 	}
 
 	configChangeData, err := configChange.Marshal()

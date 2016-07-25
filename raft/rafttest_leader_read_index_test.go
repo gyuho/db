@@ -2,6 +2,7 @@ package raft
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/gyuho/db/raft/raftpb"
@@ -106,5 +107,55 @@ func Test_raft_read_index_without_check_quorum(t *testing.T) {
 
 // (etcd raft.TestNodeReadIndex)
 func Test_raft_node_read_index(t *testing.T) {
+	var msgs []raftpb.Message
+	stepFuncAppend := func(rnd *raftNode, msg raftpb.Message) {
+		msgs = append(msgs, msg)
+	}
+	wReadIndex := uint64(1)
+	wRequestCtx := []byte("testdata")
 
+	nd := newNode()
+	st := NewStorageStableInMemory()
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, st)
+	rnd.readState.Index = wReadIndex
+	rnd.readState.RequestCtx = wRequestCtx
+
+	go nd.runWithRaftNode(rnd)
+
+	nd.Campaign(context.TODO())
+
+	for {
+		rd := <-nd.Ready()
+		if rd.ReadState.Index != wReadIndex {
+			t.Fatalf("read index expected %d, got %d", wReadIndex, rd.ReadState.Index)
+		}
+		if !bytes.Equal(rd.ReadState.RequestCtx, wRequestCtx) {
+			t.Fatalf("request ctx expected %s, got %s", wRequestCtx, rd.ReadState.RequestCtx)
+		}
+
+		st.Append(rd.EntriesToAppend...)
+
+		// until this raft node becomes leader
+		if rd.SoftState.LeaderID == rnd.id {
+			rnd.stepFunc = stepFuncAppend
+			nd.Advance()
+			break
+		}
+
+		nd.Advance()
+	}
+
+	wRequestCtx = []byte("testdata2")
+	nd.ReadIndex(context.TODO(), wRequestCtx)
+	nd.Stop()
+
+	if len(msgs) != 1 {
+		t.Fatalf("len(msgs) expected 1, got %d", len(msgs))
+	}
+	if msgs[0].Type != raftpb.MESSAGE_TYPE_READ_INDEX {
+		t.Fatalf("msgs[0].Type expected %q, got %q", raftpb.MESSAGE_TYPE_READ_INDEX, msgs[0].Type)
+	}
+	if !bytes.Equal(msgs[0].Entries[0].Data, wRequestCtx) {
+		t.Fatalf("data expected %s, got %s", wRequestCtx, msgs[0].Entries[0].Data)
+	}
 }
