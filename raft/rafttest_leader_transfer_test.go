@@ -341,6 +341,30 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 
 // (etcd raft.TestLeaderTransferToNonExistingNode)
 func Test_raft_leader_transfer_to_non_existing_node(t *testing.T) {
+	fn := newFakeNetwork(nil, nil, nil)
+
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
+		From: 1,
+		To:   1,
+	})
+	rndLeader1 := fn.allStateMachines[1].(*raftNode)
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+
+	// transfer leader from 1 to 3
+	fn.stepFirstMessage(raftpb.Message{
+		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		From: 4,
+		To:   1,
+	})
+
+	rndLeader1.assertNodeState(raftpb.NODE_STATE_LEADER)
+	if rndLeader1.leaderID != 1 {
+		t.Fatalf("leaderID expected 1, got %d", rndLeader1.leaderID)
+	}
+	if rndLeader1.leaderTransfereeID != 0 {
+		t.Fatalf("after leader transfer, leaderTransfereeID expected 0, got %d", rndLeader1.leaderTransfereeID)
+	}
 }
 
 // (etcd raft.TestLeaderTransferTimeout)
