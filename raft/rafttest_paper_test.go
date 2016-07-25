@@ -14,15 +14,15 @@ func Test_raft_paper_follower_update_term_from_Message(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeFollower(1, 2) // leaderID 2
 
-	// case msg.SenderCurrentTerm > rnd.term:
+	// case msg.SenderCurrentTerm > rnd.currentTerm:
 	//
 	// func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	//   msg.From = rnd.id
 	//
 	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: 2})
 
-	if rnd.term != 2 {
-		t.Fatalf("term expected 2, got %d", rnd.term)
+	if rnd.currentTerm != 2 {
+		t.Fatalf("term expected 2, got %d", rnd.currentTerm)
 	}
 	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
 		t.Fatalf("node state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd.state)
@@ -34,15 +34,15 @@ func Test_raft_paper_candidate_update_term_from_Message(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 
-	// case msg.SenderCurrentTerm > rnd.term:
+	// case msg.SenderCurrentTerm > rnd.currentTerm:
 	//
 	// func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	//   msg.From = rnd.id
 	//
 	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: 2})
 
-	if rnd.term != 2 {
-		t.Fatalf("term expected 2, got %d", rnd.term)
+	if rnd.currentTerm != 2 {
+		t.Fatalf("term expected 2, got %d", rnd.currentTerm)
 	}
 	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
 		t.Fatalf("node state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd.state)
@@ -55,15 +55,15 @@ func Test_raft_paper_leader_update_term_from_Message(t *testing.T) {
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
 
-	// case msg.SenderCurrentTerm > rnd.term:
+	// case msg.SenderCurrentTerm > rnd.currentTerm:
 	//
 	// func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	//   msg.From = rnd.id
 	//
 	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: 2})
 
-	if rnd.term != 2 {
-		t.Fatalf("term expected 2, got %d", rnd.term)
+	if rnd.currentTerm != 2 {
+		t.Fatalf("term expected 2, got %d", rnd.currentTerm)
 	}
 	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
 		t.Fatalf("node state expected %q, got %q", raftpb.NODE_STATE_FOLLOWER, rnd.state)
@@ -93,7 +93,7 @@ func Test_raft_paper_reject_stale_term_message(t *testing.T) {
 	rnd.stepFunc = stepFuncTest
 	rnd.loadHardState(raftpb.HardState{Term: 2})
 
-	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: rnd.term - 1})
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, SenderCurrentTerm: rnd.currentTerm - 1})
 
 	if called {
 		t.Fatal("message should have been rejected not calling stepFunc")
@@ -142,15 +142,15 @@ func Test_raft_paper_follower_start_election(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
 	rnd.becomeFollower(1, 2) // term 1, leader is 2
-	oldTerm := rnd.term
+	oldTerm := rnd.currentTerm
 
 	// election timeout to trigger election from follower
 	for i := 0; i < 2*rnd.electionTimeoutTickNum; i++ {
 		rnd.tickFunc()
 	}
 
-	if rnd.term != oldTerm+1 {
-		t.Fatalf("term should have increased to %d, got %d", oldTerm+1, rnd.term)
+	if rnd.currentTerm != oldTerm+1 {
+		t.Fatalf("term should have increased to %d, got %d", oldTerm+1, rnd.currentTerm)
 	}
 
 	rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
@@ -178,7 +178,7 @@ func Test_raft_paper_candidate_start_election(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
 	rnd.becomeCandidate() // term 2
-	oldTerm := rnd.term
+	oldTerm := rnd.currentTerm
 
 	// election timeout to trigger another election from candidate
 	// candidate starts a new election and increments its term
@@ -186,8 +186,8 @@ func Test_raft_paper_candidate_start_election(t *testing.T) {
 		rnd.tickFunc()
 	}
 
-	if rnd.term != oldTerm+1 {
-		t.Fatalf("term should have increased to %d, got %d", oldTerm+1, rnd.term)
+	if rnd.currentTerm != oldTerm+1 {
+		t.Fatalf("term should have increased to %d, got %d", oldTerm+1, rnd.currentTerm)
 	}
 
 	rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
@@ -237,7 +237,7 @@ func Test_raft_paper_election(t *testing.T) {
 
 	for i, tt := range tests {
 		rnd := newTestRaftNode(1, generateIDs(tt.clusterSize), 10, 1, NewStorageStableInMemory())
-		oldTerm := rnd.term
+		oldTerm := rnd.currentTerm
 
 		// trigger election in node 1
 		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
@@ -250,8 +250,8 @@ func Test_raft_paper_election(t *testing.T) {
 			t.Fatalf("#%d: node state expected %q, got %q", i, tt.wState, rnd.state)
 		}
 
-		if rnd.term != oldTerm+1 {
-			t.Fatalf("#%d: term should have increased to %d, got %d", i, oldTerm+1, rnd.term)
+		if rnd.currentTerm != oldTerm+1 {
+			t.Fatalf("#%d: term should have increased to %d, got %d", i, oldTerm+1, rnd.currentTerm)
 		}
 	}
 }
@@ -304,16 +304,16 @@ func Test_raft_paper_candidate_revert_to_follower(t *testing.T) {
 
 		rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
 
-		if rnd.term != 1 {
-			t.Fatalf("#%d: term expected 1, got %d", i, rnd.term)
+		if rnd.currentTerm != 1 {
+			t.Fatalf("#%d: term expected 1, got %d", i, rnd.currentTerm)
 		}
 
 		rnd.Step(msg)
 
 		rnd.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 
-		if rnd.term != msg.SenderCurrentTerm {
-			t.Fatalf("#%d: term expected %d, got %d", i, msg.SenderCurrentTerm, rnd.term)
+		if rnd.currentTerm != msg.SenderCurrentTerm {
+			t.Fatalf("#%d: term expected %d, got %d", i, msg.SenderCurrentTerm, rnd.currentTerm)
 		}
 	}
 }
@@ -324,7 +324,7 @@ func Test_raft_paper_follower_election_timeout_randomized(t *testing.T) {
 
 	electionTimedoutTick := make(map[int]bool)
 	for i := 0; i < 50*rnd.electionTimeoutTickNum; i++ {
-		rnd.becomeFollower(rnd.term+1, 2) // leader is 2
+		rnd.becomeFollower(rnd.currentTerm+1, 2) // leader is 2
 
 		time := 0
 		for (len(rnd.readAndClearMailbox())) == 0 { // till election timeout
@@ -368,7 +368,7 @@ func Test_raft_paper_candidate_election_timeout_randomized(t *testing.T) {
 func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
 	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
 	defer func() {
-		raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+		raftLogger.SetLogger(xlog.NewLogger("raft", defaultLogLevel))
 	}()
 
 	raftNodes := make([]*raftNode, 5)
@@ -381,7 +381,7 @@ func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		for _, rnd := range raftNodes {
-			rnd.becomeFollower(rnd.term+1, NoNodeID)
+			rnd.becomeFollower(rnd.currentTerm+1, NoNodeID)
 		}
 
 		electionTimedout := 0
@@ -409,7 +409,7 @@ func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
 func Test_raft_paper_candidate_election_timeout_no_conflict(t *testing.T) {
 	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
 	defer func() {
-		raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
+		raftLogger.SetLogger(xlog.NewLogger("raft", defaultLogLevel))
 	}()
 
 	raftNodes := make([]*raftNode, 5)
@@ -914,18 +914,18 @@ func Test_raft_paper_leader_sync_follower_log(t *testing.T) {
 
 		fn := newFakeNetwork(rndLeader, rndFollower, noOpBlackHole)
 
-		fn.stepFirstFrontMessage(raftpb.Message{
+		fn.stepFirstMessage(raftpb.Message{
 			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
 			From: 1,
 			To:   1,
 		})
-		fn.stepFirstFrontMessage(raftpb.Message{
+		fn.stepFirstMessage(raftpb.Message{
 			Type:              raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
 			From:              3,
 			To:                1,
 			SenderCurrentTerm: 1,
 		})
-		fn.stepFirstFrontMessage(raftpb.Message{
+		fn.stepFirstMessage(raftpb.Message{
 			Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
 			From:    1,
 			To:      1,

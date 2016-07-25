@@ -19,7 +19,7 @@ func Test_raft_snapshot_heartbeat(t *testing.T) {
 	st := NewStorageStableInMemory()
 	st.ApplySnapshot(snap)
 	rnd := newTestRaftNode(1, nil, 10, 1, st)
-	rnd.term = snap.Metadata.Term
+	rnd.currentTerm = snap.Metadata.Term
 
 	if !reflect.DeepEqual(rnd.allNodeIDs(), []uint64{1, 2, 3}) {
 		t.Fatalf("node ids expected %+v, got %+v", []uint64{1, 2, 3}, rnd.allNodeIDs())
@@ -359,7 +359,7 @@ func Test_raft_snapshot_restore_leader(t *testing.T) {
 	rnd.becomeLeader()
 
 	// force set the next index of 2
-	// to make it need snapshot from leader
+	// to trigger snapshot from leader
 	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex()
 
 	rnd.Step(raftpb.Message{
@@ -396,7 +396,7 @@ func Test_raft_snapshot_restore_leader_cancel_snapshot(t *testing.T) {
 	rnd.becomeLeader()
 
 	// force set the next index of 2
-	// to make it need snapshot from leader
+	// to trigger snapshot from leader
 	rnd.allProgresses[2].NextIndex = rnd.storageRaftLog.firstIndex() - 1
 	rnd.allProgresses[2].RecentActive = false
 	// now node 1 does not send snapshot to 2
@@ -426,8 +426,8 @@ func Test_raft_snapshot_restore_msg_snap(t *testing.T) {
 	if rnd.leaderID != uint64(1) {
 		t.Fatalf("leaderID expected 1, got %d", rnd.leaderID)
 	}
-	if rnd.term != uint64(2) {
-		t.Fatalf("term expected 2, got %d", rnd.term)
+	if rnd.currentTerm != uint64(2) {
+		t.Fatalf("term expected 2, got %d", rnd.currentTerm)
 	}
 }
 
@@ -436,12 +436,12 @@ func Test_raft_snapshot_restore_slow_node(t *testing.T) {
 	fn := newFakeNetwork(nil, nil, nil)
 
 	// make 1 leader
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 
 	// to make 3 fall behind
 	fn.isolate(3)
 	for i := 0; i <= 10; i++ {
-		fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+		fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
 	}
 
 	// to trigger snapshot
@@ -452,17 +452,17 @@ func Test_raft_snapshot_restore_slow_node(t *testing.T) {
 
 	fn.recoverAll()
 	for {
-		fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1})
+		fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1})
 		if rndLeader.allProgresses[3].RecentActive {
 			break
 		}
 	}
 
 	// trigger snapshot
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
 
 	// trigger commit
-	fn.stepFirstFrontMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
+	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, From: 1, To: 1, Entries: []raftpb.Entry{{Data: []byte("testdata")}}})
 
 	// 'maybeUpdateAndResume' updates MatchIndex
 	// 'leaderMaybeCommitWithQuorumMatchIndex' updates the committed index

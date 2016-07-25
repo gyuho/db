@@ -31,11 +31,11 @@ type Ready struct {
 	// (etcd raft.Ready.Snapshot)
 	SnapshotToSave raftpb.Snapshot
 
-	// EntriesToSave specifies the entries to save to stable storage
+	// EntriesToAppend specifies the entries to save to stable storage
 	// BEFORE messages are sent out.
 	//
 	// (etcd raft.Ready.Entries)
-	EntriesToSave []raftpb.Entry
+	EntriesToAppend []raftpb.Entry
 
 	// EntriesToCommit specifies the entries to commit, which have already been
 	// saved in stable storage.
@@ -43,7 +43,7 @@ type Ready struct {
 	// (etcd raft.Ready.CommittedEntries)
 	EntriesToCommit []raftpb.Entry
 
-	// MessagesToSend is outbound messages to be sent AFTER EntriesToSave are committed
+	// MessagesToSend is outbound messages to be sent AFTER EntriesToAppend are committed
 	// to the stable storage. If it contains raftpb.LEADER_SNAPSHOT_REQUEST, the application
 	// MUST report back to Raft when the snapshot has been received or has failed, by calling
 	// ReportSnapshot.
@@ -63,7 +63,7 @@ func (rd Ready) ContainsUpdates() bool {
 	return rd.SoftState != nil ||
 		!raftpb.IsEmptyHardState(rd.HardStateToSave) ||
 		!raftpb.IsEmptySnapshot(rd.SnapshotToSave) ||
-		len(rd.EntriesToSave) > 0 ||
+		len(rd.EntriesToAppend) > 0 ||
 		len(rd.EntriesToCommit) > 0 ||
 		len(rd.MessagesToSend) > 0 ||
 		rd.ReadState.Index != 0
@@ -72,7 +72,7 @@ func (rd Ready) ContainsUpdates() bool {
 // (etcd raft.newReady)
 func newReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState raftpb.HardState) Ready {
 	rd := Ready{
-		EntriesToSave:   rnd.storageRaftLog.unstableEntries(),
+		EntriesToAppend: rnd.storageRaftLog.unstableEntries(),
 		EntriesToCommit: rnd.storageRaftLog.nextEntriesToApply(),
 		MessagesToSend:  rnd.mailbox,
 	}

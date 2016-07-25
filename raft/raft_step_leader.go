@@ -122,7 +122,7 @@ func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
 
 	// maybeCommit is only successful if 'indexToCommit' is greater than current 'committedIndex'
 	// and the current term of 'indexToCommit' matches the 'termToCommit', without ErrCompacted.
-	return rnd.storageRaftLog.maybeCommit(indexToCommit, rnd.term)
+	return rnd.storageRaftLog.maybeCommit(indexToCommit, rnd.currentTerm)
 }
 
 // leaderSendAppendOrSnapshot sends:
@@ -236,7 +236,7 @@ func (rnd *raftNode) leaderAppendEntriesToLeader(entries ...raftpb.Entry) {
 
 	for idx := range entries {
 		entries[idx].Index = storageLastIndex + 1 + uint64(idx)
-		entries[idx].Term = rnd.term
+		entries[idx].Term = rnd.currentTerm
 	}
 
 	rnd.storageRaftLog.appendToStorageUnstable(entries...)
@@ -264,7 +264,7 @@ func (rnd *raftNode) becomeLeader() {
 
 	oldState := rnd.state
 
-	rnd.resetWithTerm(rnd.term)
+	rnd.resetWithTerm(rnd.currentTerm)
 	rnd.leaderID = rnd.id
 	rnd.state = raftpb.NODE_STATE_LEADER
 
@@ -327,9 +327,9 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	// will respond to these requests with reject hints of its last index, if needed.
 	//
 	//
-	// If checkQuorum is true, leader checks if quorum of cluster are active for every election timeout
-	// (if rnd.allProgresses[id].RecentActive {activeN++}).
-	// And leader maintains 'Progress.RecentActive' for every incoming message from follower.
+	// If checkQuorum is true, leader checks if quorum of cluster are active for every election timeout.
+	// Leader sends internal check-quorum message to trigger quorum-check
+	// for every election timeout (raftNode.tickFuncLeaderHeartbeatTimeout).
 	// Now, if quorum is not active, leader reverts back to follower.
 
 	// leader to take action, or receive response
@@ -341,7 +341,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM: // pb.MsgCheckQuorum
 		if !rnd.checkQuorumActive() {
 			raftLogger.Warningf("%s steps down to %q, because quorum is not active", rnd.describe(), raftpb.NODE_STATE_FOLLOWER)
-			rnd.becomeFollower(rnd.term, NoNodeID) // becomeFollower(term, leader)
+			rnd.becomeFollower(rnd.currentTerm, NoNodeID) // becomeFollower(term, leader)
 		}
 		return
 
@@ -407,6 +407,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		}
 		rnd.sendToMailbox(raftpb.Message{
 			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_INDEX,
+			To:       msg.From,
 			LogIndex: logIndex,
 			Entries:  msg.Entries,
 		})
@@ -549,14 +550,9 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRANSFER_LEADER: // pb.MsgTransferLeader
+	case raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER: // pb.MsgTransferLeader
 		lastLeaderTransfereeID := rnd.leaderTransfereeID
 		leaderTransfereeID := msg.From
-
-		if rnd.id == leaderTransfereeID {
-			raftLogger.Infof("%s is already a leader, so ignores leadership transfer request", rnd.describe())
-			return
-		}
 
 		if lastLeaderTransfereeID != NoNodeID {
 			if lastLeaderTransfereeID == leaderTransfereeID {
@@ -572,6 +568,11 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	(%x got a new leadership transfer request to FOLLOWER %x)
 
 `, rnd.describeLong(), lastLeaderTransfereeID, rnd.id, leaderTransfereeID)
+		}
+
+		if rnd.id == leaderTransfereeID {
+			raftLogger.Infof("%s is already a leader, so ignores leadership transfer request", rnd.describe())
+			return
 		}
 
 		rnd.leaderTransfereeID = leaderTransfereeID

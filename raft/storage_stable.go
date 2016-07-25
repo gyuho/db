@@ -49,7 +49,7 @@ type StorageStable interface {
 	// logs when the quorum of cluster is available. But when the unavailable
 	// minority of servers become available, they need to catch up, by
 	// receiving the snapshots from leader, because those missing log entries
-	// are possibly gone forever (compacted). So servers sometimes sends snapshots
+	// are possibly gone forever(compacted). So leader sometimes sends snapshots
 	// to each other across the network. Write-ahead log approach continuously
 	// snapshots to the disk.
 	//

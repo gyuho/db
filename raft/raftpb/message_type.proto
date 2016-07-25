@@ -29,7 +29,7 @@ enum MESSAGE_TYPE {
 	LEADER_SNAPSHOT                      = 11; // (etcd raft.raftpb.MsgSnap)
 	INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT = 12; // (etcd raft.raftpb.MsgSnapStatus)
 
-	INTERNAL_TRANSFER_LEADER = 13; // (etcd raft.raftpb.MsgTransferLeader)
+	INTERNAL_LEADER_TRANSFER = 13; // (etcd raft.raftpb.MsgTransferLeader)
 	FORCE_ELECTION_TIMEOUT   = 14; // (etcd raft.raftpb.MsgTimeoutNow)
 	
 	READ_INDEX             = 15; // (etcd raft.raftpb.MsgReadIndex)

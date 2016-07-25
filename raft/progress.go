@@ -55,6 +55,8 @@ func (pr *Progress) resetState(state raftpb.PROGRESS_STATE) {
 	pr.PendingSnapshotIndex = 0
 	pr.Paused = false
 
+	pr.inflights.freeAll()
+
 	// https://github.com/coreos/etcd/pull/5921
 	// this only changes when leader receives a message from follower,
 	// which indicates that the follower is active in leader's viewpoint

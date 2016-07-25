@@ -83,11 +83,11 @@ func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 }
 
 // (etcd raft.network.send)
-func (fn *fakeNetwork) stepFirstFrontMessage(msgs ...raftpb.Message) {
+func (fn *fakeNetwork) stepFirstMessage(msgs ...raftpb.Message) {
 	for len(msgs) > 0 {
-		m := msgs[0]
-		st := fn.allStateMachines[m.To]
-		st.Step(m)
+		msg := msgs[0]
+		st := fn.allStateMachines[msg.To]
+		st.Step(msg)
 
 		msgs = append(msgs[1:], fn.filter(st.readAndClearMailbox())...)
 	}

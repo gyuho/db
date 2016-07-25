@@ -19,8 +19,8 @@ const (
 // (etcd raft.newTestRaft)
 func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *raftNode {
 	return newRaftNode(&Config{
-		ID:                      id,
 		allPeerIDs:              allPeerIDs,
+		ID:                      id,
 		ElectionTickNum:         electionTick,
 		HeartbeatTimeoutTickNum: heartbeatTick,
 		CheckQuorum:             false,
@@ -39,8 +39,8 @@ func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
 	}
 
 	rnd := newRaftNode(&Config{
-		ID:                      1, // to be overwritten in 'newFakeNetwork'
 		allPeerIDs:              nil,
+		ID:                      1, // to be overwritten in 'newFakeNetwork'
 		ElectionTickNum:         defaultTestElectionTickNum,
 		HeartbeatTimeoutTickNum: defaultTestHeartbeatTimeoutTickNum,
 		CheckQuorum:             false,

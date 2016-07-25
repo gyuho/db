@@ -38,14 +38,14 @@ func Test_raft_log_replication(t *testing.T) {
 
 	for i, tt := range tests {
 		// to trigger election to 1
-		tt.fakeNetwork.stepFirstFrontMessage(raftpb.Message{
+		tt.fakeNetwork.stepFirstMessage(raftpb.Message{
 			Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN,
 			From: 1,
 			To:   1,
 		})
 
 		for _, m := range tt.msgsToSendOneByOne {
-			tt.fakeNetwork.stepFirstFrontMessage(m)
+			tt.fakeNetwork.stepFirstMessage(m)
 		}
 
 		for id, machine := range tt.fakeNetwork.allStateMachines {

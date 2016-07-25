@@ -15,4 +15,3 @@ rm -rf vendor
 glide -v
 glide update --strip-vendor --strip-vcs --update-vendored
 glide vc --only-code --no-tests
-

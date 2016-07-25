@@ -6,9 +6,14 @@ import (
 	"github.com/gyuho/db/pkg/xlog"
 )
 
+const (
+	defaultLogLevel = xlog.WARN
+	// defaultLogLevel = xlog.INFO
+	// defaultLogLevel = xlog.DEBUG
+)
+
 func init() {
-	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
-	// raftLogger.SetLogger(xlog.NewLogger("raft", xlog.DEBUG))
+	raftLogger.SetLogger(xlog.NewLogger("raft", defaultLogLevel))
 }
 
 // Logger defines logging interface for Raft.
