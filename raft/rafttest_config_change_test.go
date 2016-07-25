@@ -106,7 +106,20 @@ func Test_raft_recover_pending_config(t *testing.T) {
 
 // (etcd raft.TestRecoverDoublePendingConfig)
 func Test_raft_recover_double_pending_config(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			t.Logf("panic with %v", err)
+		} else {
+			t.Fatal("expect panic, but nothing happens")
+		}
+	}()
 
+	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
+	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE})
+	rnd.leaderAppendEntriesToLeader(raftpb.Entry{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE})
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
 }
 
 // (etcd raft.TestAddNode)
