@@ -11,16 +11,16 @@ import (
 //
 // (etcd raft.raftLog)
 type storageRaftLog struct {
-	// storageStable contains all stable entries since the last snapshot.
-	//
-	// (etcd raft.raftLog.storage)
-	storageStable StorageStable
-
 	// storageUnstable contains all unstable entries and snapshot to store into stableStorage.
 	// No need to define in pointer because 'storageRaftLog' will be passed with pointer.
 	//
 	// (etcd raft.raftLog.unstable)
 	storageUnstable storageUnstable
+
+	// storageStable contains all stable entries since the last snapshot.
+	//
+	// (etcd raft.raftLog.storage)
+	storageStable StorageStable
 
 	// committedIndex is the higest log position that is known to be stored in
 	// the stable storage "on a quorum of nodes".

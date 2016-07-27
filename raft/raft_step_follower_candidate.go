@@ -262,7 +262,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
 		if rnd.leaderID == NoNodeID {
-			raftLogger.Infof("%s has no leader (dropping proposal)", rnd.describe(), rnd.leaderID)
+			raftLogger.Infof("%s has no leader (dropping %q)", rnd.describe(), rnd.leaderID, msg.Type)
 			return
 		}
 		msg.To = rnd.leaderID
@@ -399,7 +399,7 @@ func stepCandidate(rnd *raftNode, msg raftpb.Message) {
 
 	switch msg.Type {
 	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
-		raftLogger.Infof("%s so there's no known leader (dropping proposal)", rnd.describe())
+		raftLogger.Infof("%s so there's no known leader (dropping %q)", rnd.describe(), msg.Type)
 		return
 
 	case raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT: // pb.MsgHeartbeat
