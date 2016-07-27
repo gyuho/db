@@ -22,13 +22,6 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 		return nil
 	}
 
-	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER {
-		if rnd.state != raftpb.NODE_STATE_LEADER {
-			raftLogger.Infof("%s ignores %q to %x because it's not a leader", rnd.describe(), msg.Type, msg.From)
-			return nil // ???
-		}
-	}
-
 	switch {
 	case msg.SenderCurrentTerm == 0: // local message (e.g. msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER)
 

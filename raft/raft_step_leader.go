@@ -550,7 +550,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 `, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.From)
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER: // pb.MsgTransferLeader
+	case raftpb.MESSAGE_TYPE_TRANSFER_LEADER: // pb.MsgTransferLeader
 		lastLeaderTransfereeID := rnd.leaderTransfereeID
 		leaderTransfereeID := msg.From
 

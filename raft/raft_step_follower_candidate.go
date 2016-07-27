@@ -325,12 +325,20 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		}
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
-		raftLogger.Infof("%s received %q, so now campaign to get leadership", rnd.describe(), msg.Type)
+		raftLogger.Infof("%s received %q, so now campaign to become leader", rnd.describe(), msg.Type)
 		rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
+
+	case raftpb.MESSAGE_TYPE_TRANSFER_LEADER: // pb.MsgTransferLeader
+		if rnd.leaderID == NoNodeID {
+			raftLogger.Infof("%s has no leader (dropping %q)", rnd.describe(), msg.Type)
+			return
+		}
+		msg.To = rnd.leaderID
+		rnd.sendToMailbox(msg)
 
 	case raftpb.MESSAGE_TYPE_READ_INDEX: // pb.MsgReadIndex
 		if rnd.leaderID == NoNodeID {
-			raftLogger.Infof("%s has no leader (dropping read index message)", rnd.describe())
+			raftLogger.Infof("%s has no leader (dropping %q)", rnd.describe(), msg.Type)
 			return
 		}
 		msg.To = rnd.leaderID
