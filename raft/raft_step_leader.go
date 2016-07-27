@@ -257,6 +257,17 @@ func (rnd *raftNode) leaderForceFollowerElectionTimeout(targetID uint64) {
 	})
 }
 
+// (etcd raft.numOfPendingConf)
+func countPendingConfigChange(entries []raftpb.Entry) int {
+	n := 0
+	for i := range entries {
+		if entries[i].Type == raftpb.ENTRY_TYPE_CONFIG_CHANGE {
+			n++
+		}
+	}
+	return n
+}
+
 // (etcd raft.raft.becomeLeader)
 func (rnd *raftNode) becomeLeader() {
 	// cannot be leader without going through candidate state
@@ -277,13 +288,11 @@ func (rnd *raftNode) becomeLeader() {
 		raftLogger.Panicf("%s returned unexpected error (%v) while getting uncommitted entries", rnd.describe(), err)
 	}
 
-	for i := range entries {
-		if entries[i].Type != raftpb.ENTRY_TYPE_CONFIG_CHANGE {
-			continue
-		}
-		if rnd.pendingConfigExist {
-			raftLogger.Panicf("%s has uncommitted duplicate configuration change entry (%+v)", rnd.describe(), entries[i])
-		}
+	nconf := countPendingConfigChange(entries)
+	switch {
+	case nconf > 1:
+		raftLogger.Panicf("%s has uncommitted duplicate configuration change entry (%+v)", rnd.describe(), entries)
+	case nconf == 1:
 		rnd.pendingConfigExist = true
 	}
 
