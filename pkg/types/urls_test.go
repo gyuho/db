@@ -3,8 +3,6 @@ package types
 import (
 	"reflect"
 	"testing"
-
-	"github.com/coreos/etcd/pkg/testutil"
 )
 
 func TestNewURLs(t *testing.T) {
@@ -14,18 +12,18 @@ func TestNewURLs(t *testing.T) {
 	}{
 		{
 			[]string{"http://127.0.0.1:2379"},
-			testutil.MustNewURLs(t, []string{"http://127.0.0.1:2379"}),
+			testMustNewURLs(t, []string{"http://127.0.0.1:2379"}),
 		},
 		{ // trim space
 			[]string{"   http://127.0.0.1:2379    "},
-			testutil.MustNewURLs(t, []string{"http://127.0.0.1:2379"}),
+			testMustNewURLs(t, []string{"http://127.0.0.1:2379"}),
 		},
 		{ // sort
 			[]string{
 				"http://127.0.0.2:2379",
 				"http://127.0.0.1:2379",
 			},
-			testutil.MustNewURLs(t, []string{
+			testMustNewURLs(t, []string{
 				"http://127.0.0.1:2379",
 				"http://127.0.0.2:2379",
 			}),
@@ -50,18 +48,18 @@ func TestURLsString(t *testing.T) {
 			"",
 		},
 		{
-			testutil.MustNewURLs(t, []string{"http://127.0.0.1:2379"}),
+			testMustNewURLs(t, []string{"http://127.0.0.1:2379"}),
 			"http://127.0.0.1:2379",
 		},
 		{
-			testutil.MustNewURLs(t, []string{
+			testMustNewURLs(t, []string{
 				"http://127.0.0.1:2379",
 				"http://127.0.0.2:2379",
 			}),
 			"http://127.0.0.1:2379,http://127.0.0.2:2379",
 		},
 		{
-			testutil.MustNewURLs(t, []string{
+			testMustNewURLs(t, []string{
 				"http://127.0.0.2:2379",
 				"http://127.0.0.1:2379",
 			}),
@@ -77,13 +75,13 @@ func TestURLsString(t *testing.T) {
 }
 
 func TestURLsSort(t *testing.T) {
-	g := testutil.MustNewURLs(t, []string{
+	g := testMustNewURLs(t, []string{
 		"http://127.0.0.4:2379",
 		"http://127.0.0.2:2379",
 		"http://127.0.0.1:2379",
 		"http://127.0.0.3:2379",
 	})
-	w := testutil.MustNewURLs(t, []string{
+	w := testMustNewURLs(t, []string{
 		"http://127.0.0.1:2379",
 		"http://127.0.0.2:2379",
 		"http://127.0.0.3:2379",
@@ -107,18 +105,18 @@ func TestURLsStringSlice(t *testing.T) {
 			[]string{},
 		},
 		{
-			testutil.MustNewURLs(t, []string{"http://127.0.0.1:2379"}),
+			testMustNewURLs(t, []string{"http://127.0.0.1:2379"}),
 			[]string{"http://127.0.0.1:2379"},
 		},
 		{
-			testutil.MustNewURLs(t, []string{
+			testMustNewURLs(t, []string{
 				"http://127.0.0.1:2379",
 				"http://127.0.0.2:2379",
 			}),
 			[]string{"http://127.0.0.1:2379", "http://127.0.0.2:2379"},
 		},
 		{
-			testutil.MustNewURLs(t, []string{
+			testMustNewURLs(t, []string{
 				"http://127.0.0.2:2379",
 				"http://127.0.0.1:2379",
 			}),
