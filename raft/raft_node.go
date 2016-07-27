@@ -12,7 +12,7 @@ import (
 // or to reset leader transfer.
 const NoNodeID uint64 = 0
 
-// raftNode represents Raft-algorithm-specific node.
+// raftNode contains all Raft-algorithm-specific data, wrapping storageRaftLog.
 //
 // (etcd raft.raft)
 type raftNode struct {

@@ -4,11 +4,4 @@
 // easier to test and more determinstic.
 //
 // Reference implementation is https://github.com/coreos/etcd/tree/master/raft.
-//
 package raft
-
-/*
-???
-Raft 6.3 Implementing linearizable semantics
-unique client id
-*/

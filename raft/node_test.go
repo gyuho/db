@@ -312,8 +312,6 @@ func Test_node_StartNode(t *testing.T) {
 	}, []Peer{{ID: 1}})
 	defer nd.Stop()
 
-	nd.Campaign(ctx)
-
 	// rd := Ready{
 	// 	EntriesToAppend: rnd.storageRaftLog.unstableEntries(),
 	// 	EntriesToCommit: rnd.storageRaftLog.nextEntriesToApply(),
@@ -322,18 +320,12 @@ func Test_node_StartNode(t *testing.T) {
 	// 'Advance' method MUST be followed, AFTER APPLYING the state in Ready.
 	rd1 := <-nd.Ready()
 	wrd1 := Ready{
-		SoftState: &raftpb.SoftState{
-			LeaderID:  1,
-			NodeState: raftpb.NODE_STATE_LEADER,
-		},
-		HardStateToSave: raftpb.HardState{CommittedIndex: 2, Term: 2, VotedFor: 1},
+		HardStateToSave: raftpb.HardState{CommittedIndex: 1, Term: 1, VotedFor: 0},
 		EntriesToAppend: []raftpb.Entry{
 			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
-			{Index: 2, Term: 2},
 		},
 		EntriesToCommit: []raftpb.Entry{
 			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
-			{Index: 2, Term: 2},
 		},
 	}
 	if !reflect.DeepEqual(rd1, wrd1) {
@@ -341,6 +333,11 @@ func Test_node_StartNode(t *testing.T) {
 	}
 
 	st.Append(rd1.EntriesToAppend...)
+	nd.Advance()
+
+	nd.Campaign(ctx)
+	rd := <-nd.Ready()
+	st.Append(rd.EntriesToAppend...)
 	nd.Advance()
 
 	nd.Propose(ctx, []byte("testdata"))
@@ -370,12 +367,6 @@ func Test_node_StartNode_Advance(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	configChange := raftpb.ConfigChange{Type: raftpb.CONFIG_CHANGE_TYPE_ADD_NODE, NodeID: 1}
-	configChangeData, err := configChange.Marshal()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	st := NewStorageStableInMemory()
 
 	nd := StartNode(&Config{
@@ -389,23 +380,18 @@ func Test_node_StartNode_Advance(t *testing.T) {
 
 	defer nd.Stop()
 
+	rd := <-nd.Ready()
+	st.Append(rd.EntriesToAppend...)
+	nd.Advance()
+
 	nd.Campaign(ctx)
 
 	rd1 := <-nd.Ready()
 	wrd1 := Ready{
-		SoftState: &raftpb.SoftState{
-			LeaderID:  1,
-			NodeState: raftpb.NODE_STATE_LEADER,
-		},
+		SoftState:       &raftpb.SoftState{LeaderID: 1, NodeState: raftpb.NODE_STATE_LEADER},
 		HardStateToSave: raftpb.HardState{CommittedIndex: 2, Term: 2, VotedFor: 1},
-		EntriesToAppend: []raftpb.Entry{
-			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
-			{Index: 2, Term: 2},
-		},
-		EntriesToCommit: []raftpb.Entry{
-			{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Index: 1, Term: 1, Data: configChangeData},
-			{Index: 2, Term: 2},
-		},
+		EntriesToAppend: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_NORMAL, Index: 2, Term: 2}},
+		EntriesToCommit: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_NORMAL, Index: 2, Term: 2}},
 	}
 	if !reflect.DeepEqual(rd1, wrd1) {
 		t.Fatalf("ready expected %+v, got %+v", wrd1, rd1)
@@ -414,7 +400,7 @@ func Test_node_StartNode_Advance(t *testing.T) {
 	nd.Propose(ctx, []byte("testdata"))
 
 	select {
-	case rd := <-nd.Ready():
+	case rd = <-nd.Ready():
 		t.Fatalf("unexpected ready %+v before advance", rd)
 	case <-time.After(time.Millisecond):
 	}

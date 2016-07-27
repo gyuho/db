@@ -24,7 +24,7 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 
 	// transfer leader from 1 to 2
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 2,
 		To:   1,
 	})
@@ -48,7 +48,7 @@ func Test_raft_leader_transfer_up_to_date(t *testing.T) {
 
 	// transfer leadership back from 2 to 1
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 1,
 		To:   2,
 	})
@@ -75,7 +75,7 @@ func Test_raft_leader_transfer_to_self(t *testing.T) {
 
 	// transfer leader from 1 to 1
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 1,
 		To:   1,
 	})
@@ -106,7 +106,7 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -122,7 +122,7 @@ func Test_raft_leader_transfer_back(t *testing.T) {
 
 	// transfer leader from 1 to 1
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 1,
 		To:   1,
 	})
@@ -166,7 +166,7 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 
 	// transfer leader from 1 to 2
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 2,
 		To:   1,
 	})
@@ -190,7 +190,7 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 
 	// transfer leadership back from 2 to 1
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 1,
 		To:   2,
 	})
@@ -236,7 +236,7 @@ func Test_raft_leader_transfer_to_slow_follower(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -301,7 +301,7 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 
 	// transfer leader from 1 to 3, when node 3 is lack of snapshot
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -353,7 +353,7 @@ func Test_raft_leader_transfer_to_non_existing_node(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 4,
 		To:   1,
 	})
@@ -383,7 +383,7 @@ func Test_raft_leader_transfer_timeout(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -432,7 +432,7 @@ func Test_raft_leader_transfer_ignore_proposal(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -480,7 +480,7 @@ func Test_raft_leader_transfer_receive_higher_term_vote(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -534,7 +534,7 @@ func Test_raft_leader_transfer_delete_node(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -575,7 +575,7 @@ func Test_raft_leader_transfer_second_transfer(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -591,7 +591,7 @@ func Test_raft_leader_transfer_second_transfer(t *testing.T) {
 
 	// transfer leader from 1 to 2
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 2,
 		To:   1,
 	})
@@ -627,7 +627,7 @@ func Test_raft_leader_transfer_second_transfer_to_same_node(t *testing.T) {
 
 	// transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})
@@ -647,7 +647,7 @@ func Test_raft_leader_transfer_second_transfer_to_same_node(t *testing.T) {
 
 	// again, transfer leader from 1 to 3
 	fn.stepFirstMessage(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER,
+		Type: raftpb.MESSAGE_TYPE_TRANSFER_LEADER,
 		From: 3,
 		To:   1,
 	})

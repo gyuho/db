@@ -1,8 +1,8 @@
 hash: 153c73a7b7495fcbdae052f0ea3dfc77a1585b63dfcbf081eb58c4f5a15a7c92
-updated: 2016-07-24T11:33:34.628656004-07:00
+updated: 2016-07-26T23:02:25.273413633-07:00
 imports:
 - name: github.com/gogo/protobuf
-  version: 6abcf94fd4c97dcb423fdafd42fe9f96ca7e421b
+  version: 607006d5227dd9366f0e6fadbcf72e673c4fa83e
   subpackages:
   - gogoproto
   - proto

@@ -17,16 +17,21 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			return nil
 		}
 
+		idx1 := rnd.storageRaftLog.appliedIndex + 1
+		idx2 := rnd.storageRaftLog.committedIndex - rnd.storageRaftLog.appliedIndex
+		ents, err := rnd.storageRaftLog.entries(idx1, idx2)
+		if err != nil {
+			raftLogger.Panicf("unexpected error getting uncommitted entries (%v)", err)
+		}
+		if nconf := countPendingConfigChange(ents); nconf > 0 &&
+			rnd.storageRaftLog.committedIndex > rnd.storageRaftLog.appliedIndex {
+			raftLogger.Warningf("%s cannot campaign since there are still %d pending config changes", rnd.describe(), nconf)
+			return nil
+		}
+
 		raftLogger.Infof("%s starts a new election", rnd.describe())
 		rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_ELECTION)
 		return nil
-	}
-
-	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_LEADER_TRANSFER {
-		if rnd.state != raftpb.NODE_STATE_LEADER {
-			raftLogger.Infof("%s ignores %q to %x because it's not a leader", rnd.describe(), msg.Type, msg.From)
-			return nil // ???
-		}
 	}
 
 	switch {

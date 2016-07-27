@@ -5,15 +5,15 @@ import (
 )
 
 // storageUnstable stores unstable entries that have not yet
-// been written to the Storage.
+// been written to the StorageStable.
 //
 // (etcd raft.unstable)
 type storageUnstable struct {
 	// (etcd raft.unstable.snapshot)
 	snapshot *raftpb.Snapshot
 
-	// indexOffset may be smaller than the actual higest log
-	// position in Storage, which means the next write to storage
+	// indexOffset may be smaller than the actual highest log
+	// position in StorageStable, which means the next write to storage
 	// might need truncate the logs before persisting these unstable
 	// log entries.
 	//
