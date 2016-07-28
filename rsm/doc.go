@@ -10,50 +10,52 @@ package rsm
 Package raft implements consensus protocol.
 
 raft consists of:
-- 'Message' struct (LogIndex, LogTerm, Entries, etc.)
-- 'storageRaftLog' struct (storageUnstable, StorageStable, committedIndex, etc.)
-- 'raftNode' struct (id, Progress, Step, becomeFollower, etc.)
-- 'Node' interface (Step, Campaign, Ready, etc.)
+- `raft.raftpb.Message` struct (LogIndex, LogTerm, Entries, etc.)
+- `raft.storageRaftLog` struct (storageUnstable, StorageStable, committedIndex, etc.)
+- `raft.raftNode` struct (id, Progress, Step, becomeFollower, etc.)
+- `raft.Node` interface (Step, Campaign, Ready, etc.)
 
-Message is used to send and receive data inside/between raft nodes. Each node state
-defines its step function to behave based on Message.Type. Raft uses leader to handle
-all log replication. Therefore, all append requests are sent as a proposal, so that
-it can be forwarded to the leader.
+raft sends and receives data inside/between raft nodes in `raft.raftpb.Message` format.
+Node state is follower, candidate, or leader. And each state has its own step function.
+And the step function operates differently with each message type.
 
-storageRaftLog stores Raft logs. When raft appends(maybeAppend) entries to storage,
-they are first added to unstable storage, which stores unstable entries that have
-not yet been written to the StorageStable. So when leader receives proposal from
-followers, it first appends those entries to its unstable storage. And then updates
-its committed index. And then replicates leader's log either with append request
-or snapshot request. Leader sends snapshot requests when a follower falls behind
-to a point that leader had already compacted log entries prior to follower's match
-index. Follower then receives such append/snapshot message from leader, and appends
-to its log (unstable storage first when it's append request), and then updates its
-commit index.
+Raft leader handles all log replication. All appends are requested in proposal message
+type, and when sent to followers, proposals are forwarded to leader.
 
-raftNode contains all Raft-algorithm-specific data, wrapping storageRaftLog.
-raftNode does not implement RPC or message transportation between nodes.
-raftNode is just one node in Raft cluster. It contains configuration data such as heartbeat
-and election timeout. It contains information such as node state, ID, leader ID, current
-term, etc.. raftNode takes different step functions, depending on node state and message
-type. Each step function implements most of the algorithms in Raft paper.
+`raft.storageRaftLog` stores Raft logs. When raft appends(maybeAppend) entries to
+storage, they are first added to unstable storage, which stores unstable entries
+that have not yet been written to `raft.StorageStable`. Leader appends proposals from
+followers to its unstable storage, and then commits them updating committed index.
+And then leader replicates those logs to followers, in append/snapshot request.
 
-If raftNode is leader, it also updates log replication Progress, which
-contains useful information about log replication status from leader to follower.
-Progress has inflights to rate,size-limit inflight messages in replication.
-Progress has three states: probe, replicate, snapshot.
+Leader sends snapshot requests when a follower falls behind and leader had already
+compacted log entries prior to follower's match index. Follower then receives such
+append/snapshot message from leader, and appends to its log (unstable storage first
+when it's append request), and then updates its committed index.
 
-Node defines the interface of a node in Raft cluster. Node still does not implement
-RPC or transport. It creates raftNode based on the given configuration, processes node
-step functions in the background, and allows only limited method calls from external packages.
-Any package that satisfies Node interface can use raft package without worrying about
-Raft consensus algorithm details. Node also wraps StorageStable interface, so that external
-packages can have their own storage implementation.
+`raft.raftNode` contains all Raft-algorithm-specific data, wrapping `raft.storageRaftLog`.
+`raft.raftNode` does not implement RPC or message transportation between nodes.
+`raft.raftNode` is just one node in Raft cluster. It contains configuration data such as heartbeat
+and election timeout. And node states, such as node state, ID, leader ID, current term, etc..
+`raft.raftNode` takes different step functions, depending on node states and message types.
+Most algorithms in Raft paper are implemented in step functions.
 
-Node keeps sending and receiving logs via proposal, receiver channel. And once those log entries
-are ready, it sends them to ready channel. And it expects the application to process this
-Ready data, and make progress by calling Advance method.
+If `raft.raftNode` is leader, it also updates log replication `raft.Progress` that represents
+the log replication status in leader's viewpoint. `raft.Progress` has inflights to rate and
+size-limit inflight messages in replication.
 
+`raft.Progress` has three states: probe, replicate, snapshot.
+
+`raft.Node` defines Raft node interface and controls the lifecyle of Raft node.
+It exposes only a few interface methods that can be easily used outside of package.
+Default `raft.Node` implementation first creates `raft.raftNode` based on the given
+configuration, processes node step functions in the background. `raft.Node` also wraps
+StorageStable interface, so that external packages can have their own storage implementation.
+
+`raft.Node` keeps sending and receiving logs via proposal and receiver channel.
+And once those log entries are ready, it sends them to `ready` channel.
+And it's application that needs to process this Ready data and make progress
+by calling the `raft.Node.Advance`.
 
 =================================================================================
 Package rafthttp ...
@@ -80,10 +82,53 @@ Package rsm is a replicated state machine built on top of consensus protocol.
 Think of it as applying machine of replicated commands.
 
 rsm consists of:
-- 'Server' (id, raftNode, Storage, etc.)
-- 'raftNode'
-- 'rsmpb'
-- 'api'
+- `etcdserver.Server` interface (Start, Stop, AddMember, etc.)
+- `etcdserver.EtcdServer` struct (id, `etcdserver.raftNode`, Storage, applier, etc.)
+- `etcdserverpb.rpc.proto`
+- `etcdserverpb.api.v3rpc`
+
+`etcdserver.Server` defines server interfaces, required for a replicated state machine.
+
+`etcdserver.EtcdServer` is the default implementation of `etcdserver.Server` interface.
+
+First create a replicated state machine with various cluster, Raft configurations.
+It includes peer addresses, storage path, WAL path, election timeout, and so on.
+
+`etcdserver.EtcdServer` embeds `etcdserver.raftNode` which then embeds `raft.Node`,
+storage, transport, and other Raft states, such as index, term, id, leader id, etc..
+`etcdserver.raftNode` is the consumer of `raft.Node` interface. When creating a
+new replicated state machine, the server also starts a `etcdserver.raftNode` that
+keeps calling `raft.Node` interface methods in the background. `etcdserver.raftNode`
+is waiting to receive from `Ready` channel, and stores, replicates, applies them.
+
+Then how do client requests get passed to `raft.Node`?
+
+`etcdserver.EtcdServer` has `processInternalRaftRequest` method to handle all client
+requests, which calls `processInternalRaftRequestOnce` that proposes client requests
+to the leader. Each request is given a unique id so that there is no duplicate request.
+
+For example, when server receives client Range request, it calls `etcdserver.EtcdServer.Range`
+and marshals the request into bytes to propose that command to the leader.
+
+`processInternalRaftRequest` takes context and `InternalRaftRequest` as arguments.
+And `InternalRaftRequest` contains all types of request, and the request tells the
+applier which request to apply.
+
+Then how does the proposed message turn into `InternalRaftRequest`?
+When proposal is received over network, the server calls `applyEntryNormal`,
+and unmarshals the data into `pb.InternalRaftRequest`, and calls `Apply` method
+on that request.
+
+If the range request is serializable, it is not forwarded to leader.
+It only ranges the local node without going through the consensus.
+
+`etcdserverpb.rpc.proto` defines rpc interfaces. For example, it defines `KVClient` with
+`Range` method, with `RangeRequest` and `RangeResponse`. It just registers the protocol
+buffer type with marshallers and unmarshallers.
+
+`etcdserverpb.api.v3rpc` implements these rpc interfaces, by calling `Range` method
+implemented in `etcdserver.EtcdServer`. So if client requests `Range` request to this
+gRPC server, it calls `etcdserver.EtcdServer.Range`.
 
 =================================================================================
 */
