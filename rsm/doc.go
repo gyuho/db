@@ -119,8 +119,8 @@ When proposal is received over network, the server calls `applyEntryNormal`,
 and unmarshals the data into `pb.InternalRaftRequest`, and calls `Apply` method
 on that request.
 
-If the range request is serializable, it is not forwarded to leader.
-It only ranges the local node without going through the consensus.
+If range request is serializable, it is not forwarded to leader, only ranging the
+local node without going through consensus protocol.
 
 `etcdserverpb.rpc.proto` defines rpc interfaces. For example, it defines `KVClient` with
 `Range` method, with `RangeRequest` and `RangeResponse`. It just registers the protocol
