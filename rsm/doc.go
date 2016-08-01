@@ -17,10 +17,10 @@ raft consists of:
 
 raft sends and receives data inside/between raft nodes in `raft.raftpb.Message` format.
 Node state is follower, candidate, or leader. And each state has its own step function.
-And the step function operates differently with each message type.
+And the step function operates differently for each message type.
 
-Raft leader handles all log replication. All appends are requested in proposal message
-type, and when sent to followers, proposals are forwarded to leader.
+Raft leader handles all log replication. All appends are requested in proposal message,
+because requests to followers need to be forwarded to leader.
 
 `raft.storageRaftLog` stores Raft logs. When raft appends(maybeAppend) entries to
 storage, they are first added to unstable storage, which stores unstable entries
@@ -34,28 +34,28 @@ append/snapshot message from leader, and appends to its log (unstable storage fi
 when it's append request), and then updates its committed index.
 
 `raft.raftNode` contains all Raft-algorithm-specific data, wrapping `raft.storageRaftLog`.
-`raft.raftNode` does not implement RPC or message transportation between nodes.
-`raft.raftNode` is just one node in Raft cluster. It contains configuration data such as heartbeat
-and election timeout. And node states, such as node state, ID, leader ID, current term, etc..
+`raft.raftNode` does not implement RPC between nodes. It is just one node in cluster.
+It contains configuration data such as heartbeat and election timeout. And states, such
+as node state, ID, leader ID, current term, etc..
+
 `raft.raftNode` takes different step functions, depending on node states and message types.
 Most algorithms in Raft paper are implemented in step functions.
 
-If `raft.raftNode` is leader, it also updates log replication `raft.Progress` that represents
-the log replication status in leader's viewpoint. `raft.Progress` has inflights to rate and
-size-limit inflight messages in replication.
+Leader `raft.raftNode` updates `raft.Progress` that represents log replication status
+of followers in leader's viewpoint. `raft.Progress` has inflights in order to rate- and
+size-limit the inflight messages in replication.
 
 `raft.Progress` has three states: probe, replicate, snapshot.
 
-`raft.Node` defines Raft node interface and controls the lifecyle of Raft node.
-It exposes only a few interface methods that can be easily used outside of package.
-Default `raft.Node` implementation first creates `raft.raftNode` based on the given
-configuration, processes node step functions in the background. `raft.Node` also wraps
-StorageStable interface, so that external packages can have their own storage implementation.
+`raft.Node` defines Raft node interface to control the lifecyle of Raft node, exposing
+only a few interface methods that can be easily used outside of package. `raft.Node` also
+wraps StorageStable interface to allow external packages to have their own storage implementation.
 
-`raft.Node` keeps sending and receiving logs via proposal and receiver channel.
-And once those log entries are ready, it sends them to `ready` channel.
-And it's application that needs to process this Ready data and make progress
-by calling the `raft.Node.Advance`.
+The default implementation first creates `raft.raftNode` based on the given configuration,
+and launches goroutine that keeps processing raft messages. `raft.Node` keeps sending and
+receiving logs via proposal and receiver channel. When those log entries are ready, it sends
+them to `ready` channel. And it's application that needs to process this Ready data and makes
+progress by calling the `raft.Node.Advance`.
 
 =================================================================================
 Package rafthttp ...
@@ -87,15 +87,16 @@ rsm consists of:
 - `etcdserverpb.rpc.proto`
 - `etcdserverpb.api.v3rpc`
 
-`etcdserver.Server` defines server interfaces, required for a replicated state machine.
+`etcdserver.Server` lays out the typical interfaces of replicated state machine server.
 
 `etcdserver.EtcdServer` is the default implementation of `etcdserver.Server` interface.
 
-First create a replicated state machine with various cluster, Raft configurations.
-It includes peer addresses, storage path, WAL path, election timeout, and so on.
+First create a replicated state machine with cluster, Raft configurations: peer addresses,
+storage path, WAL path, election timeout, and so on.
 
 `etcdserver.EtcdServer` embeds `etcdserver.raftNode` which then embeds `raft.Node`,
 storage, transport, and other Raft states, such as index, term, id, leader id, etc..
+
 `etcdserver.raftNode` is the consumer of `raft.Node` interface. When creating a
 new replicated state machine, the server also starts a `etcdserver.raftNode` that
 keeps calling `raft.Node` interface methods in the background. `etcdserver.raftNode`
