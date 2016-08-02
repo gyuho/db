@@ -90,6 +90,8 @@ func ReadDir(dir string) ([]string, error) {
 }
 
 // MkdirAll runs os.MkdirAll with writable check.
+//
+// (etcd pkg.fileutil.TouchDirAll)
 func MkdirAll(dir string) error {
 	// If path is already a directory, MkdirAll does nothing
 	// and returns nil.
@@ -104,6 +106,8 @@ func MkdirAll(dir string) error {
 
 // MkdirAllEmpty is similar to MkdirAll but returns error
 // if the deepest directory was not empty.
+//
+// (etcd pkg.fileutil.CreateDirAll)
 func MkdirAllEmpty(dir string) error {
 	err := MkdirAll(dir)
 	if err == nil {
@@ -120,6 +124,8 @@ func MkdirAllEmpty(dir string) error {
 }
 
 // ExistFileOrDir returns true if the file or directory exists.
+//
+// (etcd pkg.fileutil.Exist)
 func ExistFileOrDir(name string) bool {
 	_, err := os.Stat(name)
 	return err == nil

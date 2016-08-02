@@ -1,4 +1,4 @@
-package transportutil
+package netutil
 
 import (
 	"net"
