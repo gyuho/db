@@ -6,8 +6,9 @@ import (
 )
 
 /*
-// https://golang.org/pkg/net/#Listener
-type Listener interface {
+https://golang.org/pkg/net/#Listener
+
+type net.Listener interface {
         // Accept waits for and returns the next connection to the listener.
         Accept() (Conn, error)
 
@@ -20,8 +21,19 @@ type Listener interface {
 }
 */
 
-// NewUnixListener returns new net.Listener with unix socket.
-func NewUnixListener(addr string) (net.Listener, error) {
+type listenerUnix struct{ net.Listener }
+
+func (lu *listenerUnix) Close() error {
+	if err := os.RemoveAll(lu.Addr().String()); err != nil {
+		return err
+	}
+	return lu.Listener.Close()
+}
+
+// NewListenerUnix returns new net.Listener with unix socket.
+//
+// (etcd pkg.transport.NewUnixListener)
+func NewListenerUnix(addr string) (net.Listener, error) {
 	if err := os.RemoveAll(addr); err != nil {
 		return nil, err
 	}
@@ -29,14 +41,5 @@ func NewUnixListener(addr string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &unixListener{l}, nil
-}
-
-type unixListener struct{ net.Listener }
-
-func (ul *unixListener) Close() error {
-	if err := os.RemoveAll(ul.Addr().String()); err != nil {
-		return err
-	}
-	return ul.Listener.Close()
+	return &listenerUnix{l}, nil
 }
