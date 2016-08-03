@@ -8,6 +8,7 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
+// (etcd raft.TestStorageFirstIndex)
 func Test_StorageStableInMemory_FirstIndex(t *testing.T) {
 	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
@@ -38,6 +39,7 @@ func Test_StorageStableInMemory_FirstIndex(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestStorageLastIndex)
 func Test_StorageStableInMemory_LastIndex(t *testing.T) {
 	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
@@ -66,6 +68,7 @@ func Test_StorageStableInMemory_LastIndex(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestStorageTerm)
 func Test_StorageStableInMemory_Term(t *testing.T) {
 	snapshotEntries := []raftpb.Entry{{Index: 3, Term: 3}, {Index: 4, Term: 4}, {Index: 5, Term: 5}}
 	tests := []struct {
@@ -112,6 +115,7 @@ func Test_StorageStableInMemory_Term(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestStorageEntries)
 func Test_StorageStableInMemory_Entries(t *testing.T) {
 	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
@@ -205,6 +209,7 @@ func Test_StorageStableInMemory_Entries(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestStorageAppend)
 func Test_StorageStableInMemory_Append(t *testing.T) {
 	tests := []struct {
 		snapshotEntries []raftpb.Entry
@@ -277,6 +282,7 @@ func Test_StorageStableInMemory_Append(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestStorageCreateSnapshot)
 func Test_StorageStableInMemory_CreateSnapshot(t *testing.T) {
 	var (
 		snapshotEntries = []raftpb.Entry{
@@ -310,6 +316,7 @@ func Test_StorageStableInMemory_CreateSnapshot(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestStorageCompact)
 func Test_StorageStableInMemory_Compact(t *testing.T) {
 	snapshotEntries := []raftpb.Entry{
 		{Index: 3, Term: 3},
@@ -347,5 +354,35 @@ func Test_StorageStableInMemory_Compact(t *testing.T) {
 		if len(st.snapshotEntries) != tt.wSnapshotEntriesN {
 			t.Fatalf("#%d: size of snapshot entries expected %d, got %d", i, tt.wSnapshotEntriesN, len(st.snapshotEntries))
 		}
+	}
+}
+
+// (etcd raft.TestStorageApplySnapshot)
+func Test_StorageStableInMemory_ApplySnapshot_OutOfDate(t *testing.T) {
+	snapshots := []raftpb.Snapshot{
+		{
+			Data: []byte("testdata"),
+			Metadata: raftpb.SnapshotMetadata{
+				Index: 4, Term: 4,
+				ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2, 3}},
+			},
+		},
+		{
+			Data: []byte("testdata"),
+			Metadata: raftpb.SnapshotMetadata{
+				Index: 3, Term: 3,
+				ConfigState: raftpb.ConfigState{IDs: []uint64{1, 2, 3}},
+			},
+		},
+	}
+
+	st := NewStorageStableInMemory()
+
+	if err := st.ApplySnapshot(snapshots[0]); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := st.ApplySnapshot(snapshots[1]); err != ErrSnapOutOfDate {
+		t.Fatal(err)
 	}
 }

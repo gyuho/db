@@ -289,6 +289,12 @@ func (ms *StorageStableInMemory) ApplySnapshot(snapshot raftpb.Snapshot) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
+	msIndex := ms.snapshot.Metadata.Index
+	snapIndex := snapshot.Metadata.Index
+	if msIndex >= snapIndex {
+		return ErrSnapOutOfDate
+	}
+
 	ms.snapshot = snapshot
 	ms.snapshotEntries = []raftpb.Entry{ // metadata in the first entry as a dummy entry
 		{Index: snapshot.Metadata.Index, Term: snapshot.Metadata.Term},
