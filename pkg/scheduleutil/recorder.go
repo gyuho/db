@@ -81,6 +81,23 @@ func (r *recorderBuffered) Chan() <-chan Action {
 	return ch
 }
 
+///////////////////////////////////////////
+// to satisfy Wait interface
+
+func (r *recorderBuffered) Register(id uint64) <-chan interface{} {
+	r.Record(Action{Name: "Register"})
+	return nil
+}
+func (r *recorderBuffered) Trigger(id uint64, x interface{}) {
+	r.Record(Action{Name: "Trigger"})
+}
+
+func (r *recorderBuffered) IsRegistered(id uint64) bool {
+	panic("recorderBuffered.IsRegistered() shouldn't be called")
+}
+
+///////////////////////////////////////////
+
 // RecorderStream writes all Actions to an unbuffered channel
 type recorderStream struct {
 	ch chan Action
