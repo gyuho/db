@@ -6,7 +6,7 @@ import (
 )
 
 func createTempFile(b []byte) (string, error) {
-	f, err := ioutil.TempFile("", "etcd-test-tls-")
+	f, err := ioutil.TempFile("", "tls-tests")
 	if err != nil {
 		return "", err
 	}
