@@ -7,26 +7,26 @@ import (
 	"time"
 )
 
-// connKeepAlive defines keep alive connection interface.
-// connLimit implements connKeepAlive interface.
+// connWithKeepAlive defines keep alive connection interface.
+// connLimit implements connWithKeepAlive interface.
 //
 // (etcd pkg.transport.keepAliveConn)
-type connKeepAlive interface {
+type connWithKeepAlive interface {
 	SetKeepAlive(bool) error
 	SetKeepAlivePeriod(d time.Duration) error
 }
 
 // (etcd pkg.transport.keepaliveListener)
-type listenerKeepAlive struct {
+type listenerWithKeepAlive struct {
 	net.Listener
 }
 
-func (l *listenerKeepAlive) Accept() (net.Conn, error) {
+func (l *listenerWithKeepAlive) Accept() (net.Conn, error) {
 	c, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	kac := c.(connKeepAlive)
+	kac := c.(connWithKeepAlive)
 
 	// detection time: tcp_keepalive_time + tcp_keepalive_probes + tcp_keepalive_intvl
 	// default on linux:  30 + 8 * 30
@@ -37,34 +37,34 @@ func (l *listenerKeepAlive) Accept() (net.Conn, error) {
 	return c, nil
 }
 
-// NewListenerKeepAlive returns a listener that listens on the given address.
+// NewListenerWithKeepAlive returns a listener that listens on the given address.
 // Be careful when wrap around KeepAliveListener with another Listener if TLSInfo is not nil.
 // Some pkgs (like go/http) might expect Listener to return TLSConn type to start TLS handshake.
 // http://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html
 //
 // (etcd pkg.transport.NewKeepAliveListener)
-func NewListenerKeepAlive(l net.Listener, scheme string, tlsConfig *tls.Config) (net.Listener, error) {
+func NewListenerWithKeepAlive(l net.Listener, scheme string, tlsConfig *tls.Config) (net.Listener, error) {
 	if scheme == "https" {
 		if tlsConfig == nil {
 			return nil, fmt.Errorf("cannot listen on TLS for given listener: KeyFile and CertFile are not presented")
 		}
-		return NewListenerKeepAliveTLS(l, tlsConfig), nil
+		return NewListenerWithKeepAliveTLS(l, tlsConfig), nil
 	}
-	return &listenerKeepAlive{Listener: l}, nil
+	return &listenerWithKeepAlive{Listener: l}, nil
 }
 
 // (etcd pkg.transport.tlsKeepaliveListener)
-type listenerKeepAliveTLS struct {
+type listenerWithKeepAliveTLS struct {
 	net.Listener
 	tlsConfig *tls.Config
 }
 
-func (l *listenerKeepAliveTLS) Accept() (net.Conn, error) {
+func (l *listenerWithKeepAliveTLS) Accept() (net.Conn, error) {
 	c, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	kac := c.(connKeepAlive)
+	kac := c.(connWithKeepAlive)
 
 	// detection time: tcp_keepalive_time + tcp_keepalive_probes + tcp_keepalive_intvl
 	// default on linux:  30 + 8 * 30
@@ -76,14 +76,14 @@ func (l *listenerKeepAliveTLS) Accept() (net.Conn, error) {
 	return c, nil
 }
 
-// NewListenerKeepAliveTLS creates a Listener which accepts connections from an inner
+// NewListenerWithKeepAliveTLS creates a Listener which accepts connections from an inner
 // Listener and wraps each connection with Server.
 // The configuration config must be non-nil and must have
 // at least one certificate.
 //
 // (etcd pkg.transport.newTLSKeepaliveListener)
-func NewListenerKeepAliveTLS(l net.Listener, tlsConfig *tls.Config) net.Listener {
-	ln := &listenerKeepAliveTLS{}
+func NewListenerWithKeepAliveTLS(l net.Listener, tlsConfig *tls.Config) net.Listener {
+	ln := &listenerWithKeepAliveTLS{}
 	ln.Listener = l
 	ln.tlsConfig = tlsConfig
 	return ln

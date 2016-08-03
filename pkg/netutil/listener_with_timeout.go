@@ -8,13 +8,13 @@ import (
 )
 
 // (etcd pkg.transport.timeoutConn)
-type connTimeout struct {
+type connWithTimeout struct {
 	net.Conn
 	writeTimeout time.Duration
 	readTimeout  time.Duration
 }
 
-func (c *connTimeout) Write(b []byte) (n int, err error) {
+func (c *connWithTimeout) Write(b []byte) (n int, err error) {
 	if c.writeTimeout > 0 {
 		if err := c.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
 			return 0, err
@@ -23,7 +23,7 @@ func (c *connTimeout) Write(b []byte) (n int, err error) {
 	return c.Conn.Write(b)
 }
 
-func (c *connTimeout) Read(b []byte) (n int, err error) {
+func (c *connWithTimeout) Read(b []byte) (n int, err error) {
 	if c.readTimeout > 0 {
 		if err := c.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
 			return 0, err
@@ -33,30 +33,30 @@ func (c *connTimeout) Read(b []byte) (n int, err error) {
 }
 
 // (etcd pkg.transport.rwTimeoutListener)
-type listenerTimeout struct {
+type listenerWithTimeout struct {
 	net.Listener
 	writeTimeout time.Duration
 	readTimeout  time.Duration
 }
 
-func (l *listenerTimeout) Accept() (net.Conn, error) {
+func (l *listenerWithTimeout) Accept() (net.Conn, error) {
 	c, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	return &connTimeout{
+	return &connWithTimeout{
 		Conn:         c,
 		writeTimeout: l.writeTimeout,
 		readTimeout:  l.readTimeout,
 	}, nil
 }
 
-// NewListenerTimeout returns Listener that listens on the given address.
+// NewListenerWithTimeout returns Listener that listens on the given address.
 // If read/write on the accepted connection blocks longer than its time limit,
 // it will return timeout error.
 //
 // (etcd pkg.transport.NewTimeoutListener)
-func NewListenerTimeout(addr, scheme string, tlsConfig *tls.Config, writeTimeout, readTimeout time.Duration) (l net.Listener, err error) {
+func NewListenerWithTimeout(addr, scheme string, tlsConfig *tls.Config, writeTimeout, readTimeout time.Duration) (l net.Listener, err error) {
 	switch scheme {
 	case "unix", "unixs":
 		l, err = NewListenerUnix(addr)
@@ -74,7 +74,7 @@ func NewListenerTimeout(addr, scheme string, tlsConfig *tls.Config, writeTimeout
 		return nil, fmt.Errorf("%q is not supported", scheme)
 	}
 
-	l = &listenerTimeout{
+	l = &listenerWithTimeout{
 		Listener:     l,
 		writeTimeout: writeTimeout,
 		readTimeout:  readTimeout,
