@@ -29,7 +29,7 @@ type TLSInfo struct {
 
 	// ParseFunc exists to simplify testing. Typically, parseFunc
 	// should be left nil. In that case, tls.X509KeyPair will be used.
-	ParseFunc func([]byte, []byte) (tls.Certificate, error)
+	ParseFunc func(certPEMBlock, keyPEMBlock []byte) (tls.Certificate, error)
 }
 
 func (ti TLSInfo) String() string {
