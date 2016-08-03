@@ -7,14 +7,14 @@ import (
 )
 
 // (etcd pkg.transport.TestNewTimeoutListener)
-func Test_NewListenerTimeout(t *testing.T) {
-	l, err := NewListenerTimeout("127.0.0.1:0", "http", nil, time.Hour, time.Hour)
+func Test_NewListenerWithTimeout(t *testing.T) {
+	l, err := NewListenerWithTimeout("127.0.0.1:0", "http", nil, time.Hour, time.Hour)
 	if err != nil {
-		t.Fatalf("unexpected NewListenerTimeout error: %v", err)
+		t.Fatalf("unexpected NewListenerWithTimeout error: %v", err)
 	}
 	defer l.Close()
 
-	tln := l.(*listenerTimeout)
+	tln := l.(*listenerWithTimeout)
 	if tln.writeTimeout != time.Hour {
 		t.Errorf("write timeout = %s, want %s", tln.writeTimeout, time.Hour)
 	}
@@ -24,12 +24,12 @@ func Test_NewListenerTimeout(t *testing.T) {
 }
 
 // (etcd pkg.transport.TestWriteReadTimeoutListener)
-func Test_ListenerTimeout(t *testing.T) {
+func Test_ListenerWithTimeout(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("unexpected listen error: %v", err)
 	}
-	wln := listenerTimeout{
+	wln := listenerWithTimeout{
 		Listener:     ln,
 		writeTimeout: 10 * time.Millisecond,
 		readTimeout:  10 * time.Millisecond,

@@ -53,10 +53,10 @@ func Test_NewTransport_TLSInfo(t *testing.T) {
 }
 
 // (etcd pkg.transport.TestNewTimeoutTransport)
-func Test_NewTransportTimeout(t *testing.T) {
-	tr, err := NewTransportTimeout(tlsutil.TLSInfo{}, time.Hour, time.Hour, time.Hour)
+func Test_NewTransportWithTimeout(t *testing.T) {
+	tr, err := NewTransportWithTimeout(tlsutil.TLSInfo{}, time.Hour, time.Hour, time.Hour)
 	if err != nil {
-		t.Fatalf("unexpected NewTransportTimeout error: %v", err)
+		t.Fatalf("unexpected NewTransportWithTimeout error: %v", err)
 	}
 
 	remoteAddr := func(w http.ResponseWriter, r *http.Request) {
@@ -71,9 +71,9 @@ func Test_NewTransportTimeout(t *testing.T) {
 	}
 	defer conn.Close()
 
-	tconn, ok := conn.(*connTimeout)
+	tconn, ok := conn.(*connWithTimeout)
 	if !ok {
-		t.Fatalf("failed to dial out *connTimeout")
+		t.Fatalf("failed to dial out *connWithTimeout")
 	}
 	if tconn.writeTimeout != time.Hour {
 		t.Errorf("write timeout = %s, want %s", tconn.writeTimeout, time.Hour)
@@ -113,7 +113,7 @@ func Test_NewTransportTimeout(t *testing.T) {
 }
 
 // (etcd pkg.transport.TestReadWriteTimeoutDialer)
-func Test_dialerTimeout(t *testing.T) {
+func Test_dialerWithTimeout(t *testing.T) {
 	stop := make(chan struct{})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -123,7 +123,7 @@ func Test_dialerTimeout(t *testing.T) {
 	ts := testBlockingServer{ln, 2, stop}
 	go ts.Start(t)
 
-	d := dialerTimeout{
+	d := dialerWithTimeout{
 		writeTimeout: 10 * time.Millisecond,
 		readTimeout:  10 * time.Millisecond,
 	}

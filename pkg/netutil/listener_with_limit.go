@@ -8,7 +8,7 @@ import (
 )
 
 // (etcd pkg.transport.limitListenerConn)
-type connLimit struct {
+type connWithLimit struct {
 	net.Conn
 	releaseOnce sync.Once
 	release     func()
@@ -19,13 +19,13 @@ type connLimit struct {
 // (etcd pkg.transport.ErrNotTCP)
 var ErrNotTCP = errors.New("only tcp connections have keepalive")
 
-func (c *connLimit) Close() error {
+func (c *connWithLimit) Close() error {
 	err := c.Conn.Close()
 	c.releaseOnce.Do(c.release)
 	return err
 }
 
-func (c *connLimit) SetKeepAlive(doKeepAlive bool) error {
+func (c *connWithLimit) SetKeepAlive(doKeepAlive bool) error {
 	tcpc, ok := c.Conn.(*net.TCPConn)
 	if !ok {
 		return ErrNotTCP
@@ -33,7 +33,7 @@ func (c *connLimit) SetKeepAlive(doKeepAlive bool) error {
 	return tcpc.SetKeepAlive(doKeepAlive)
 }
 
-func (c *connLimit) SetKeepAlivePeriod(d time.Duration) error {
+func (c *connWithLimit) SetKeepAlivePeriod(d time.Duration) error {
 	tcpc, ok := c.Conn.(*net.TCPConn)
 	if !ok {
 		return ErrNotTCP
@@ -42,33 +42,33 @@ func (c *connLimit) SetKeepAlivePeriod(d time.Duration) error {
 }
 
 // (etcd pkg.transport.limitListener)
-type listenerLimit struct {
+type listenerWithLimit struct {
 	net.Listener
 	sem chan struct{}
 }
 
-func (l *listenerLimit) acquire() {
+func (l *listenerWithLimit) acquire() {
 	l.sem <- struct{}{}
 }
 
-func (l *listenerLimit) release() {
+func (l *listenerWithLimit) release() {
 	<-l.sem
 }
 
-func (l *listenerLimit) Accept() (net.Conn, error) {
+func (l *listenerWithLimit) Accept() (net.Conn, error) {
 	l.acquire()
 	c, err := l.Listener.Accept()
 	if err != nil {
 		l.release()
 		return nil, err
 	}
-	return &connLimit{Conn: c, release: l.release}, nil
+	return &connWithLimit{Conn: c, release: l.release}, nil
 }
 
-// NewListenerLimit returns a Listener that accepts at most n simultaneous
+// NewListenerWithLimit returns a Listener that accepts at most n simultaneous
 // connections from the provided Listener.
 //
 // (etcd pkg.transport.LimitListener)
-func NewListenerLimit(l net.Listener, n int) net.Listener {
-	return &listenerLimit{Listener: l, sem: make(chan struct{}, n)}
+func NewListenerWithLimit(l net.Listener, n int) net.Listener {
+	return &listenerWithLimit{Listener: l, sem: make(chan struct{}, n)}
 }

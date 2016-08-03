@@ -76,28 +76,28 @@ func getNetDialer(d time.Duration) *net.Dialer {
 }
 
 // (etcd pkg.transport.rwTimeoutDialer)
-type dialerTimeout struct {
+type dialerWithTimeout struct {
 	net.Dialer
 	writeTimeout time.Duration
 	readTimeout  time.Duration
 }
 
-func (d dialerTimeout) Dial(network, address string) (net.Conn, error) {
+func (d dialerWithTimeout) Dial(network, address string) (net.Conn, error) {
 	conn, err := d.Dialer.Dial(network, address)
-	return &connTimeout{
+	return &connWithTimeout{
 		Conn:         conn,
 		writeTimeout: d.writeTimeout,
 		readTimeout:  d.readTimeout,
 	}, err
 }
 
-// NewTransportTimeout returns a transport created using the given TLS info.
+// NewTransportWithTimeout returns a transport created using the given TLS info.
 // If read/write on the created connection blocks longer than its time limit,
 // it will return timeout error.
 // If read/write timeout is set, transport will not be able to reuse connection.
 //
 // (etcd pkg.transport.NewTimeoutTransport)
-func NewTransportTimeout(info tlsutil.TLSInfo, dialTimeout, writeTimeout, readTimeout time.Duration) (*http.Transport, error) {
+func NewTransportWithTimeout(info tlsutil.TLSInfo, dialTimeout, writeTimeout, readTimeout time.Duration) (*http.Transport, error) {
 	tr, err := NewTransport(info, dialTimeout)
 	if err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func NewTransportTimeout(info tlsutil.TLSInfo, dialTimeout, writeTimeout, readTi
 		tr.MaxIdleConnsPerHost = 1024
 	}
 
-	tr.Dial = (&dialerTimeout{
+	tr.Dial = (&dialerWithTimeout{
 		Dialer:       *getNetDialer(dialTimeout),
 		writeTimeout: writeTimeout,
 		readTimeout:  readTimeout,

@@ -11,15 +11,15 @@ import (
 )
 
 // (etcd pkg.transport.TestNewKeepAliveListener)
-func Test_NewListenerKeepAlive(t *testing.T) {
+func Test_NewListenerWithKeepAlive(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("unexpected listen error: %v", err)
 	}
 
-	ln, err = NewListenerKeepAlive(ln, "http", nil)
+	ln, err = NewListenerWithKeepAlive(ln, "http", nil)
 	if err != nil {
-		t.Fatalf("unexpected NewListenerKeepAlive error: %v", err)
+		t.Fatalf("unexpected NewListenerWithKeepAlive error: %v", err)
 	}
 
 	go http.Get("http://" + ln.Addr().String())
@@ -47,9 +47,9 @@ func Test_NewListenerKeepAlive(t *testing.T) {
 		t.Fatalf("unexpected serverConfig error: %v", err)
 	}
 
-	tlsln, err := NewListenerKeepAlive(ln, "https", tlscfg)
+	tlsln, err := NewListenerWithKeepAlive(ln, "https", tlscfg)
 	if err != nil {
-		t.Fatalf("unexpected NewListenerKeepAlive error: %v", err)
+		t.Fatalf("unexpected NewListenerWithKeepAlive error: %v", err)
 	}
 
 	go http.Get("https://" + tlsln.Addr().String())
@@ -65,13 +65,13 @@ func Test_NewListenerKeepAlive(t *testing.T) {
 	tlsln.Close()
 }
 
-func Test_NewListenerKeepAlive_TLS_EmptyConfig(t *testing.T) {
+func Test_NewListenerWithKeepAlive_TLS_EmptyConfig(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("unexpected listen error: %v", err)
 	}
 
-	_, err = NewListenerKeepAlive(ln, "https", nil)
+	_, err = NewListenerWithKeepAlive(ln, "https", nil)
 	if err == nil {
 		t.Errorf("err = nil, want not presented error")
 	}
