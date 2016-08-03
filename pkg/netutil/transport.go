@@ -19,7 +19,9 @@ http.Transport implements this interface.
 */
 
 // (etcd pkg.transport.unixListener)
-type transportUnix struct{ *http.Transport }
+type transportUnix struct {
+	*http.Transport
+}
 
 func (tu *transportUnix) RoundTrip(req *http.Request) (*http.Response, error) {
 	url := *req.URL
@@ -71,4 +73,49 @@ func getNetDialer(d time.Duration) *net.Dialer {
 		Timeout:   d,
 		KeepAlive: 30 * time.Second, // from http.DefaultTransport
 	}
+}
+
+// (etcd pkg.transport.rwTimeoutDialer)
+type dialerTimeout struct {
+	*net.Dialer
+	writeTimeout time.Duration
+	readTimeout  time.Duration
+}
+
+func (d *dialerTimeout) Dial(network, address string) (net.Conn, error) {
+	conn, err := d.Dialer.Dial(network, address)
+	return &connTimeout{
+		Conn:         conn,
+		writeTimeout: d.writeTimeout,
+		readTimeout:  d.readTimeout,
+	}, err
+}
+
+// NewTransportTimeout returns a transport created using the given TLS info.
+// If read/write on the created connection blocks longer than its time limit,
+// it will return timeout error.
+// If read/write timeout is set, transport will not be able to reuse connection.
+//
+// (etcd pkg.transport.NewTimeoutTransport)
+func NewTransportTimeout(info tlsutil.TLSInfo, dialTimeout, writeTimeout, readTimeout time.Duration) (*http.Transport, error) {
+	tr, err := NewTransport(info, dialTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	if readTimeout != 0 || writeTimeout != 0 {
+		// the timed out connection will timeout soon after it is idle.
+		// it should not be put back to http transport as an idle connection for future usage.
+		tr.MaxIdleConnsPerHost = -1
+	} else {
+		// allow more idle connections between peers to avoid unncessary port allocation.
+		tr.MaxIdleConnsPerHost = 1024
+	}
+
+	tr.Dial = (&dialerTimeout{
+		Dialer:       getNetDialer(dialTimeout),
+		writeTimeout: writeTimeout,
+		readTimeout:  readTimeout,
+	}).Dial
+	return tr, nil
 }
