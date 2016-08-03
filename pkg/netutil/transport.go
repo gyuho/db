@@ -77,12 +77,12 @@ func getNetDialer(d time.Duration) *net.Dialer {
 
 // (etcd pkg.transport.rwTimeoutDialer)
 type dialerTimeout struct {
-	*net.Dialer
+	net.Dialer
 	writeTimeout time.Duration
 	readTimeout  time.Duration
 }
 
-func (d *dialerTimeout) Dial(network, address string) (net.Conn, error) {
+func (d dialerTimeout) Dial(network, address string) (net.Conn, error) {
 	conn, err := d.Dialer.Dial(network, address)
 	return &connTimeout{
 		Conn:         conn,
@@ -113,7 +113,7 @@ func NewTransportTimeout(info tlsutil.TLSInfo, dialTimeout, writeTimeout, readTi
 	}
 
 	tr.Dial = (&dialerTimeout{
-		Dialer:       getNetDialer(dialTimeout),
+		Dialer:       *getNetDialer(dialTimeout),
 		writeTimeout: writeTimeout,
 		readTimeout:  readTimeout,
 	}).Dial

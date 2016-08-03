@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -109,4 +110,86 @@ func Test_NewTransportTimeout(t *testing.T) {
 	if bytes.Equal(addr0, addr1) {
 		t.Errorf("addr0 = %s addr1= %s, want not equal", string(addr0), string(addr1))
 	}
+}
+
+// (etcd pkg.transport.TestReadWriteTimeoutDialer)
+func Test_dialerTimeout(t *testing.T) {
+	stop := make(chan struct{})
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := testBlockingServer{ln, 2, stop}
+	go ts.Start(t)
+
+	d := dialerTimeout{
+		writeTimeout: 10 * time.Millisecond,
+		readTimeout:  10 * time.Millisecond,
+	}
+	conn, err := d.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	// fill the socket buffer
+	data := make([]byte, 5*1024*1024)
+	done := make(chan struct{})
+	go func() {
+		_, err = conn.Write(data)
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+	// It waits 1s more to avoid delay in low-end system.
+	case <-time.After(d.writeTimeout*10 + time.Second):
+		t.Fatal("wait timeout")
+	}
+
+	if operr, ok := err.(*net.OpError); !ok || operr.Op != "write" || !operr.Timeout() {
+		t.Errorf("err = %v, want write i/o timeout error", err)
+	}
+
+	conn, err = d.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("unexpected dial error: %v", err)
+	}
+	defer conn.Close()
+
+	buf := make([]byte, 10)
+	go func() {
+		_, err = conn.Read(buf)
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(d.readTimeout * 10):
+		t.Fatal("wait timeout")
+	}
+
+	if operr, ok := err.(*net.OpError); !ok || operr.Op != "read" || !operr.Timeout() {
+		t.Errorf("err = %v, want write i/o timeout error", err)
+	}
+
+	stop <- struct{}{}
+}
+
+type testBlockingServer struct {
+	ln   net.Listener
+	n    int
+	stop chan struct{}
+}
+
+func (ts *testBlockingServer) Start(t *testing.T) {
+	for i := 0; i < ts.n; i++ {
+		conn, err := ts.ln.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+	}
+	<-ts.stop
 }
