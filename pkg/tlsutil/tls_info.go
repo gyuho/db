@@ -2,20 +2,29 @@ package tlsutil
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 )
 
 // TLSInfo contains TLS configuration.
+//
+// (etcd pkg.transport.TLSInfo)
 type TLSInfo struct {
-	CertFile       string
-	KeyFile        string
-	CAFile         string
-	TrustedCAFile  string
+	// CertFile is TLS cert file.
+	CertFile string
+
+	// KeyFile is TLS key file.
+	KeyFile string
+
+	// TrustedCAFile is TLS trusted CA key file.
+	TrustedCAFile string
+
 	ClientCertAuth bool
 
+	// ServerName ensures the cert matches the given host
+	// in case of discovery / virtual hosting
+	ServerName string
+
+	// SelfCert is true, when TLS is self-signed.
 	SelfCert bool
 
 	// ParseFunc exists to simplify testing. Typically, parseFunc
@@ -24,15 +33,19 @@ type TLSInfo struct {
 }
 
 func (ti TLSInfo) String() string {
-	return fmt.Sprintf("cert=%q, key=%q, ca=%q, trusted-ca=%q, client-cert-auth=%v", ti.CertFile, ti.KeyFile, ti.CAFile, ti.TrustedCAFile, ti.ClientCertAuth)
+	return fmt.Sprintf("cert=%q, key=%q, trusted-ca=%q, client-cert-auth=%v", ti.CertFile, ti.KeyFile, ti.TrustedCAFile, ti.ClientCertAuth)
 }
 
 // Empty returns true if TLSInfo is empty.
+//
+// (etcd pkg.transport.TLSInfo.Empty)
 func (ti TLSInfo) Empty() bool {
 	return ti.CertFile == "" && ti.KeyFile == ""
 }
 
 // BaseConfig returns *tls.Config from TLSInfo.
+//
+// (etcd pkg.transport.TLSInfo.baseConfig)
 func (ti TLSInfo) BaseConfig() (*tls.Config, error) {
 	if ti.KeyFile == "" || ti.CertFile == "" {
 		return nil, fmt.Errorf("CertFile and KeyFile must both be present[cert: %q, key: %q]", ti.CertFile, ti.KeyFile)
@@ -47,11 +60,10 @@ func (ti TLSInfo) BaseConfig() (*tls.Config, error) {
 }
 
 // CAFiles returns a list of CA file paths.
+//
+// (etcd pkg.transport.TLSInfo.cafiles)
 func (ti TLSInfo) CAFiles() []string {
 	var cs []string
-	if ti.CAFile != "" {
-		cs = append(cs, ti.CAFile)
-	}
 	if ti.TrustedCAFile != "" {
 		cs = append(cs, ti.TrustedCAFile)
 	}
@@ -59,15 +71,12 @@ func (ti TLSInfo) CAFiles() []string {
 }
 
 // ServerConfig generates a tls.Config object for use by an HTTP server.
+//
+// (etcd pkg.transport.TLSInfo.ServerConfig)
 func (ti TLSInfo) ServerConfig() (*tls.Config, error) {
 	cfg, err := ti.BaseConfig()
 	if err != nil {
 		return nil, err
-	}
-
-	cfg.ClientAuth = tls.NoClientCert
-	if ti.CAFile != "" || ti.ClientCertAuth {
-		cfg.ClientAuth = tls.RequireAndVerifyClientCert
 	}
 
 	cs := ti.CAFiles()
@@ -79,10 +88,18 @@ func (ti TLSInfo) ServerConfig() (*tls.Config, error) {
 		cfg.ClientCAs = cp
 	}
 
+	cfg.ClientAuth = tls.NoClientCert
+	// if ti.TrustedCAFile != "" || ti.ClientCertAuth {
+	if len(cs) > 0 || ti.ClientCertAuth { // ???
+		cfg.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
 	return cfg, nil
 }
 
 // ClientConfig generates a tls.Config object for use by an HTTP client.
+//
+// (etcd pkg.transport.TLSInfo.ClientConfig)
 func (ti TLSInfo) ClientConfig() (*tls.Config, error) {
 	var cfg *tls.Config
 	var err error
@@ -109,54 +126,4 @@ func (ti TLSInfo) ClientConfig() (*tls.Config, error) {
 	}
 
 	return cfg, nil
-}
-
-// NewCertPool creates x509 certPool with provided CA files.
-func NewCertPool(CAFiles []string) (*x509.CertPool, error) {
-	certPool := x509.NewCertPool()
-
-	for _, CAFile := range CAFiles {
-		pemByte, err := ioutil.ReadFile(CAFile)
-		if err != nil {
-			return nil, err
-		}
-
-		for {
-			var block *pem.Block
-			block, pemByte = pem.Decode(pemByte)
-			if block == nil {
-				break
-			}
-			cert, err := x509.ParseCertificate(block.Bytes)
-			if err != nil {
-				return nil, err
-			}
-			certPool.AddCert(cert)
-		}
-	}
-
-	return certPool, nil
-}
-
-// NewCert generates TLS cert by using the given cert,key and parse function.
-func NewCert(certFile, keyFile string, parseFunc func([]byte, []byte) (tls.Certificate, error)) (*tls.Certificate, error) {
-	cert, err := ioutil.ReadFile(certFile)
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := ioutil.ReadFile(keyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if parseFunc == nil {
-		parseFunc = tls.X509KeyPair
-	}
-
-	tlsCert, err := parseFunc(cert, key)
-	if err != nil {
-		return nil, err
-	}
-	return &tlsCert, nil
 }
