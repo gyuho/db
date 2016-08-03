@@ -18,11 +18,13 @@ type http.RoundTripper interface {
 http.Transport implements this interface.
 */
 
+// (etcd pkg.transport.unixListener)
 type transportUnix struct{ *http.Transport }
 
 func (tu *transportUnix) RoundTrip(req *http.Request) (*http.Response, error) {
-	req2 := *req
-	req2.URL.Scheme = strings.Replace(req.URL.Scheme, "unix", "http", 1)
+	url := *req.URL
+	req.URL = &url
+	req.URL.Scheme = strings.Replace(req.URL.Scheme, "unix", "http", 1)
 	return tu.Transport.RoundTrip(req)
 }
 
@@ -39,7 +41,7 @@ func NewTransport(ti tlsutil.TLSInfo, dialTimeout time.Duration) (*http.Transpor
 	tr := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		DialContext:         getNetDialer(dialTimeout).DialContext,
-		TLSHandshakeTimeout: 10 * time.Second, // from http.DefaultTransport https://golang.org/pkg/net/http/#RoundTripper
+		TLSHandshakeTimeout: 10 * time.Second, // from http.DefaultTransport
 		TLSClientConfig:     tlsClientConfig,
 	}
 
@@ -48,10 +50,11 @@ func NewTransport(ti tlsutil.TLSInfo, dialTimeout time.Duration) (*http.Transpor
 		return dialer.DialContext(ctx, "unix", addr)
 	}
 
+	// https://golang.org/pkg/net/http/#RoundTripper
 	utr := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		DialContext:         dialFunc,
-		TLSHandshakeTimeout: 10 * time.Second, // from http.DefaultTransport https://golang.org/pkg/net/http/#RoundTripper
+		TLSHandshakeTimeout: 10 * time.Second, // from http.DefaultTransport
 		TLSClientConfig:     tlsClientConfig,
 	}
 	ut := &transportUnix{utr}
@@ -63,8 +66,9 @@ func NewTransport(ti tlsutil.TLSInfo, dialTimeout time.Duration) (*http.Transpor
 }
 
 func getNetDialer(d time.Duration) *net.Dialer {
+	// https://golang.org/pkg/net/http/#RoundTripper
 	return &net.Dialer{
 		Timeout:   d,
-		KeepAlive: 30 * time.Second, // from http.DefaultTransport https://golang.org/pkg/net/http/#RoundTripper
+		KeepAlive: 30 * time.Second, // from http.DefaultTransport
 	}
 }

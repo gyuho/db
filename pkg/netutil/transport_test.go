@@ -9,10 +9,11 @@ import (
 	"github.com/gyuho/db/pkg/tlsutil"
 )
 
+// (etcd pkg.transport.TestNewTransportTLSInfo)
 func Test_NewTransport_TLSInfo(t *testing.T) {
-	tmp, err := createTempFile([]byte("XXX"))
+	tmp, err := createTempFile([]byte("testdata"))
 	if err != nil {
-		t.Fatalf("Unable to prepare tmpfile: %v", err)
+		t.Fatal(err)
 	}
 	defer os.Remove(tmp)
 
@@ -34,9 +35,10 @@ func Test_NewTransport_TLSInfo(t *testing.T) {
 
 	for i, tt := range tests {
 		tt.ParseFunc = fakeCertificateParserFunc(tls.Certificate{}, nil)
+
 		trans, err := NewTransport(tt, time.Second)
 		if err != nil {
-			t.Fatalf("Received unexpected error from NewTransport: %v", err)
+			t.Fatalf("#%d: NewTransport error (%v)", i, err)
 		}
 
 		if trans.TLSClientConfig == nil {
