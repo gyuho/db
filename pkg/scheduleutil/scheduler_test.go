@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// (etcd pkg.schedule.TestFIFOSchedule)
 func Test_Scheduler_fifo(t *testing.T) {
 	s := NewSchedulerFIFO()
 	defer s.Stop()
