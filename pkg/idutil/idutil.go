@@ -37,6 +37,14 @@ func NewGenerator(memberID uint16, now time.Time) *Generator {
 	}
 }
 
+/*
+& AND (let's say f)
+
+1. f(a, b) = f(b, a)
+2. f(a, a) = a
+3. f(a, b) ≤ max(a, b)
+*/
+
 func lowByteBit(x uint64, n uint) uint64 {
 	return x & (math.MaxUint64 >> (8*8 - n)) // ???
 }
