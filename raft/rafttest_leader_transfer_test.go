@@ -143,6 +143,7 @@ func Test_raft_leader_transfer_with_check_quorum(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		rnd := fn.allStateMachines[uint64(i)].(*raftNode)
 		rnd.checkQuorum = true
+		rnd.setRandomizedElectionTimeoutTickNum(rnd.electionTimeoutTickNum + i)
 	}
 
 	// rnd.checkQuorum = true

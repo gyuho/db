@@ -220,8 +220,11 @@ func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	rnd3.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
+
+	// need to reset randomizedElectionTimeout larger than electionTimeout again,
+	// because the value might be reset to electionTimeout since the last state changes
 	rnd1.setRandomizedElectionTimeoutTickNum(rnd1.electionTimeoutTickNum + 1)
-	rnd2.setRandomizedElectionTimeoutTickNum(rnd2.electionTimeoutTickNum + 1)
+	rnd2.setRandomizedElectionTimeoutTickNum(rnd2.electionTimeoutTickNum + 2)
 
 	// time out rnd2, so that rnd2 now does not ignore the vote request
 	// and rnd2 becomes the follower. And rnd1 will start campaign, and rnd2
