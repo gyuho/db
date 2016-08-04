@@ -19,6 +19,7 @@ func Test_raft_read_index_with_check_quorum(t *testing.T) {
 	rnd3.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
+	rnd2.setRandomizedElectionTimeoutTickNum(rnd2.electionTimeoutTickNum + 1)
 
 	// trigger election in rnd2
 	for i := 0; i < rnd2.electionTimeoutTickNum; i++ {

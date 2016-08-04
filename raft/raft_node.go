@@ -361,3 +361,12 @@ func (rnd *raftNode) assertUnexpectedNodeState(unexpected raftpb.NODE_STATE) {
 		raftLogger.Panicf("%s in unexpected state", rnd.describe())
 	}
 }
+
+// setRandomizedElectionTimeoutTickNum set up the value by caller instead of choosing
+// by system, in some test scenario we need to fill in some expected value to
+// ensure the certainty.
+//
+// (etcd raft.setRandomizedElectionTimeout)
+func (rnd *raftNode) setRandomizedElectionTimeoutTickNum(num int) {
+	rnd.randomizedElectionTimeoutTickNum = num
+}

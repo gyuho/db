@@ -220,6 +220,8 @@ func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	rnd3.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
+	rnd1.setRandomizedElectionTimeoutTickNum(rnd1.electionTimeoutTickNum + 1)
+	rnd2.setRandomizedElectionTimeoutTickNum(rnd2.electionTimeoutTickNum + 1)
 
 	// time out rnd2, so that rnd2 now does not ignore the vote request
 	// and rnd2 becomes the follower. And rnd1 will start campaign, and rnd2
@@ -268,7 +270,8 @@ func Test_raft_leader_election_checkQuorum_leader_ignore_vote(t *testing.T) {
 	// func (rnd *raftNode) pastElectionTimeout() bool {
 	// 	return rnd.electionTimeoutElapsedTickNum >= rnd.randomizedElectionTimeoutTickNum
 	// }
-	rnd2.randomizedElectionTimeoutTickNum = rnd2.electionTimeoutTickNum + 1 // to prevent rnd2 from election timeout
+	rnd2.setRandomizedElectionTimeoutTickNum(rnd2.electionTimeoutTickNum + 1) // to prevent rnd2 from election timeout
+
 	for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
 		rnd2.tickFunc()
 	}
@@ -324,6 +327,7 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	rnd3.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2, rnd3)
+	rnd2.setRandomizedElectionTimeoutTickNum(rnd2.electionTimeoutTickNum + 1)
 
 	// time out rnd2, so that rnd2 now does not ignore the vote request
 	// and rnd2 becomes the follower. And rnd1 will start campaign, and rnd2
@@ -388,6 +392,7 @@ func Test_raft_leader_election_checkQuorum_non_promotable_voter(t *testing.T) {
 	rnd2.checkQuorum = true
 
 	fn := newFakeNetwork(rnd1, rnd2)
+	rnd2.setRandomizedElectionTimeoutTickNum(rnd2.electionTimeoutTickNum + 1)
 
 	// remove again, because it is updated inside 'newFakeNetwork'
 	rnd2.deleteProgress(2)
