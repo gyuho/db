@@ -1,10 +1,10 @@
-// Package rsm implements replicated state machine.
+// Package rsm implements replicated state machines.
 //
 // (etcd etcdserver)
 package rsm
 
-// WORKING IN PROGRESS
 /*
+WORKING IN PROGRESS
 
 =================================================================================
 Package raft implements consensus protocol.
@@ -66,12 +66,23 @@ Package raftwal ...
 
 
 =================================================================================
-Package raftsnap ...
+Package storage ...
 
+mvcc.index interface defines in-memory tree data structure interface with basic Get, Range, Put, Compact, and other methods (index.go)
+mvcc.treeIndex struct is B-Tree that satisfies mvcc.index interface (index.go).
+mvcc.keyIndex struct defines a node inserted into mvcc.treeIndex (key_index.go).
+mvcc.keyIndex struct also keeps track of key versions (key_index.go).
 
-=================================================================================
-Package kvstorage ...
+mvcc.KV                    interface defines storage interface with Rev, FirstRev, Range, Put, Compact, TxnBegin, TxnRange, and other methods (kv.go).
+mvcc.WatchStream           interface defines watch operations with Watch, Chan, Close, and other methods (watcher.go).
+mvcc.Watchable             interface wraps NewWatchStream method that returns mvcc.WatchStream (kv.go).
+mvcc.WatchableKV           interface wraps mvcc.KV interface and mvcc.Watchable interface (kv.go).
+mvcc.ConsistentWatchableKV interface wraps mvcc.WatchableKV interface with ConsistentIndex method (kv.go).
+mvcc.ConsistentIndexGetter interface defines ConsistentIndex method (kvstore.go).
 
+mvcc.store struct embeds mvcc.ConsistentIndexGetter interface, mvcc.index interface, backend.BatchTx interface, lease.Lessor interface and others.
+mvcc.NewStore creates a new mvcc.store with a new mvcc.treeIndex for mvcc.index.
+mvcc.store struct implements mvcc.KV interface.
 
 =================================================================================
 Package mvcc ...
@@ -81,13 +92,23 @@ Package mvcc ...
 Package rsm is a replicated state machine built on top of consensus protocol.
 Think of it as applying machine of replicated commands.
 
-rsm consists of:
+
+
+
+
+
+
+
+
+=================================================================================
+
+etcdserver consists of:
 - `etcdserver.Server` interface (Start, Stop, AddMember, etc.)
 - `etcdserver.EtcdServer` struct (id, `etcdserver.raftNode`, Storage, applier, etc.)
 - `etcdserverpb.rpc.proto`
 - `etcdserverpb.api.v3rpc`
 
-`etcdserver.Server` lays out the typical interfaces of replicated state machine server.
+`etcdserver.Server` defines typical interface of replicated state machine server.
 
 `etcdserver.EtcdServer` is the default implementation of `etcdserver.Server` interface.
 
@@ -97,39 +118,32 @@ storage path, WAL path, election timeout, and so on.
 `etcdserver.EtcdServer` embeds `etcdserver.raftNode` which then embeds `raft.Node`,
 storage, transport, and other Raft states, such as index, term, id, leader id, etc..
 
-`etcdserver.raftNode` is the consumer of `raft.Node` interface. When creating a
-new replicated state machine, the server also starts a `etcdserver.raftNode` that
-keeps calling `raft.Node` interface methods in the background. `etcdserver.raftNode`
-is waiting to receive from `Ready` channel, and stores, replicates, applies them.
+`etcdserver.raftNode` runs `raft.Node` interface. When creating a new replicated state machine,
+the server starts a `etcdserver.raftNode` that keeps calling `raft.Node` interface methods in
+background. `etcdserver.raftNode` keeps receiving from `Ready` channel, and stores, replicates,
+applies them.
 
 Then how do client requests get passed to `raft.Node`?
 
-`etcdserver.EtcdServer` has `processInternalRaftRequest` method to handle all client
-requests, which calls `processInternalRaftRequestOnce` that proposes client requests
-to the leader. Each request is given a unique id so that there is no duplicate request.
-
-For example, when server receives client Range request, it calls `etcdserver.EtcdServer.Range`
-and marshals the request into bytes to propose that command to the leader.
-
-`processInternalRaftRequest` takes context and `InternalRaftRequest` as arguments.
-And `InternalRaftRequest` contains all types of request, and the request tells the
-applier which request to apply.
-
-Then how does the proposed message turn into `InternalRaftRequest`?
-When proposal is received over network, the server calls `applyEntryNormal`,
-and unmarshals the data into `pb.InternalRaftRequest`, and calls `Apply` method
-on that request.
-
-If range request is serializable, it is not forwarded to leader, only ranging the
-local node without going through consensus protocol.
-
-`etcdserverpb.rpc.proto` defines rpc interfaces. For example, it defines `KVClient` with
-`Range` method, with `RangeRequest` and `RangeResponse`. It just registers the protocol
-buffer type with marshallers and unmarshallers.
-
-`etcdserverpb.api.v3rpc` implements these rpc interfaces, by calling `Range` method
-implemented in `etcdserver.EtcdServer`. So if client requests `Range` request to this
-gRPC server, it calls `etcdserver.EtcdServer.Range`.
+1. etcdserverpb defines RPC interfaces (e.g. KV service interface with Range, Put methods)
+2. etcdserverpb then generates KVServer, KVClient interfaces that can en/decode Protocol Buffer messages
+3. etcdserver.RaftKV interface defines the same interface as etcdserverpb.KVServer
+4. etcdserver.EtcdServer implements etcdserver.RaftKV interface with `etcdserver.raftNode` (v3_server.go)
+5. etcdserver.api.v3rpc.kvServer struct embeds this etcdserver.RaftKV interface
+6. etcdserver.api.v3rpc.NewKVServer returns a new etcdserverpb.KVServer with etcdserver.EtcdServer
+7. etcdserver.api.v3rpc.NewKVServer is used to register gRPC server handler
+8. When client sends request with etcdserverpb.KVClient, these handlers are triggered
+9. When client sends Range request with etcdserverpb.KVClient, it goes to etcdserver.api.v3rpc.NewKVServer
+10. And it goes to etcdserver.api.v3rpc.kvServer.Range
+11. And it goes to etcdserver.RaftKV.Range
+12. And it goes to etcdserver.EtcdServer.Range
+13. If req.Serializable is true, it ranges the local node and returns
+14. If req.Serializable is false, it goes to etcdserver.EtcdServer.processInternalRaftRequest
+15. And it goes to etcdserver.EtcdServer.processInternalRaftRequestOnce
+16. processInternalRaftRequestOnce assigns a unique ID to each request to ensure there is no duplicate request
+17. processInternalRaftRequestOnce marshals the request into bytes and proposes that command to the leader
+18. Leader's applier goroutine receives this in bytes and Unmarshal it (etcdserver.EtcdServer.applyEntryNormal)
+19. And leader applies it and returns
 
 =================================================================================
 */
