@@ -90,7 +90,7 @@ Package mvcc ...
 
 =================================================================================
 Package rsm is a replicated state machine built on top of consensus protocol.
-Think of it as applying machine of replicated commands.
+It is also an applying machine of those replicated commands.
 
 
 
