@@ -8,9 +8,10 @@ import (
 const snapshotFileSuffix = ".snap"
 
 var (
-	ErrNoSnapshot    = errors.New("raftsnap: no available snapshot")
-	ErrEmptySnapshot = errors.New("raftsnap: empty snapshot")
-	ErrCRCMismatch   = errors.New("raftsnap: crc mismatch")
+	ErrNoSnapshot       = errors.New("raftsnap: no available snapshot")
+	ErrNoSnapshotDBFile = errors.New("raftsnap: snapshot db file doesn't exist")
+	ErrEmptySnapshot    = errors.New("raftsnap: empty snapshot")
+	ErrCRCMismatch      = errors.New("raftsnap: crc mismatch")
 
 	crcTable = crc32.MakeTable(crc32.Castagnoli)
 

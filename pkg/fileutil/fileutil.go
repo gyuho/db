@@ -73,6 +73,8 @@ func DirWritable(dir string) error {
 }
 
 // ReadDir returns the filenames in the given directory in sorted order.
+//
+// (etcd pkg.fileutil.ReadDir)
 func ReadDir(dir string) ([]string, error) {
 	d, err := os.Open(dir)
 	if err != nil {
