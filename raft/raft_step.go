@@ -2,6 +2,7 @@ package raft
 
 import (
 	"bytes"
+	"math"
 
 	"github.com/gyuho/db/raft/raftpb"
 )
@@ -18,8 +19,8 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 		}
 
 		idx1 := rnd.storageRaftLog.appliedIndex + 1
-		idx2 := rnd.storageRaftLog.committedIndex - rnd.storageRaftLog.appliedIndex
-		ents, err := rnd.storageRaftLog.entries(idx1, idx2)
+		idx2 := rnd.storageRaftLog.committedIndex + 1
+		ents, err := rnd.storageRaftLog.slice(idx1, idx2, math.MaxUint64)
 		if err != nil {
 			raftLogger.Panicf("unexpected error getting uncommitted entries (%v)", err)
 		}
