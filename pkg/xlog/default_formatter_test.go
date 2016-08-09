@@ -27,6 +27,26 @@ func TestDefaultFormatterLogger(t *testing.T) {
 	fmt.Println(txt)
 }
 
+func TestDefaultFormatterLoggerGlobal(t *testing.T) {
+	buf := new(bytes.Buffer)
+	SetFormatter(NewDefaultFormatter(buf))
+
+	logger := NewLogger("test", DEBUG)
+	logger.Println("Hello World!")
+
+	SetGlobalMaxLogLevel(INFO)
+	logger.Debugln("DO NOT PRINT THIS")
+
+	txt := buf.String()
+	if !strings.Contains(txt, "Hello World!") {
+		t.Fatalf("unexpected log %q", txt)
+	}
+	if strings.Contains(txt, "DO NOT PRINT THIS") {
+		t.Fatalf("unexpected log %q", txt)
+	}
+	fmt.Println(txt)
+}
+
 func TestDefaultFormatterLoggerFile(t *testing.T) {
 	fpath := "test.log"
 	defer os.RemoveAll(fpath)

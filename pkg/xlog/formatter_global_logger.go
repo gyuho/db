@@ -58,3 +58,12 @@ func GetLogger(name string) (*Logger, bool) {
 	xlogger.mu.Unlock()
 	return lg, ok
 }
+
+// SetGlobalMaxLogLevel sets max log levels of all loggers.
+func SetGlobalMaxLogLevel(lvl LogLevel) {
+	xlogger.mu.Lock()
+	for _, lg := range xlogger.loggers {
+		lg.maxLvl = lvl
+	}
+	xlogger.mu.Unlock()
+}
