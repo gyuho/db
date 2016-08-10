@@ -12,7 +12,7 @@ import (
 // fallocate preallocates blocks to a file. Disk space is indeed reserved by this call,
 // but it doesn't write anything. It allocates blocks and marks them as uninitialized
 // requiring no I/O to the data blocks. Which is much faster than creating a file by
-// filling it with zeros.
+// filling it with zeros (pre-allocate pages).
 //
 // The default operation (mode is 0) of fallocate allocates the disk space
 // in the range starting at offset and continuing for sizeInBytes(len) bytes.
