@@ -8,6 +8,10 @@ import (
 
 // Generator generates unique uint64 id based on member ID, timestamp, and counter.
 //
+//	| prefix   | suffix              |
+//	| 2 bytes  | 5 bytes   | 1 byte  |
+//	| memberID | timestamp | cnt     |
+//
 // (etcd idutil.Generator)
 type Generator struct {
 	mu sync.Mutex
@@ -21,6 +25,29 @@ type Generator struct {
 	suffix uint64
 }
 
+/*
+& (AND)
+
+Let f be &
+
+	1. f(a, b) = f(b, a)
+	2. f(a, a) = a
+	3. f(a, b) ≤ max(a, b)
+
+
+∨ (OR)
+
+Let f be ∨
+
+	1. f(a, b) = f(b, a)
+	2. f(a, a) = a
+	3. f(a, b) ≥ max(a, b)
+*/
+
+func lowByteBit(x uint64, n uint) uint64 {
+	return x & (math.MaxUint64 >> (8*8 - n)) // lower n bytes
+}
+
 // NewGenerator returns a new Generator.
 //
 // (etcd idutil.NewGenerator)
@@ -29,24 +56,12 @@ func NewGenerator(memberID uint16, now time.Time) *Generator {
 
 	msec := uint64(now.UnixNano()) / uint64(time.Millisecond)
 	suffix := lowByteBit(msec, 8*5)
-	suffix = suffix << 8 // ???
+	suffix = suffix << 8 // one uppter byte to spare for count
 
 	return &Generator{
 		prefix: prefix,
 		suffix: suffix,
 	}
-}
-
-/*
-& AND (let's say f)
-
-1. f(a, b) = f(b, a)
-2. f(a, a) = a
-3. f(a, b) ≤ max(a, b)
-*/
-
-func lowByteBit(x uint64, n uint) uint64 {
-	return x & (math.MaxUint64 >> (8*8 - n)) // ???
 }
 
 // Next generates the next unique ID.
