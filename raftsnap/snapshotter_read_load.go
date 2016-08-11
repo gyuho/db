@@ -20,7 +20,7 @@ func Read(snapFileName string) (*raftpb.Snapshot, error) {
 	}
 
 	if len(b) == 0 {
-		logger.Errorf("unexpected empty snapshot")
+		logger.Error("unexpected empty snapshot")
 		return nil, ErrEmptySnapshot
 	}
 
@@ -31,7 +31,7 @@ func Read(snapFileName string) (*raftpb.Snapshot, error) {
 	}
 
 	if len(sSnap.Data) == 0 || sSnap.CRC == 0 {
-		logger.Errorf("unexpected empty snapshot")
+		logger.Error("unexpected empty snapshot")
 		return nil, ErrEmptySnapshot
 	}
 
@@ -46,6 +46,7 @@ func Read(snapFileName string) (*raftpb.Snapshot, error) {
 		logger.Errorf("corrupted snapshot file %v: %v", snapFileName, err)
 		return nil, err
 	}
+
 	return &rSnap, nil
 }
 
