@@ -33,6 +33,8 @@ compacted log entries prior to follower's match index. Follower then receives su
 append/snapshot message from leader, and appends to its log (unstable storage first
 when it's append request), and then updates its committed index.
 
+Only leader can send snapshots.
+
 `raft.raftNode` contains all Raft-algorithm-specific data, wrapping `raft.storageRaftLog`.
 `raft.raftNode` does not implement RPC between nodes. It is just one node in cluster.
 It contains configuration data such as heartbeat and election timeout. And states, such
@@ -50,6 +52,12 @@ size-limit the inflight messages in replication.
 `raft.Node` defines Raft node interface to control the lifecyle of Raft node, exposing
 only a few interface methods that can be easily used outside of package. `raft.Node` also
 wraps StorageStable interface to allow external packages to have their own storage implementation.
+
+`raft.Ready` returns a channel that receives point-in-time state of `raft.Node`.
+`raft.Advance` method MUST be followed, after applying the state in `raft.Ready`.
+Application cannot receive `raft.Ready` again, without calling `raft.Advance`.
+Application must commit `raft.Ready` entries to storage before calling `raft.Advance`.
+Applying log entires can be asynchronous (etcd does this in scheduler in the background).
 
 The default implementation first creates `raft.raftNode` based on the given configuration,
 and launches goroutine that keeps processing raft messages. `raft.Node` keeps sending and

@@ -27,6 +27,7 @@ type Ready struct {
 	HardStateToSave raftpb.HardState
 
 	// SnapshotToSave specifies the Snapshot to save to stable storage.
+	// Only leader can send Snapshot.
 	//
 	// (etcd raft.Ready.Snapshot)
 	SnapshotToSave raftpb.Snapshot

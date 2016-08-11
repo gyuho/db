@@ -55,6 +55,10 @@ type Node interface {
 
 	// Ready returns a channel that receives point-in-time state of Node.
 	// 'Advance' method MUST be followed, AFTER APPLYING the state in Ready.
+	// Application cannot receive Ready again, without calling Advance.
+	// Application must commit Ready entries to storage before calling Advance.
+	// Applying log entires can be asynchronous (etcd does this in scheduler
+	// in the background).
 	//
 	// (etcd raft.Node.Ready)
 	Ready() <-chan Ready
