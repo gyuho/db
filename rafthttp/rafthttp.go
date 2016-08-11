@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	ErrMemberRemoved  = errors.New("rafthttp: the member has been permanently removed from the cluster") // (etcd rafthttp.errMemberRemoved)
-	ErrMemberNotFound = errors.New("rafthttp: member not found")                                         // (etcd rafthttp.errMemberNotFound)
-	ErrStopped        = errors.New("rafthttp: stopped")                                                  // (etcd rafthttp.errStopped)
+	ErrMemberRemoved         = errors.New("rafthttp: the member has been permanently removed from the cluster") // (etcd rafthttp.errMemberRemoved)
+	ErrMemberNotFound        = errors.New("rafthttp: member not found")                                         // (etcd rafthttp.errMemberNotFound)
+	ErrStopped               = errors.New("rafthttp: stopped")                                                  // (etcd rafthttp.errStopped)
+	ErrUnsupportedStreamType = errors.New("rafthttp: unsupported stream type")                                  // (etcd rafthttp.errUnsupportedStreamType)
 )
 
 const (
