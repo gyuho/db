@@ -174,7 +174,7 @@ func (sr *storageRaftLog) mustCheckOutOfBounds(startIndex, endIndex uint64) erro
 		return ErrCompacted
 	}
 
-	entryN := sr.lastIndex() - firstIndex + 1
+	entryN := sr.lastIndex() + 1 - firstIndex
 	if endIndex > firstIndex+entryN {
 		raftLogger.Panicf("entries[%d, %d) is out of bound [first index=%d | last index=%d]", startIndex, endIndex, firstIndex, sr.lastIndex())
 	}
