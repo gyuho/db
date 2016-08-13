@@ -14,17 +14,32 @@ var (
 
 const (
 	// ConnWriteTimeout is I/O timeout for each connection, enough for recycling bad connections, otherwise minutes.
+	//
+	// (etcd rafthttp.ConnWriteTimeout)
 	ConnWriteTimeout = 5 * time.Second
 
 	// ConnReadTimeout is I/O timeout for each connection, enough for recycling bad connections, otherwise minutes.
+	//
+	// (etcd rafthttp.ConnReadTimeout)
 	ConnReadTimeout = 5 * time.Second
 
-	receiveBufferN = 1024 * 4 // (etcd rafthttp.recvBufSize)
+	// MaxConnReadByteN is the maximum number of bytes a single read can read out.
+	//
+	// 64KB should be big enough without causing throughput bottleneck,
+	// and small enough to not cause read-timeout.
+	//
+	// (etcd rafthttp.connReadLimitByte)
+	MaxConnReadByteN = 64 * 1024
 
-	// maxPendingProposalN is the maximum number of proposals to hold
+	// MaxReceiveBufferN is the maximum buffer size for receiver.
+	//
+	// (etcd rafthttp.recvBufSize)
+	MaxReceiveBufferN = 4 * 1024
+
+	// MaxPendingProposalN is the maximum number of proposals to hold
 	// during one leader election process. Usually, election takes up to
 	// 1-second.
 	//
 	// (etcd rafthttp.maxPendingProposals)
-	maxPendingProposalN = 1024 * 4
+	MaxPendingProposalN = 4 * 1024
 )
