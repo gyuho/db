@@ -2,6 +2,7 @@ package rafthttp
 
 import (
 	"errors"
+	"path"
 	"time"
 )
 
@@ -10,6 +11,15 @@ var (
 	ErrMemberNotFound        = errors.New("rafthttp: member not found")                                         // (etcd rafthttp.errMemberNotFound)
 	ErrStopped               = errors.New("rafthttp: stopped")                                                  // (etcd rafthttp.errStopped)
 	ErrUnsupportedStreamType = errors.New("rafthttp: unsupported stream type")                                  // (etcd rafthttp.errUnsupportedStreamType)
+	ErrIncompatibleVersion   = errors.New("rafthttp: incompatible version")                                     // (etcd rafthttp.errIncompatibleVersion)
+	ErrClusterIDMismatch     = errors.New("rafthttp: cluster ID mismatch")                                      // (etcd rafthttp.errClusterIDMismatch)
+)
+
+var (
+	RaftPrefix         = "/raft"
+	ProbingPrefix      = path.Join(RaftPrefix, "probing")
+	RaftStreamPrefix   = path.Join(RaftPrefix, "stream")
+	RaftSnapshotPrefix = path.Join(RaftPrefix, "snapshot")
 )
 
 const (
