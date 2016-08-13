@@ -1,5 +1,5 @@
 hash: 153c73a7b7495fcbdae052f0ea3dfc77a1585b63dfcbf081eb58c4f5a15a7c92
-updated: 2016-08-07T22:55:49.951837909-07:00
+updated: 2016-08-13T00:26:13.444624274-07:00
 imports:
 - name: github.com/gogo/protobuf
   version: a4cceea7a401a73fefafd1a21fedbd4694124a82
@@ -8,7 +8,7 @@ imports:
   - proto
   - protoc-gen-gogo/descriptor
 - name: github.com/golang/protobuf
-  version: c3cefd437628a0b7d31b34fe44b3a7a540e98527
+  version: 2c1988e8c18d14b142c0b472624f71647cf39adb
   subpackages:
   - proto
 testImports: []

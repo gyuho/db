@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Installing glide..."
 GLIDE_ROOT="$GOPATH/src/github.com/Masterminds/glide"
 rm -rf $GLIDE_ROOT
 go get -v -u github.com/Masterminds/glide
@@ -12,6 +11,6 @@ pushd "${GLIDE_ROOT}"
 popd
 
 rm -rf vendor
-glide -v
-glide update --strip-vendor --strip-vcs --update-vendored
+
+glide --verbose update --delete --strip-vendor --strip-vcs --update-vendored --skip-test
 glide vc --only-code --no-tests
