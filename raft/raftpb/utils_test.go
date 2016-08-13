@@ -23,7 +23,7 @@ func Test_DescribeMessageLongLong(t *testing.T) {
 		Data:  []byte("hello"),
 	}
 	msg := Message{
-		Type:     MESSAGE_TYPE_RESPONSE_TO_APPEND_FROM_LEADER,
+		Type:     MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND,
 		From:     7777,
 		To:       9999,
 		LogIndex: 10,
