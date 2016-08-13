@@ -34,6 +34,10 @@ type status struct {
 	stopc chan struct{}
 }
 
+func newStatus() *status {
+	return &status{stopc: make(chan struct{})}
+}
+
 // α(alpha) is weight factor for SRTT
 //
 // https://tools.ietf.org/html/rfc2988
