@@ -1,6 +1,7 @@
 package rafthttp
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/gyuho/db/pkg/scheduleutil"
@@ -27,15 +28,16 @@ func startTestPeerPipeline(pt *PeerTransport, picker *urlPicker) *peerPipeline {
 // (etcd rafthttp.TestPipelineSend)
 func Test_peerPipeline_start(t *testing.T) {
 	tr := &roundTripperRecorder{}
-	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
 	pt := &PeerTransport{peerPipelineRoundTripper: tr}
-	pl := startTestPeerPipeline(pt, picker)
 
-	pl.raftMessageChan <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
+	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
+	pn := startTestPeerPipeline(pt, picker)
+
+	pn.raftMessageChan <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
 
 	scheduleutil.WaitSchedule()
 
-	pl.stop()
+	pn.stop()
 
 	if tr.Request() == nil {
 		t.Fatal("sender fails to post the data")
@@ -44,7 +46,21 @@ func Test_peerPipeline_start(t *testing.T) {
 
 // (etcd rafthttp.TestPipelineKeepSendingWhenPostError)
 func Test_peerPipeline_send_error(t *testing.T) {
+	tr := &respRoundTripper{rec: scheduleutil.NewRecorderStream(), err: fmt.Errorf("roundtrip error")}
+	pt := &PeerTransport{peerPipelineRoundTripper: tr}
 
+	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
+	pn := startTestPeerPipeline(pt, picker)
+	defer pn.stop()
+
+	for i := 0; i < 50; i++ {
+		pn.raftMessageChan <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
+	}
+
+	_, err := tr.rec.Wait(50)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // (etcd rafthttp.TestPipelineExceedMaximumServing)
