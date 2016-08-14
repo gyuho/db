@@ -15,6 +15,7 @@ import (
 type Peer interface {
 	sendMessageToPeer(msgs raftpb.Message)
 	sendSnapshotToPeer(msgs raftsnap.Message)
+
 	updatePeer(urls types.URLs)
 
 	attachOutgoingConn(conn *outgoingConn)

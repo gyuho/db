@@ -99,6 +99,10 @@ type PeerTransport struct {
 	peerRemotes map[types.ID]*peerRemote
 }
 
+func (pt *PeerTransport) ErrChan() chan error {
+	return pt.errc
+}
+
 func (pt *PeerTransport) Start() error {
 	var err error
 
