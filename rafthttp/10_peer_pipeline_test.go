@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/gyuho/db/pkg/scheduleutil"
@@ -197,5 +198,24 @@ func Test_peerPipeline_send_post_error(t *testing.T) {
 
 // (etcd rafthttp.TestStopBlockedPipeline)
 func Test_peerPipeline_stop_blocked(t *testing.T) {
+	tr := newRoundTripperBlocker()
+	pt := &PeerTransport{peerPipelineRoundTripper: tr}
 
+	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
+	pn := startTestPeerPipeline(pt, picker)
+
+	for i := 0; i < connPerPipeline*10; i++ {
+		pn.raftMessageChan <- raftpb.Message{}
+	}
+
+	donec := make(chan struct{})
+	go func() {
+		pn.stop()
+		donec <- struct{}{}
+	}()
+	select {
+	case <-donec:
+	case <-time.After(time.Second):
+		t.Fatal("failed to stop pipeline in 1s")
+	}
 }
