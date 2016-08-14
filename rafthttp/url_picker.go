@@ -7,6 +7,9 @@ import (
 	"github.com/gyuho/db/pkg/types"
 )
 
+// urlPicker picks URL with pinned index.
+//
+// (etcd rafthttp.urlPicker)
 type urlPicker struct {
 	mu        sync.Mutex
 	urls      types.URLs

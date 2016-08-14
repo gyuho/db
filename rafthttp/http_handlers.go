@@ -45,4 +45,20 @@ type http.ResponseWriter interface {
         // send error codes.
         WriteHeader(int)
 }
+
+
+
+https://golang.org/pkg/net/http/#Flusher
+
+The Flusher interface is implemented by ResponseWriters that
+allow an HTTP handler to flush buffered data to the client.
+
+Note that even for ResponseWriters that support Flush,
+if the client is connected through an HTTP proxy,
+the buffered data may not reach the client until the response completes.
+
+type http.Flusher interface {
+        // Flush sends any buffered data to the client.
+        Flush()
+}
 */

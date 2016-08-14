@@ -2,17 +2,19 @@ package rafthttp
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/gyuho/db/pkg/probing"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/raftsnap"
 )
 
-// Transporter defines rafthttp transport layer.
+// PeerTransporter defines rafthttp transport layer.
 //
 // (etcd rafthttp.Transporter)
-type Transporter interface {
+type PeerTransporter interface {
 	// Start starts transporter.
 	// Start must be called first.
 	//
@@ -71,6 +73,24 @@ type Transporter interface {
 	AddPeerRemote(id types.ID, urls []string)
 }
 
-// Transport implements Transporter.
-type Transport struct {
+// PeerTransport implements PeerTransporter. It sends and receives raft messages to/from peers.
+//
+// (etcd rafthttp.Transport)
+type PeerTransport struct {
+	From      types.ID
+	ClusterID types.ID
+	PeerURLs  types.URLs
+
+	Raft            Raft
+	RaftSnapshotter *raftsnap.Snapshotter
+
+	errc chan error
+
+	prober                   probing.Prober
+	streamRoundTripper       http.RoundTripper
+	peerPipelineRoundTripper http.RoundTripper
+
+	mu          sync.RWMutex
+	peers       map[types.ID]*peer
+	peerRemotes map[types.ID]*peerRemote
 }
