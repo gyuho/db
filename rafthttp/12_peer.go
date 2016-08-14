@@ -31,7 +31,21 @@ type Peer interface {
 //
 // (etcd rafthttp.peer)
 type peer struct {
-	mu sync.Mutex
+	// id is the id of this remote peer.
+	id     types.ID
+	status *peerStatus
+	r      Raft
+
+	urlPicker    *urlPicker
+	streamWriter *streamWriter
+
+	sendc chan raftpb.Message
+	recvc chan raftpb.Message
+	propc chan raftpb.Message
+	stopc chan struct{}
+
+	mu     sync.Mutex
+	paused bool
 }
 
 func (p *peer) Pause() {
