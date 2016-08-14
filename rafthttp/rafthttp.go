@@ -16,10 +16,18 @@ var (
 )
 
 var (
-	RaftPrefix         = "/raft"
-	ProbingPrefix      = path.Join(RaftPrefix, "probing")
-	RaftStreamPrefix   = path.Join(RaftPrefix, "stream")
-	RaftSnapshotPrefix = path.Join(RaftPrefix, "snapshot")
+	PrefixRaft         = "/raft"                           // (etcd rafthttp.RaftPrefix)
+	PrefixRaftProbing  = path.Join(PrefixRaft, "probing")  // (etcd rafthttp.ProbingPrefix)
+	PrefixRaftStream   = path.Join(PrefixRaft, "stream")   // (etcd rafthttp.RaftStreamPrefix)
+	PrefixRaftSnapshot = path.Join(PrefixRaft, "snapshot") // (etcd rafthttp.RaftSnapshotPrefix)
+)
+
+var (
+	HeaderVersion   = "X-rafthttp-Version"   // X-Server-Version
+	HeaderClusterID = "X-rafthttp-ClusterID" // X-Etcd-Cluster-ID
+	HeaderPeerURLs  = "X-rafthttp-PeerURLs"  // X-PeerURLs
+	HeaderFromID    = "X-rafthttp-From"      // X-Server-From
+	HeaderToID      = "X-rafthttp-To"        // X-Raft-To
 )
 
 const (
@@ -33,23 +41,33 @@ const (
 	// (etcd rafthttp.ConnReadTimeout)
 	ConnReadTimeout = 5 * time.Second
 
-	// MaxConnReadByteN is the maximum number of bytes a single read can read out.
+	// maxConnReadByteN is the maximum number of bytes a single read can read out.
 	//
 	// 64KB should be big enough without causing throughput bottleneck,
 	// and small enough to not cause read-timeout.
 	//
 	// (etcd rafthttp.connReadLimitByte)
-	MaxConnReadByteN = 64 * 1024
+	maxConnReadByteN = 64 * 1024
 
-	// MaxReceiveBufferN is the maximum buffer size for receiver.
+	// receiveBufferN is the buffer size for receiver.
 	//
 	// (etcd rafthttp.recvBufSize)
-	MaxReceiveBufferN = 4 * 1024
+	receiveBufferN = 4 * 1024
 
-	// MaxPendingProposalN is the maximum number of proposals to hold
+	// pipelineBufferN is the buffer size of pipeline, to help hold temporary network latency.
+	//
+	// (etcd rafthttp.pipelineBufSize)
+	pipelineBufferN = 64
+
+	// connPerPipeline is the number of connections per pipeline.
+	//
+	// (etcd rafthttp.connPerPipeline)
+	connPerPipeline = 4
+
+	// maxPendingProposalN is the maximum number of proposals to hold
 	// during one leader election process. Usually, election takes up to
 	// 1-second.
 	//
 	// (etcd rafthttp.maxPendingProposals)
-	MaxPendingProposalN = 4 * 1024
+	maxPendingProposalN = 4 * 1024
 )

@@ -9,35 +9,34 @@ import (
 	"github.com/gyuho/db/pkg/types"
 )
 
-// memberStatus is the status of remote member in local member's viewpoint.
+// peerStatus is the status of remote peer in local member's viewpoint.
 //
 // (etcd rafthttp.peerStatus)
-type memberStatus struct {
+type peerStatus struct {
 	id types.ID
 
 	mu sync.Mutex
-
-	// since is zero when the remote member is not active
+	// since is zero when the peer is not active.
 	since time.Time
 }
 
-func newMemberStatus(id types.ID) *memberStatus {
-	return &memberStatus{id: id}
+func newPeerStatus(id types.ID) *peerStatus {
+	return &peerStatus{id: id}
 }
 
-func (s *memberStatus) activate() {
+func (s *peerStatus) activate() {
 	s.mu.Lock()
 	if s.since.IsZero() {
-		logger.Infof("remote member %s became active", s.id)
+		logger.Infof("member %s became active", s.id)
 		s.since = time.Now()
 	}
 	s.mu.Unlock()
 }
 
-func (s *memberStatus) deactivate(ft failureType) {
+func (s *peerStatus) deactivate(ft failureType) {
 	s.mu.Lock()
 	if !s.since.IsZero() {
-		logger.Infof("remote member %s became inactive (%s)", s.id, ft.String())
+		logger.Infof("member %s became inactive (%s)", s.id, ft.String())
 		s.since = time.Time{}
 	}
 	s.mu.Unlock()
@@ -55,13 +54,13 @@ func (ft failureType) String() string {
 	return w.String()
 }
 
-func (s *memberStatus) isActive() bool {
+func (s *peerStatus) isActive() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return !s.since.IsZero()
 }
 
-func (s *memberStatus) activeSince() time.Time {
+func (s *peerStatus) activeSince() time.Time {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.since
