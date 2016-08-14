@@ -3,13 +3,25 @@ package rafthttp
 import (
 	"sync"
 	"time"
+
+	"github.com/gyuho/db/pkg/types"
+	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/raftsnap"
 )
 
 // Peer defines peer operations.
 //
 // (etcd rafthttp.Peer)
 type Peer interface {
+	sendMessageToPeer(msgs raftpb.Message)
+	sendSnapshotToPeer(msgs raftsnap.Message)
+	updatePeer(urls types.URLs)
+
+	attachOutgoingConn(conn *outgoingConn)
+
 	activeSince() time.Time
+
+	stop()
 }
 
 // peer represents remote Raft node. Local Raft node uses peer to send messages to remote peers.

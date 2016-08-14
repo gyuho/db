@@ -3,8 +3,8 @@ package rafthttp
 import (
 	"errors"
 	"testing"
-	"time"
 
+	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 )
@@ -24,7 +24,7 @@ func Test_streamWriter_attatchOutgoingConn(t *testing.T) {
 		sw.attachOutgoingConn(&outgoingConn{Writer: wfc, Flusher: wfc, Closer: wfc})
 
 		for j := 0; j < 3; j++ {
-			time.Sleep(10 * time.Millisecond)
+			scheduleutil.WaitSchedule()
 
 			// previous connection should be closed; if not wait
 			if prev != nil && !prev.getClosed() {
@@ -45,7 +45,7 @@ func Test_streamWriter_attatchOutgoingConn(t *testing.T) {
 
 		sw.raftMessageChan <- raftpb.Message{}
 
-		time.Sleep(10 * time.Millisecond)
+		scheduleutil.WaitSchedule()
 
 		if _, working := sw.messageChanToSend(); !working {
 			t.Fatalf("working expected true, got %v", working)
@@ -75,7 +75,7 @@ func Test_streamWriter_attatchOutgoingConn_bad(t *testing.T) {
 
 	sw.raftMessageChan <- raftpb.Message{}
 
-	time.Sleep(10 * time.Millisecond)
+	scheduleutil.WaitSchedule()
 
 	if _, working := sw.messageChanToSend(); working {
 		t.Fatalf("working expected false, got %v", working)

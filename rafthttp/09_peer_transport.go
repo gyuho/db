@@ -40,7 +40,7 @@ type PeerTransporter interface {
 	// SendSnapshotToPeer sends snapshot to its remote peers.
 	//
 	// (etcd rafthttp.Transporter.SendSnapshot)
-	SendSnapshotToPeer(msgs raftsnap.Message)
+	SendSnapshotToPeer(msg raftsnap.Message)
 
 	// AddPeer adds a peer with given peer URLs to the transport.
 	//
