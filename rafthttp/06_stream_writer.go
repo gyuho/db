@@ -23,7 +23,8 @@ type outgoingConn struct {
 type streamWriter struct {
 	peerID types.ID
 	status *peerStatus
-	r      Raft
+
+	r Raft
 
 	outgoingConnChan chan *outgoingConn
 	raftMessageChan  chan raftpb.Message

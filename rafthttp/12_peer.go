@@ -31,13 +31,14 @@ type Peer interface {
 //
 // (etcd rafthttp.peer)
 type peer struct {
-	// id is the id of this remote peer.
-	id     types.ID
+	peerID types.ID
 	status *peerStatus
 	r      Raft
 
-	urlPicker    *urlPicker
+	picker       *urlPicker
 	streamWriter *streamWriter
+	peerPipeline *peerPipeline
+	streamReader *streamReader
 
 	sendc chan raftpb.Message
 	recvc chan raftpb.Message
