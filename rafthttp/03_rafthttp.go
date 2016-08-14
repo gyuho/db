@@ -76,6 +76,7 @@ var (
 )
 
 var (
+	HeaderContentType     = "Content-Type"
 	HeaderContentProtobuf = "application/protobuf"
 	HeaderFromID          = "X-rafthttp-From"           // X-Server-From
 	HeaderToID            = "X-rafthttp-To"             // X-Raft-To
@@ -106,7 +107,7 @@ func createPostRequest(target url.URL, path string, rd io.Reader, contentType st
 		logger.Panic(err)
 	}
 
-	req.Header.Set("Content-Type", contentType)
+	req.Header.Set(HeaderContentType, contentType)
 	req.Header.Set(HeaderFromID, from.String())
 	req.Header.Set(HeaderClusterID, clusterID.String())
 	req.Header.Set(HeaderServerVersion, version.ServerVersion)

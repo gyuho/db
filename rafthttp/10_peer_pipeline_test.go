@@ -2,12 +2,14 @@ package rafthttp
 
 import (
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/version"
 )
 
 func startTestPeerPipeline(pt *PeerTransport, picker *urlPicker) *peerPipeline {
@@ -105,14 +107,40 @@ func Test_peerPipeline_send_maximum(t *testing.T) {
 	}
 }
 
-// (etcd rafthttp.TestPipelineSendFailed)
-func Test_peerPipeline_send_failed(t *testing.T) {
-
-}
-
 // (etcd rafthttp.TestPipelinePost)
 func Test_peerPipeline_send_post(t *testing.T) {
+	tr := &roundTripperRecorder{}
+	pt := &PeerTransport{ClusterID: types.ID(1), peerPipelineRoundTripper: tr}
 
+	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
+	pn := startTestPeerPipeline(pt, picker)
+	if err := pn.post([]byte("testdata")); err != nil {
+		t.Fatal(err)
+	}
+	pn.stop()
+
+	if g := tr.Request().Method; g != "POST" {
+		t.Fatalf("method = %s, want %s", g, "POST")
+	}
+	if g := tr.Request().URL.String(); g != "http://localhost:2380/raft" {
+		t.Fatalf("url = %s, want %s", g, "http://localhost:2380/raft")
+	}
+	if g := tr.Request().Header.Get(HeaderContentType); g != HeaderContentProtobuf {
+		t.Fatalf("content type = %s, want %s", g, HeaderContentProtobuf)
+	}
+	if g := tr.Request().Header.Get(HeaderServerVersion); g != version.ServerVersion {
+		t.Fatalf("version = %s, want %s", g, version.ServerVersion)
+	}
+	if g := tr.Request().Header.Get(HeaderClusterID); g != "1" {
+		t.Fatalf("cluster id = %s, want %s", g, "1")
+	}
+	b, err := ioutil.ReadAll(tr.Request().Body)
+	if err != nil {
+		t.Fatalf("unexpected ReadAll error: %v", err)
+	}
+	if string(b) != "testdata" {
+		t.Fatalf("body = %s, want %s", b, "testdata")
+	}
 }
 
 // (etcd rafthttp.TestPipelinePostBad)
