@@ -2,32 +2,23 @@ package rafthttp
 
 import (
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"path"
+	"strings"
 	"time"
+
+	"github.com/gyuho/db/pkg/types"
+	"github.com/gyuho/db/version"
 )
 
 var (
-	ErrMemberRemoved         = errors.New("rafthttp: the member has been permanently removed from the cluster") // (etcd rafthttp.errMemberRemoved)
-	ErrMemberNotFound        = errors.New("rafthttp: member not found")                                         // (etcd rafthttp.errMemberNotFound)
-	ErrStopped               = errors.New("rafthttp: stopped")                                                  // (etcd rafthttp.errStopped)
-	ErrUnsupportedStreamType = errors.New("rafthttp: unsupported stream type")                                  // (etcd rafthttp.errUnsupportedStreamType)
-	ErrIncompatibleVersion   = errors.New("rafthttp: incompatible version")                                     // (etcd rafthttp.errIncompatibleVersion)
-	ErrClusterIDMismatch     = errors.New("rafthttp: cluster ID mismatch")                                      // (etcd rafthttp.errClusterIDMismatch)
-)
-
-var (
-	PrefixRaft         = "/raft"                           // (etcd rafthttp.RaftPrefix)
-	PrefixRaftProbing  = path.Join(PrefixRaft, "probing")  // (etcd rafthttp.ProbingPrefix)
-	PrefixRaftStream   = path.Join(PrefixRaft, "stream")   // (etcd rafthttp.RaftStreamPrefix)
-	PrefixRaftSnapshot = path.Join(PrefixRaft, "snapshot") // (etcd rafthttp.RaftSnapshotPrefix)
-)
-
-var (
-	HeaderVersion   = "X-rafthttp-Version"   // X-Server-Version
-	HeaderClusterID = "X-rafthttp-ClusterID" // X-Etcd-Cluster-ID
-	HeaderPeerURLs  = "X-rafthttp-PeerURLs"  // X-PeerURLs
-	HeaderFromID    = "X-rafthttp-From"      // X-Server-From
-	HeaderToID      = "X-rafthttp-To"        // X-Raft-To
+	ErrMemberRemoved     = errors.New("rafthttp: the member has been permanently removed from the cluster") // (etcd rafthttp.errMemberRemoved)
+	ErrMemberNotFound    = errors.New("rafthttp: member not found")                                         // (etcd rafthttp.errMemberNotFound)
+	ErrStopped           = errors.New("rafthttp: stopped")                                                  // (etcd rafthttp.errStopped)
+	ErrClusterIDMismatch = errors.New("rafthttp: cluster ID mismatch")                                      // (etcd rafthttp.errClusterIDMismatch)
 )
 
 const (
@@ -76,3 +67,82 @@ const (
 	// (etcd rafthttp.maxPendingProposals)
 	maxPendingProposalN = 4 * 1024
 )
+
+var (
+	PrefixRaft         = "/raft"                           // (etcd rafthttp.RaftPrefix)
+	PrefixRaftProbing  = path.Join(PrefixRaft, "probing")  // (etcd rafthttp.ProbingPrefix)
+	PrefixRaftStream   = path.Join(PrefixRaft, "stream")   // (etcd rafthttp.RaftStreamPrefix)
+	PrefixRaftSnapshot = path.Join(PrefixRaft, "snapshot") // (etcd rafthttp.RaftSnapshotPrefix)
+)
+
+var (
+	HeaderContentProtobuf = "application/protobuf"
+	HeaderFromID          = "X-rafthttp-From"           // X-Server-From
+	HeaderToID            = "X-rafthttp-To"             // X-Raft-To
+	HeaderClusterID       = "X-rafthttp-ClusterID"      // X-Etcd-Cluster-ID
+	HeaderServerVersion   = "X-rafthttp-Server-Version" // X-Server-Version
+	HeaderPeerURLs        = "X-rafthttp-PeerURLs"       // X-PeerURLs
+)
+
+// (etcd rafthttp.setPeerURLsHeader)
+func setHeaderPeerURLs(req *http.Request, peerURLs types.URLs) {
+	if peerURLs == nil {
+		return
+	}
+	ps := make([]string, peerURLs.Len())
+	for i := range peerURLs {
+		ps[i] = peerURLs[i].String()
+	}
+	req.Header.Set(HeaderPeerURLs, strings.Join(ps, ","))
+}
+
+// (etcd rafthttp.createPostRequest)
+func createPostRequest(target url.URL, path string, rd io.Reader, contentType string, from, clusterID types.ID, peerURLs types.URLs) *http.Request {
+	uu := target
+	uu.Path = path
+
+	req, err := http.NewRequest("POST", uu.String(), rd)
+	if err != nil {
+		logger.Panic(err)
+	}
+
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set(HeaderFromID, from.String())
+	req.Header.Set(HeaderClusterID, clusterID.String())
+	req.Header.Set(HeaderServerVersion, version.ServerVersion)
+
+	setHeaderPeerURLs(req, peerURLs)
+
+	return req
+}
+
+// (etcd rafthttp.checkPostResponse)
+func checkPostResponse(resp *http.Response, body []byte, req *http.Request, peerID types.ID) error {
+	switch resp.StatusCode {
+	case http.StatusPreconditionFailed:
+		switch strings.TrimSuffix(string(body), "\n") {
+		case ErrClusterIDMismatch.Error():
+			logger.Errorf("request was ignored (%v, remote[%s]=%s, local=%s)", ErrClusterIDMismatch, peerID, resp.Header.Get(HeaderClusterID), req.Header.Get(HeaderClusterID))
+			return ErrClusterIDMismatch
+		default:
+			return fmt.Errorf("unhandled error %q", string(body))
+		}
+
+	case http.StatusForbidden:
+		return ErrMemberRemoved
+
+	case http.StatusNoContent:
+		return nil
+
+	default:
+		return fmt.Errorf("unexpected http status %s while posting to %q", http.StatusText(resp.StatusCode), req.URL.String())
+	}
+}
+
+// (etcd rafthttp.reportCriticalError)
+func sendError(err error, errc chan<- error) {
+	select {
+	case errc <- err:
+	default:
+	}
+}

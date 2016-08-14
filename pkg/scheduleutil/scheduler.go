@@ -3,13 +3,7 @@ package scheduleutil
 import (
 	"context"
 	"sync"
-	"time"
 )
-
-// WaitSchedule briefly sleeps in order to invoke the go scheduler.
-//
-// (etcd pkg.testutil.WaitSchedule)
-func WaitSchedule() { time.Sleep(10 * time.Millisecond) }
 
 // Job is a function to be run with context.
 //
