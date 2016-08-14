@@ -11,6 +11,12 @@ import (
 	"github.com/gyuho/db/raftsnap"
 )
 
+// Pausable defines pausable transport interface.
+type Pausable interface {
+	Pause()
+	Resume()
+}
+
 // PeerTransporter defines rafthttp transport layer.
 //
 // (etcd rafthttp.Transporter)

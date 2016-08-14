@@ -8,9 +8,3 @@ package rafthttp
 // (etcd rafthttp.peer)
 type peer struct {
 }
-
-// peerRemote handles newly joined peers.
-//
-// (etcd rafthttp.remote)
-type peerRemote struct {
-}
