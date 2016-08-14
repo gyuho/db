@@ -5,3 +5,9 @@ package rafthttp
 // (etcd rafthttp.remote)
 type peerRemote struct {
 }
+
+func (r *peerRemote) Pause() {
+}
+
+func (r *peerRemote) Resume() {
+}
