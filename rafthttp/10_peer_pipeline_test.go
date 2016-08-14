@@ -1,8 +1,10 @@
 package rafthttp
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"testing"
 
 	"github.com/coreos/etcd/pkg/testutil"
@@ -145,7 +147,27 @@ func Test_peerPipeline_send_post(t *testing.T) {
 
 // (etcd rafthttp.TestPipelinePostBad)
 func Test_peerPipeline_send_post_bad(t *testing.T) {
+	tests := []struct {
+		u    string
+		code int
+		err  error
+	}{
+		{"http://localhost:2380", 0, errors.New("testerror")},
+		{"http://localhost:2380", http.StatusOK, nil},
+		{"http://localhost:2380", http.StatusCreated, nil},
+	}
+	for i, tt := range tests {
+		pt := &PeerTransport{peerPipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
+		picker := newURLPicker(types.MustNewURLs([]string{tt.u}))
+		pn := startTestPeerPipeline(pt, picker)
 
+		err := pn.post([]byte("testdata"))
+		pn.stop()
+
+		if err == nil {
+			t.Fatalf("#%d: err = nil, want not nil", i)
+		}
+	}
 }
 
 // (etcd rafthttp.TestPipelinePostErrorc)
