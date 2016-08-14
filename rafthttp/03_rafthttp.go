@@ -50,10 +50,10 @@ const (
 	// (etcd rafthttp.recvBufSize)
 	receiveBufferN = 4 * 1024
 
-	// pipelineBufferN is the buffer size of pipeline, to help hold temporary network latency.
+	// peerPipelineBufferN is the buffer size of pipeline, to help hold temporary network latency.
 	//
 	// (etcd rafthttp.pipelineBufSize)
-	pipelineBufferN = 64
+	peerPipelineBufferN = 64
 
 	// connPerPipeline is the number of connections per pipeline.
 	//

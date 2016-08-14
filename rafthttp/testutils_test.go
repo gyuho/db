@@ -2,6 +2,7 @@ package rafthttp
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"sync"
@@ -99,8 +100,9 @@ func (t *roundTripperRecorder) Request() *http.Request {
 // (etcd rafthttp.roundTripperBlocker)
 type roundTripperBlocker struct {
 	unblockc chan struct{}
-	mu       sync.Mutex
-	cancel   map[*http.Request]chan struct{}
+
+	mu     sync.Mutex
+	cancel map[*http.Request]chan struct{}
 }
 
 // (etcd rafthttp.newRoundTripperBlocker)
@@ -108,6 +110,29 @@ func newRoundTripperBlocker() *roundTripperBlocker {
 	return &roundTripperBlocker{
 		unblockc: make(chan struct{}),
 		cancel:   make(map[*http.Request]chan struct{}),
+	}
+}
+
+func (t *roundTripperBlocker) RoundTrip(req *http.Request) (*http.Response, error) {
+	c := make(chan struct{}, 1)
+
+	t.mu.Lock()
+	t.cancel[req] = c
+	t.mu.Unlock()
+
+	select {
+	case <-t.unblockc:
+		return &http.Response{StatusCode: http.StatusNoContent, Body: &nopReadCloser{}}, nil
+
+	case <-c:
+		return nil, errors.New("request canceled")
+
+	case <-req.Context().Done():
+		return nil, errors.New("request canceled")
+
+		// DEPRECATED:
+		// case <-req.Cancel:
+		// return nil, errors.New("request canceled")
 	}
 }
 

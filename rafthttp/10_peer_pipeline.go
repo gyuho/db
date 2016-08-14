@@ -33,7 +33,7 @@ type peerPipeline struct {
 }
 
 func (p *peerPipeline) start() {
-	p.raftMessageChan = make(chan raftpb.Message, pipelineBufferN)
+	p.raftMessageChan = make(chan raftpb.Message, peerPipelineBufferN)
 	p.stopc = make(chan struct{})
 	p.connWg.Add(connPerPipeline)
 

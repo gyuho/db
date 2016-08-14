@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
@@ -65,7 +66,43 @@ func Test_peerPipeline_send_error(t *testing.T) {
 
 // (etcd rafthttp.TestPipelineExceedMaximumServing)
 func Test_peerPipeline_send_maximum(t *testing.T) {
+	tr := newRoundTripperBlocker()
+	pt := &PeerTransport{peerPipelineRoundTripper: tr}
 
+	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
+	pn := startTestPeerPipeline(pt, picker)
+	defer pn.stop()
+
+	scheduleutil.WaitSchedule()
+
+	for i := 0; i < connPerPipeline+peerPipelineBufferN; i++ {
+		select {
+		case pn.raftMessageChan <- raftpb.Message{}:
+		default:
+			t.Fatal("failed to send out message")
+		}
+
+		// force the sender to grab data
+		testutil.WaitSchedule()
+	}
+
+	// try to send a data when we are sure the buffer is full
+	select {
+	case pn.raftMessageChan <- raftpb.Message{}:
+		t.Fatal("unexpected message sendout")
+	default:
+	}
+
+	tr.unblock()
+
+	scheduleutil.WaitSchedule()
+
+	// It could send new data after previous ones succeed
+	select {
+	case pn.raftMessageChan <- raftpb.Message{}:
+	default:
+		t.Fatal("failed to send out message")
+	}
 }
 
 // (etcd rafthttp.TestPipelineSendFailed)
