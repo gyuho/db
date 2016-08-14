@@ -172,7 +172,27 @@ func Test_peerPipeline_send_post_bad(t *testing.T) {
 
 // (etcd rafthttp.TestPipelinePostErrorc)
 func Test_peerPipeline_send_post_error(t *testing.T) {
+	tests := []struct {
+		u    string
+		code int
+		err  error
+	}{
+		{"http://localhost:2380", http.StatusForbidden, nil},
+	}
+	for i, tt := range tests {
+		pt := &PeerTransport{peerPipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
+		picker := newURLPicker(types.MustNewURLs([]string{tt.u}))
+		pn := startTestPeerPipeline(pt, picker)
 
+		pn.post([]byte("testdata"))
+		pn.stop()
+
+		select {
+		case <-pn.errc:
+		default:
+			t.Fatalf("#%d: cannot receive from errorc", i)
+		}
+	}
 }
 
 // (etcd rafthttp.TestStopBlockedPipeline)
