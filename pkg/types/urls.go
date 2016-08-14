@@ -57,6 +57,8 @@ func (us URLs) Less(i, j int) bool { return us[i].String() < us[j].String() }
 func (us URLs) Swap(i, j int)      { us[i], us[j] = us[j], us[i] }
 
 // MustNewURLs returns URLs for the given string slice.
+//
+// (etcd rafthttp.mustNewURLPicker)
 func MustNewURLs(strs []string) URLs {
 	urls, err := NewURLs(strs)
 	if err != nil {
