@@ -162,10 +162,10 @@ func (pt *PeerTransport) Stop() {
 	defer pt.mu.Unlock()
 
 	for _, p := range pt.peers {
-
+		_ = p
 	}
 	for _, r := range pt.peerRemotes {
-
+		_ = r
 	}
 
 	if tr, ok := pt.streamRoundTripper.(*http.Transport); ok {

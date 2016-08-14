@@ -2,8 +2,11 @@ package rafthttp
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"sync"
 
+	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
@@ -66,4 +69,81 @@ func (wfc *fakeWriterFlusherCloser) getClosed() bool {
 	defer wfc.mu.Unlock()
 
 	return wfc.closed
+}
+
+// (etcd rafthttp.nopReadCloser)
+type nopReadCloser struct{}
+
+func (n *nopReadCloser) Read(p []byte) (int, error) { return 0, io.EOF }
+func (n *nopReadCloser) Close() error               { return nil }
+
+// (etcd rafthttp.roundTripperRecorder)
+type roundTripperRecorder struct {
+	mu  sync.Mutex
+	req *http.Request
+}
+
+func (t *roundTripperRecorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.req = req
+	return &http.Response{StatusCode: http.StatusNoContent, Body: &nopReadCloser{}}, nil
+}
+
+func (t *roundTripperRecorder) Request() *http.Request {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.req
+}
+
+// (etcd rafthttp.roundTripperBlocker)
+type roundTripperBlocker struct {
+	unblockc chan struct{}
+	mu       sync.Mutex
+	cancel   map[*http.Request]chan struct{}
+}
+
+// (etcd rafthttp.newRoundTripperBlocker)
+func newRoundTripperBlocker() *roundTripperBlocker {
+	return &roundTripperBlocker{
+		unblockc: make(chan struct{}),
+		cancel:   make(map[*http.Request]chan struct{}),
+	}
+}
+
+func (t *roundTripperBlocker) unblock() {
+	close(t.unblockc)
+}
+
+func (t *roundTripperBlocker) CancelRequest(req *http.Request) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if c, ok := t.cancel[req]; ok {
+		c <- struct{}{}
+		delete(t.cancel, req)
+	}
+}
+
+// (etcd rafthttp.respRoundTripper)
+type respRoundTripper struct {
+	mu  sync.Mutex
+	rec scheduleutil.Recorder
+
+	code   int
+	header http.Header
+	err    error
+}
+
+// (etcd rafthttp.newRespRoundTripper)
+func newRespRoundTripper(code int, err error) *respRoundTripper {
+	return &respRoundTripper{code: code, err: err}
+}
+
+func (t *respRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.rec != nil {
+		t.rec.Record(scheduleutil.Action{Name: "req", Parameters: []interface{}{req}})
+	}
+	return &http.Response{StatusCode: t.code, Header: t.header, Body: &nopReadCloser{}}, t.err
 }
