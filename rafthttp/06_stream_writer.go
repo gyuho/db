@@ -94,6 +94,7 @@ func (sw *streamWriter) stop() {
 // emptyLeaderHeartbeat is a special heartbeat message without From, To fields.
 var emptyLeaderHeartbeat = raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT}
 
+// (etcd rafthttp.streamWriter.run)
 func (sw *streamWriter) run() {
 	var (
 		messageBinaryEncoder *raftpb.MessageBinaryEncoder
@@ -169,4 +170,22 @@ func (sw *streamWriter) run() {
 			return
 		}
 	}
+}
+
+// (etcd rafthttp.streamWriter.attach)
+func (sw *streamWriter) attachOutgoingConn(conn *outgoingConn) bool {
+	select {
+	case sw.outgoingConnChan <- conn:
+		return true
+	case <-sw.donec:
+		return false
+	}
+}
+
+// (etcd rafthttp.streamWriter.writec)
+func (sw *streamWriter) messageChanToSend() (chan<- raftpb.Message, bool) {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+
+	return sw.raftMessageChan, sw.working
 }
