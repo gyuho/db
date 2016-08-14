@@ -191,7 +191,7 @@ func Test_peerPipeline_send_post_error(t *testing.T) {
 		select {
 		case <-pn.errc:
 		default:
-			t.Fatalf("#%d: cannot receive from errorc", i)
+			t.Fatalf("#%d: cannot receive from errc", i)
 		}
 	}
 }

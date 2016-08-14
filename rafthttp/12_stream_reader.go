@@ -18,11 +18,11 @@ type streamReader struct {
 	picker        *urlPicker
 	peerTransport *PeerTransport
 
-	recvc  chan<- raftpb.Message
-	propc  chan<- raftpb.Message
-	stopc  chan struct{}
-	donec  chan struct{}
-	errorc chan<- error
+	recvc chan<- raftpb.Message
+	propc chan<- raftpb.Message
+	stopc chan struct{}
+	donec chan struct{}
+	errc  chan<- error
 
 	mu     sync.Mutex
 	paused bool
