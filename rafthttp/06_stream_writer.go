@@ -55,10 +55,10 @@ func startStreamWriter(peerID types.ID, status *peerStatus, r Raft) *streamWrite
 	return wr
 }
 
-// close closes streamWriter and returns true if closed successfully.
+// closeWriter closes streamWriter and returns true if closed successfully.
 //
 // (etcd rafthttp.streamWriter.close)
-func (sw *streamWriter) close() bool {
+func (sw *streamWriter) closeWriter() bool {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 
@@ -113,7 +113,7 @@ func (sw *streamWriter) run() {
 		// if multiple cases are available, it selects randomly
 		select {
 		case conn := <-sw.outgoingConnChan:
-			sw.close()
+			sw.closeWriter()
 			messageBinaryEncoder = raftpb.NewMessageBinaryEncoder(conn.Writer)
 			httpFlusher = conn.Flusher
 
@@ -144,7 +144,7 @@ func (sw *streamWriter) run() {
 			sw.status.deactivate(failureType{source: "streamWriter message", action: "encode message", err: err})
 
 			logger.Warningf("failed to encode message; closing streamWriter to peer %s (%v)", sw.peerID, err)
-			sw.close()
+			sw.closeWriter()
 			raftMessageChan, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
 
 			sw.r.ReportUnreachable(msg.To)
@@ -161,11 +161,11 @@ func (sw *streamWriter) run() {
 			sw.status.deactivate(failureType{source: "streamWriter message", action: "encode heartbeat", err: err})
 
 			logger.Warningf("failed to encode heartbeat; closing streamWriter to peer %s (%v)", sw.peerID, err)
-			sw.close()
+			sw.closeWriter()
 			raftMessageChan, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
 
 		case <-sw.stopc:
-			sw.close()
+			sw.closeWriter()
 			close(sw.donec)
 			return
 		}

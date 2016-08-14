@@ -3,6 +3,7 @@ package rafthttp
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,7 +52,7 @@ type failureType struct {
 func (ft failureType) String() string {
 	w := bytes.NewBuffer(nil)
 	json.NewEncoder(w).Encode(ft)
-	return w.String()
+	return strings.TrimSpace(w.String())
 }
 
 func (s *peerStatus) isActive() bool {
