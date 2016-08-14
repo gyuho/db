@@ -49,6 +49,11 @@ const (
 	// (etcd rafthttp.connReadLimitByte)
 	maxConnReadByteN = 64 * 1024
 
+	// streamBufferN is the buffer size for stream.
+	//
+	// (etcd rafthttp.streamBufSize)
+	streamBufferN = 4 * 1024
+
 	// receiveBufferN is the buffer size for receiver.
 	//
 	// (etcd rafthttp.recvBufSize)
