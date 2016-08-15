@@ -172,3 +172,34 @@ func (t *respRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	}
 	return &http.Response{StatusCode: t.code, Header: t.header, Body: &nopReadCloser{}}, t.err
 }
+
+// (etcd rafthttp.respWaitRoundTripper)
+type respRoundTripperWait struct {
+	rt     *respRoundTripper
+	onResp func()
+}
+
+func (t *respRoundTripperWait) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.rt.RoundTrip(req)
+	resp.Body = newWaitReadCloser()
+	t.onResp()
+	return resp, err
+}
+
+// (etcd rafthttp.waitReadCloser)
+type waitReadCloser struct{ closec chan struct{} }
+
+// (etcd rafthttp.newWaitReadCloser)
+func newWaitReadCloser() *waitReadCloser {
+	return &waitReadCloser{make(chan struct{})}
+}
+
+func (wrc *waitReadCloser) Read(p []byte) (int, error) {
+	<-wrc.closec
+	return 0, io.EOF
+}
+
+func (wrc *waitReadCloser) Close() error {
+	close(wrc.closec)
+	return nil
+}
