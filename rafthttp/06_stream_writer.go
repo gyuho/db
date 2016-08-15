@@ -92,9 +92,6 @@ func (sw *streamWriter) stop() {
 	logger.Infof("stopped streamWriter to peer %s", sw.peerID)
 }
 
-// emptyLeaderHeartbeat is a special heartbeat message without From, To fields.
-var emptyLeaderHeartbeat = raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT}
-
 // (etcd rafthttp.streamWriter.run)
 func (sw *streamWriter) run() {
 	var (

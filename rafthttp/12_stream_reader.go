@@ -158,8 +158,47 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	}
 }
 
-func (sr *streamReader) decodeLoop(rc io.ReadCloser) {
+func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
+	sr.mu.Lock()
+	sr.closer = rc
+	sr.mu.Unlock()
 
+	dec := raftpb.NewMessageBinaryDecoder(rc)
+
+	for {
+		msg, err := dec.Decode()
+		if err != nil {
+			sr.mu.Lock()
+			sr.close()
+			sr.mu.Unlock()
+			return err
+		}
+
+		sr.mu.Lock()
+		paused := sr.paused
+		sr.mu.Unlock()
+		if paused {
+			continue
+		}
+
+		if isEmptyLeaderHeartbeat(msg) {
+			continue
+		}
+
+		recvc := sr.recvc
+		if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
+			recvc = sr.propc
+		}
+
+		select {
+		case recvc <- msg:
+		default:
+			logger.Warningf("dropped %q from %s since receiving buffer is full", msg.Type, types.ID(msg.From))
+			if sr.status.isActive() {
+				logger.Warningf("%s network is overloaded", sr.peerID)
+			}
+		}
+	}
 }
 
 func (sr *streamReader) run() {
