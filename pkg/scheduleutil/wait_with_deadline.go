@@ -33,10 +33,19 @@ func NewWaitWithDeadline() WaitWithDeadline {
 }
 
 func (w *waitListWithDeadline) Wait(deadline time.Time) <-chan struct{} {
+	// The given deadline SHOULD be unique but CI manages to get
+	// the same nano time in the unit tests.
+	nano := deadline.UnixNano()
 	ch := make(chan struct{}, 1)
 
 	w.mu.Lock()
-	w.list[deadline.UnixNano()] = ch // The given deadline SHOULD be unique.
+	for {
+		if w.list[nano] == nil {
+			w.list[nano] = ch
+			break
+		}
+		nano++
+	}
 	w.mu.Unlock()
 
 	return ch
