@@ -31,21 +31,21 @@ func newFakePeer() *fakePeer {
 	}
 }
 
-func (pr *fakePeer) send(m raftpb.Message) {
+func (pr *fakePeer) sendMessageToPeer(m raftpb.Message) {
 	if pr.paused {
 		return
 	}
 	pr.msgs = append(pr.msgs, m)
 }
 
-func (pr *fakePeer) sendSnap(msg raftsnap.Message) {
+func (pr *fakePeer) sendSnapshotToPeer(msg raftsnap.Message) {
 	if pr.paused {
 		return
 	}
 	pr.snapMsgs = append(pr.snapMsgs, msg)
 }
 
-func (pr *fakePeer) update(urls types.URLs)                { pr.peerURLs = urls }
+func (pr *fakePeer) updatePeer(urls types.URLs)            { pr.peerURLs = urls }
 func (pr *fakePeer) attachOutgoingConn(conn *outgoingConn) { pr.connc <- conn }
 func (pr *fakePeer) activeSince() time.Time                { return time.Time{} }
 func (pr *fakePeer) stop()                                 {}
