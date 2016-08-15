@@ -1,6 +1,9 @@
 package rafthttp
 
-import "github.com/gyuho/db/pkg/types"
+import (
+	"github.com/gyuho/db/pkg/types"
+	"github.com/gyuho/db/raft/raftpb"
+)
 
 // peerRemote handles newly joined peers.
 //
@@ -12,8 +15,46 @@ type peerRemote struct {
 	pipeline *pipeline
 }
 
+func (r *peerRemote) stop() {
+	r.pipeline.stop()
+}
+
 func (r *peerRemote) Pause() {
+	r.pipeline.stop()
 }
 
 func (r *peerRemote) Resume() {
+	r.pipeline.start()
+}
+
+// (etcd rafthttp.startRemote)
+func startRemote(peerID types.ID, peerURLs types.URLs, tr *Transport) *peerRemote {
+
+	pipeline := &pipeline{
+		peerID:    peerID,
+		status:    newPeerStatus(peerID),
+		r:         tr.Raft,
+		picker:    newURLPicker(peerURLs),
+		transport: tr,
+		errc:      tr.errc,
+	}
+
+	pipeline.start()
+
+	return &peerRemote{
+		peerID:   peerID,
+		status:   pipeline.status,
+		pipeline: pipeline,
+	}
+}
+
+func (r *peerRemote) send(msg raftpb.Message) {
+	select {
+	case r.pipeline.raftMessageChan <- msg:
+	default:
+		logger.Warningf("dropped %q from %s since sending buffer is full", msg.Type, types.ID(msg.From))
+		if r.status.isActive() {
+			logger.Warningf("%s network is bad/overloaded", r.peerID)
+		}
+	}
 }
