@@ -1,9 +1,12 @@
 package rafthttp
 
 import (
+	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/gyuho/db/pkg/types"
+	"github.com/gyuho/db/version"
 )
 
 // (etcd rafthttp.TestStreamReaderDialRequest)
@@ -11,7 +14,6 @@ func Test_streamReader_dial_request(t *testing.T) {
 	tr := &roundTripperRecorder{}
 	sr := &streamReader{
 		peerID: types.ID(2),
-
 		picker: newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
 		pt:     &PeerTransport{From: types.ID(1), ClusterID: types.ID(1), streamRoundTripper: tr},
 	}
@@ -38,7 +40,45 @@ func Test_streamReader_dial_request(t *testing.T) {
 
 // (etcd rafthttp.TestStreamReaderDialResult)
 func Test_streamReader_dial_result(t *testing.T) {
+	tests := []struct {
+		code  int
+		err   error
+		wok   bool
+		whalt bool
+	}{
+		{0, errors.New("blah"), false, false},
+		{http.StatusOK, nil, true, false},
+		{http.StatusMethodNotAllowed, nil, false, false},
+		{http.StatusNotFound, nil, false, false},
+		{http.StatusPreconditionFailed, nil, false, false},
+		{http.StatusGone, nil, false, true},
+	}
 
+	for i, tt := range tests {
+		h := http.Header{}
+		h.Add(HeaderServerVersion, version.ServerVersion)
+
+		tr := &respRoundTripper{
+			code:   tt.code,
+			header: h,
+			err:    tt.err,
+		}
+
+		sr := &streamReader{
+			peerID: types.ID(2),
+			picker: newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
+			pt:     &PeerTransport{ClusterID: types.ID(1), streamRoundTripper: tr},
+			errc:   make(chan error, 1),
+		}
+
+		_, err := sr.dial()
+		if ok := err == nil; ok != tt.wok {
+			t.Fatalf("#%d: ok = %v, want %v", i, ok, tt.wok)
+		}
+		if halt := len(sr.errc) > 0; halt != tt.whalt {
+			t.Fatalf("#%d: halt = %v, want %v", i, halt, tt.whalt)
+		}
+	}
 }
 
 // (etcd rafthttp.TestStream)
