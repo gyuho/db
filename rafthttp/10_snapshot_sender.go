@@ -138,3 +138,25 @@ func (s *snapshotSender) send(msg raftsnap.Message) {
 
 	logger.Infof("finished snapshotSender.send to peer %s [index: %d]", types.ID(msg.To), msg.Snapshot.Metadata.Index)
 }
+
+// (etcd rafthttp.snapshotHandler)
+type snapshotSenderHandler struct {
+	tr          Transporter
+	r           Raft
+	snapshotter *raftsnap.Snapshotter
+	clusterID   types.ID
+}
+
+// (etcd rafthttp.newSnapshotHandler)
+func newSnapshotSenderHandler(tr Transporter, r Raft, snapshotter *raftsnap.Snapshotter, clusterID types.ID) http.Handler {
+	return &snapshotSenderHandler{
+		tr:          tr,
+		r:           r,
+		snapshotter: snapshotter,
+		clusterID:   clusterID,
+	}
+}
+
+func (hd *snapshotSenderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+}
