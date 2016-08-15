@@ -69,10 +69,11 @@ const (
 )
 
 var (
-	PrefixRaft         = "/raft"                           // (etcd rafthttp.RaftPrefix)
-	PrefixRaftProbing  = path.Join(PrefixRaft, "probing")  // (etcd rafthttp.ProbingPrefix)
-	PrefixRaftStream   = path.Join(PrefixRaft, "stream")   // (etcd rafthttp.RaftStreamPrefix)
-	PrefixRaftSnapshot = path.Join(PrefixRaft, "snapshot") // (etcd rafthttp.RaftSnapshotPrefix)
+	PrefixRaft              = "/raft"                          // (etcd rafthttp.RaftPrefix)
+	PrefixRaftProbing       = path.Join(PrefixRaft, "probing") // (etcd rafthttp.ProbingPrefix)
+	PrefixRaftStream        = path.Join(PrefixRaft, "stream")  // (etcd rafthttp.RaftStreamPrefix)
+	PrefixRaftStreamMessage = path.Join(PrefixRaft, "stream", "message")
+	PrefixRaftSnapshot      = path.Join(PrefixRaft, "snapshot") // (etcd rafthttp.RaftSnapshotPrefix)
 )
 
 var (
@@ -126,7 +127,7 @@ func checkPostResponse(resp *http.Response, body []byte, req *http.Request, peer
 			logger.Errorf("request was ignored (%v, remote[%s]=%s, local=%s)", ErrClusterIDMismatch, peerID, resp.Header.Get(HeaderClusterID), req.Header.Get(HeaderClusterID))
 			return ErrClusterIDMismatch
 		default:
-			return fmt.Errorf("unhandled error %q", string(body))
+			return fmt.Errorf("unhandled error %q", body)
 		}
 
 	case http.StatusForbidden:

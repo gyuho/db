@@ -51,8 +51,8 @@ func (p *peerPipeline) stop() {
 }
 
 func (p *peerPipeline) post(data []byte) error {
-	target := p.picker.pick()
-	req := createPostRequest(target, PrefixRaft, bytes.NewBuffer(data), HeaderContentProtobuf, p.pt.From, p.pt.ClusterID, p.pt.PeerURLs)
+	targetURL := p.picker.pick()
+	req := createPostRequest(targetURL, PrefixRaft, bytes.NewBuffer(data), HeaderContentProtobuf, p.pt.From, p.pt.ClusterID, p.pt.PeerURLs)
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	req = req.WithContext(ctx)
@@ -69,20 +69,20 @@ func (p *peerPipeline) post(data []byte) error {
 	resp, err := p.pt.peerPipelineRoundTripper.RoundTrip(req)
 	close(donec)
 	if err != nil {
-		p.picker.unreachable(target)
+		p.picker.unreachable(targetURL)
 		return err
 	}
 
 	bts, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		p.picker.unreachable(target)
+		p.picker.unreachable(targetURL)
 		return err
 	}
 	resp.Body.Close()
 
 	err = checkPostResponse(resp, bts, req, p.peerID)
 	if err != nil {
-		p.picker.unreachable(target)
+		p.picker.unreachable(targetURL)
 		if err == ErrMemberRemoved {
 			sendError(err, p.errc)
 		}
