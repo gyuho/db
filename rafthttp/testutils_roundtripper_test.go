@@ -10,60 +10,6 @@ import (
 
 //////////////////////////////////////////////////////////////
 
-// (etcd rafthttp.roundTripperBlocker)
-type roundTripperBlocker struct {
-	unblockc chan struct{}
-
-	mu     sync.Mutex
-	cancel map[*http.Request]chan struct{}
-}
-
-// (etcd rafthttp.newRoundTripperBlocker)
-func newRoundTripperBlocker() *roundTripperBlocker {
-	return &roundTripperBlocker{
-		unblockc: make(chan struct{}),
-		cancel:   make(map[*http.Request]chan struct{}),
-	}
-}
-
-func (t *roundTripperBlocker) RoundTrip(req *http.Request) (*http.Response, error) {
-	c := make(chan struct{}, 1)
-
-	t.mu.Lock()
-	t.cancel[req] = c
-	t.mu.Unlock()
-
-	select {
-	case <-t.unblockc:
-		return &http.Response{StatusCode: http.StatusNoContent, Body: &nopReaderCloser{}}, nil
-
-	case <-c:
-		return nil, errors.New("request canceled")
-
-	case <-req.Context().Done():
-		return nil, errors.New("request canceled")
-
-		// DEPRECATED:
-		// case <-req.Cancel:
-		// return nil, errors.New("request canceled")
-	}
-}
-
-func (t *roundTripperBlocker) unblock() {
-	close(t.unblockc)
-}
-
-func (t *roundTripperBlocker) CancelRequest(req *http.Request) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if c, ok := t.cancel[req]; ok {
-		c <- struct{}{}
-		delete(t.cancel, req)
-	}
-}
-
-//////////////////////////////////////////////////////////////
-
 // (etcd rafthttp.roundTripperRecorder)
 type roundTripperRecorder struct {
 	mu  sync.Mutex
@@ -125,5 +71,57 @@ func (t *respRoundTripperWait) RoundTrip(req *http.Request) (*http.Response, err
 }
 
 //////////////////////////////////////////////////////////////
+
+// (etcd rafthttp.roundTripperBlocker)
+type roundTripperBlocker struct {
+	unblockc chan struct{}
+
+	mu     sync.Mutex
+	cancel map[*http.Request]chan struct{}
+}
+
+// (etcd rafthttp.newRoundTripperBlocker)
+func newRoundTripperBlocker() *roundTripperBlocker {
+	return &roundTripperBlocker{
+		unblockc: make(chan struct{}),
+		cancel:   make(map[*http.Request]chan struct{}),
+	}
+}
+
+func (t *roundTripperBlocker) RoundTrip(req *http.Request) (*http.Response, error) {
+	c := make(chan struct{}, 1)
+
+	t.mu.Lock()
+	t.cancel[req] = c
+	t.mu.Unlock()
+
+	select {
+	case <-t.unblockc:
+		return &http.Response{StatusCode: http.StatusNoContent, Body: &nopReaderCloser{}}, nil
+
+	case <-c:
+		return nil, errors.New("request canceled")
+
+	case <-req.Context().Done():
+		return nil, errors.New("request canceled")
+
+		// DEPRECATED:
+		// case <-req.Cancel:
+		// return nil, errors.New("request canceled")
+	}
+}
+
+func (t *roundTripperBlocker) unblock() {
+	close(t.unblockc)
+}
+
+func (t *roundTripperBlocker) CancelRequest(req *http.Request) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if c, ok := t.cancel[req]; ok {
+		c <- struct{}{}
+		delete(t.cancel, req)
+	}
+}
 
 //////////////////////////////////////////////////////////////

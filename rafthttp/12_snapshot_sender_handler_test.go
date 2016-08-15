@@ -56,6 +56,6 @@ func testSnapshotSend(t *testing.T, sm *raftsnap.Message) (bool, []os.FileInfo) 
 }
 
 // (etcd rafthttp.TestSnapshotSend)
-func Test_snapshotSender(t *testing.T) {
+func Test_snapshotSender_snapshotSenderHandler(t *testing.T) {
 
 }
