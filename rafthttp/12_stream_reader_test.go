@@ -4,7 +4,9 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/gyuho/db/pkg/testutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/version"
 )
@@ -81,12 +83,34 @@ func Test_streamReader_dial_result(t *testing.T) {
 	}
 }
 
-// (etcd rafthttp.TestStream)
-func Test_streamReader(t *testing.T) {
-
-}
-
 // (etcd rafthttp.TestStreamReaderStopOnConnect)
 func Test_streamReader_stop_on_connect(t *testing.T) {
+	defer testutil.AfterTest(t)
+	h := http.Header{}
+	h.Add(HeaderServerVersion, version.ServerVersion)
 
+	tr := &respRoundTripperWait{rt: &respRoundTripper{code: http.StatusOK, header: h}}
+	sr := &streamReader{
+		peerID: types.ID(2),
+		status: newPeerStatus(types.ID(2)),
+		picker: newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
+		pt:     &PeerTransport{ClusterID: types.ID(1), streamRoundTripper: tr},
+		errc:   make(chan error, 1),
+	}
+	tr.onResp = func() {
+		go sr.stop()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	sr.start()
+
+	select {
+	case <-sr.donec:
+	case <-time.After(time.Second):
+		t.Fatal("did not close in time")
+	}
+}
+
+// (etcd rafthttp.TestStream)
+func Test_streamReader(t *testing.T) {
 }
