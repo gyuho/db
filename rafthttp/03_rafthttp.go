@@ -33,6 +33,11 @@ const (
 	// (etcd rafthttp.ConnReadTimeout)
 	ConnReadTimeout = 5 * time.Second
 
+	// snapResponseReadTimeout is timeout for reading snapshot response body.
+	//
+	// (etcd rafthttp.snapResponseReadTimeout)
+	snapResponseReadTimeout = 5 * time.Second
+
 	// maxConnReadByteN is the maximum number of bytes a single read can read out.
 	//
 	// 64KB should be big enough without causing throughput bottleneck,

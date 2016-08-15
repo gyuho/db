@@ -26,7 +26,7 @@ var testSnap = &raftpb.Snapshot{
 
 // (etcd snap.TestSaveAndLoad)
 func Test_Snapshotter_SaveAndLoad(t *testing.T) {
-	dir := path.Join(os.TempDir(), "snapshot")
+	dir := filepath.Join(os.TempDir(), "snapshot")
 	err := os.Mkdir(dir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func Test_Snapshotter_SaveAndLoad(t *testing.T) {
 
 // (etcd snap.TestBadCRC)
 func Test_Snapshotter_BadCRC(t *testing.T) {
-	dir := path.Join(os.TempDir(), "snapshot")
+	dir := filepath.Join(os.TempDir(), "snapshot")
 	err := os.Mkdir(dir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func Test_Snapshotter_BadCRC(t *testing.T) {
 
 // (etcd snap.TestFailback)
 func Test_Snapshotter_Failback(t *testing.T) {
-	dir := path.Join(os.TempDir(), "snapshot")
+	dir := filepath.Join(os.TempDir(), "snapshot")
 	err := os.Mkdir(dir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func Test_Snapshotter_Failback(t *testing.T) {
 
 // (etcd snap.TestLoadNewestSnap)
 func Test_Snapshotter_LoadNewestSnap(t *testing.T) {
-	dir := path.Join(os.TempDir(), "snapshot")
+	dir := filepath.Join(os.TempDir(), "snapshot")
 	err := os.Mkdir(dir, 0700)
 	if err != nil {
 		t.Fatal(err)
