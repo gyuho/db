@@ -17,6 +17,8 @@ var _ = fmt.Errorf
 var _ = math.Inf
 
 // SNAPSHOT_STATUS represents the state of snapshot.
+//
+// (etcd raft.SnapshotStatus)
 type SNAPSHOT_STATUS int32
 
 const (
@@ -38,6 +40,8 @@ func (x SNAPSHOT_STATUS) String() string {
 }
 func (SNAPSHOT_STATUS) EnumDescriptor() ([]byte, []int) { return fileDescriptorSnapshot, []int{0} }
 
+// ConfigState contains configuration states.
+//
 // (etcd raftpb.ConfState)
 type ConfigState struct {
 	IDs []uint64 `protobuf:"varint,1,rep,name=IDs,json=iDs" json:"IDs,omitempty"`
@@ -48,6 +52,8 @@ func (m *ConfigState) String() string            { return proto.CompactTextStrin
 func (*ConfigState) ProtoMessage()               {}
 func (*ConfigState) Descriptor() ([]byte, []int) { return fileDescriptorSnapshot, []int{0} }
 
+// SnapshotMetadata contains snapshot metadata.
+//
 // (etcd raftpb.SnapshotMetadata)
 type SnapshotMetadata struct {
 	ConfigState ConfigState `protobuf:"bytes,1,opt,name=ConfigState,json=configState" json:"ConfigState"`

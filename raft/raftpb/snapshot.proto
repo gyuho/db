@@ -9,11 +9,15 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
 
+// ConfigState contains configuration states.
+//
 // (etcd raftpb.ConfState)
 message ConfigState {
 	repeated uint64 IDs = 1;
 }
 
+// SnapshotMetadata contains snapshot metadata.
+//
 // (etcd raftpb.SnapshotMetadata)
 message SnapshotMetadata {
 	ConfigState ConfigState = 1 [(gogoproto.nullable) = false]; // generate without pointer
@@ -23,6 +27,8 @@ message SnapshotMetadata {
 }
 
 // SNAPSHOT_STATUS represents the state of snapshot.
+//
+// (etcd raft.SnapshotStatus)
 enum SNAPSHOT_STATUS {
 	FINISHED = 0;
 	FAILED   = 1;
