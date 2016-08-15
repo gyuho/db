@@ -120,7 +120,7 @@ func (s *snapshotSender) send(msg raftsnap.Message) {
 	defer msg.CloseWithError(err)
 
 	if err != nil {
-		logger.Warningf("snapshotSender.send to peer %s [index: %d] failed (%v)", types.ID(msg.To), msg.Snapshot.Metadata.Index, err)
+		logger.Warningf("failed to snapshotSender.send to peer %s [index: %d] (%v)", types.ID(msg.To), msg.Snapshot.Metadata.Index, err)
 
 		if err == ErrMemberRemoved {
 			sendError(err, s.errc)
@@ -137,26 +137,4 @@ func (s *snapshotSender) send(msg raftsnap.Message) {
 	s.r.ReportSnapshot(msg.To, raftpb.SNAPSHOT_STATUS_FINISHED)
 
 	logger.Infof("finished snapshotSender.send to peer %s [index: %d]", types.ID(msg.To), msg.Snapshot.Metadata.Index)
-}
-
-// (etcd rafthttp.snapshotHandler)
-type snapshotSenderHandler struct {
-	tr          Transporter
-	r           Raft
-	snapshotter *raftsnap.Snapshotter
-	clusterID   types.ID
-}
-
-// (etcd rafthttp.newSnapshotHandler)
-func newSnapshotSenderHandler(tr Transporter, r Raft, snapshotter *raftsnap.Snapshotter, clusterID types.ID) http.Handler {
-	return &snapshotSenderHandler{
-		tr:          tr,
-		r:           r,
-		snapshotter: snapshotter,
-		clusterID:   clusterID,
-	}
-}
-
-func (hd *snapshotSenderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 }

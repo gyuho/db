@@ -9,6 +9,11 @@ import (
 	"github.com/gyuho/db/raftsnap"
 )
 
+// (etcd rafthttp.peerGetter)
+type peerGetter interface {
+	Get(id types.ID) Peer
+}
+
 // Peer defines peer operations.
 //
 // (etcd rafthttp.Peer)
