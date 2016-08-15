@@ -151,7 +151,16 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 
 func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
 	sr.mu.Lock()
-	sr.closer = rc
+	select {
+	case <-sr.stopc:
+		sr.mu.Unlock()
+		if err := rc.Close(); err != nil {
+			return err
+		}
+		return io.EOF
+	default:
+		sr.closer = rc
+	}
 	sr.mu.Unlock()
 
 	dec := raftpb.NewMessageBinaryDecoder(rc)
