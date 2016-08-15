@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gyuho/db/pkg/netutil"
 	"github.com/gyuho/db/pkg/types"
@@ -68,16 +69,6 @@ func (sr *streamReader) stop() {
 	sr.mu.Unlock()
 
 	<-sr.donec
-}
-
-func (sr *streamReader) start() {
-	sr.stopc = make(chan struct{})
-	sr.donec = make(chan struct{})
-	if sr.errc == nil {
-		sr.errc = sr.pt.errc
-	}
-
-	go sr.run()
 }
 
 func (sr *streamReader) dial() (io.ReadCloser, error) {
@@ -201,6 +192,42 @@ func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
 	}
 }
 
-func (sr *streamReader) run() {
+func (sr *streamReader) start() {
+	sr.stopc = make(chan struct{})
+	sr.donec = make(chan struct{})
+	if sr.errc == nil {
+		sr.errc = sr.pt.errc
+	}
 
+	logger.Infof("started streamReader to peer %s", sr.peerID)
+	go sr.run()
+}
+
+func (sr *streamReader) run() {
+	for {
+		rc, err := sr.dial()
+		if err != nil {
+			sr.status.deactivate(failureType{source: "stream dial", action: "dial", err: err})
+		} else {
+			sr.status.activate()
+			logger.Infof("established streamReader to peer %s", sr.peerID)
+
+			err = sr.decodeLoop(rc)
+			logger.Warningf("lost streamReader connection to peer %s", sr.peerID)
+			switch {
+			case err == io.EOF, netutil.IsClosedConnectionError(err):
+				logger.Warningf("connection lost; remote closed")
+			default:
+				sr.status.deactivate(failureType{source: "stream decodeLoop", action: "decode", err: err})
+			}
+		}
+
+		select {
+		case <-time.After(100 * time.Millisecond):
+		case <-sr.stopc:
+			close(sr.donec)
+			logger.Infof("stopped streamReader to peer %s", sr.peerID)
+			return
+		}
+	}
 }
