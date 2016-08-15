@@ -2,9 +2,13 @@ package rafthttp
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"io/ioutil"
+	"net/http"
 
-	"github.com/gyuho/db/pkg/ioutil"
+	"github.com/coreos/etcd/pkg/httputil"
+	dbioutil "github.com/gyuho/db/pkg/ioutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/raftsnap"
@@ -49,18 +53,88 @@ func newSnapshotSender(transport *Transport, to types.ID, status *peerStatus, pi
 	}
 }
 
+func createSnapBody(msg raftsnap.Message) io.ReadCloser {
+	buf := new(bytes.Buffer)
+	enc := raftpb.NewMessageBinaryEncoder(buf)
+	if err := enc.Encode(&msg.Message); err != nil {
+		logger.Panic(err)
+	}
+	return &dbioutil.ReaderAndCloser{
+		Reader: io.MultiReader(buf, msg.ReadCloser),
+		Closer: msg.ReadCloser,
+	}
+}
+
 func (s *snapshotSender) stop() {
 	close(s.stopc)
 }
 
-func createSnapBody(msg raftsnap.Message) io.ReadCloser {
-	buf := new(bytes.Buffer)
-	enc := raftpb.NewMessageBinaryEncoder(buf)
-	if err := enc.Encode(&msg.RaftMessage); err != nil {
-		logger.Panic(err)
+func (s *snapshotSender) post(req *http.Request) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), snapResponseReadTimeout)
+	req = req.WithContext(ctx)
+
+	errc := make(chan error)
+	go func() {
+		defer close(errc)
+
+		resp, err := s.transport.pipelineRoundTripper.RoundTrip(req)
+		if err != nil {
+			errc <- err
+			return
+		}
+
+		bts, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			errc <- err
+			return
+		}
+
+		if err = checkPostResponse(resp, bts, req, s.to); err != nil {
+			errc <- err
+			return
+		}
+		httputil.GracefulClose(resp)
+	}()
+
+	select {
+	case <-s.stopc:
+		cancel()
+		return ErrStopped
+
+	case err := <-errc:
+		cancel()
+		return err
 	}
-	return &ioutil.ReaderAndCloser{
-		Reader: io.MultiReader(buf, msg.ReadCloser),
-		Closer: msg.ReadCloser,
+}
+
+func (s *snapshotSender) send(msg raftsnap.Message) {
+	rc := createSnapBody(msg)
+	defer rc.Close()
+
+	logger.Infof("starting snapshotSender.send to peer %s [index: %d]", types.ID(msg.To), msg.Snapshot.Metadata.Index)
+
+	targetURL := s.picker.pick()
+	req := createPostRequest(targetURL, PrefixRaftSnapshot, rc, HeaderContentStream, s.from, s.clusterID, s.transport.PeerURLs)
+
+	err := s.post(req)
+	defer msg.CloseWithError(err)
+
+	if err != nil {
+		logger.Warningf("snapshotSender.send to peer %s [index: %d] failed (%v)", types.ID(msg.To), msg.Snapshot.Metadata.Index, err)
+
+		if err == ErrMemberRemoved {
+			sendError(err, s.errc)
+		}
+
+		s.status.deactivate(failureType{source: "snapshot post", action: "post", err: err})
+		s.picker.unreachable(targetURL)
+		s.r.ReportUnreachable(msg.To)
+		s.r.ReportSnapshot(msg.To, raftpb.SNAPSHOT_STATUS_FAILED)
+		return
 	}
+
+	s.status.activate()
+	s.r.ReportSnapshot(msg.To, raftpb.SNAPSHOT_STATUS_FINISHED)
+
+	logger.Infof("finished snapshotSender.send to peer %s [index: %d]", types.ID(msg.To), msg.Snapshot.Metadata.Index)
 }

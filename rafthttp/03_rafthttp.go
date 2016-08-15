@@ -85,11 +85,13 @@ var (
 var (
 	HeaderContentType     = "Content-Type"
 	HeaderContentProtobuf = "application/protobuf"
-	HeaderFromID          = "X-rafthttp-From"           // X-Server-From
-	HeaderToID            = "X-rafthttp-To"             // X-Raft-To
-	HeaderClusterID       = "X-rafthttp-ClusterID"      // X-Etcd-Cluster-ID
-	HeaderServerVersion   = "X-rafthttp-Server-Version" // X-Server-Version
-	HeaderPeerURLs        = "X-rafthttp-PeerURLs"       // X-PeerURLs
+	HeaderContentStream   = "application/octet-stream"
+
+	HeaderFromID        = "X-rafthttp-From"           // X-Server-From
+	HeaderToID          = "X-rafthttp-To"             // X-Raft-To
+	HeaderClusterID     = "X-rafthttp-ClusterID"      // X-Etcd-Cluster-ID
+	HeaderServerVersion = "X-rafthttp-Server-Version" // X-Server-Version
+	HeaderPeerURLs      = "X-rafthttp-PeerURLs"       // X-PeerURLs
 )
 
 // (etcd rafthttp.setPeerURLsHeader)
