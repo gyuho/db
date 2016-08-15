@@ -3,11 +3,14 @@ package rafthttp
 import (
 	"errors"
 	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/gyuho/db/pkg/testutil"
 	"github.com/gyuho/db/pkg/types"
+	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/version"
 )
 
@@ -112,5 +115,79 @@ func Test_streamReader_stop_on_connect(t *testing.T) {
 }
 
 // (etcd rafthttp.TestStream)
-func Test_streamReader(t *testing.T) {
+func Test_streamReader_streamWriter(t *testing.T) {
+	recvc := make(chan raftpb.Message, streamBufferN)
+	propc := make(chan raftpb.Message, streamBufferN)
+	msgapp := raftpb.Message{
+		Type:              raftpb.MESSAGE_TYPE_LEADER_APPEND,
+		From:              2,
+		To:                1,
+		SenderCurrentTerm: 1,
+		LogIndex:          3,
+		LogTerm:           1,
+		Entries:           []raftpb.Entry{{Index: 4, Term: 1}},
+	}
+
+	tests := []struct {
+		m       raftpb.Message
+		msgChan chan raftpb.Message
+	}{
+		{
+			raftpb.Message{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, To: 2},
+			propc,
+		},
+		{
+			msgapp,
+			recvc,
+		},
+	}
+
+	for i, tt := range tests {
+		h := &fakeStreamHandler{}
+		srv := httptest.NewServer(h)
+		defer srv.Close()
+
+		sw := startStreamWriter(types.ID(1), newPeerStatus(types.ID(1)), &fakeRaft{})
+		defer sw.stop()
+
+		h.sw = sw
+
+		picker := newURLPicker(types.MustNewURLs([]string{srv.URL}))
+
+		sr := &streamReader{
+			peerID: types.ID(2),
+			status: newPeerStatus(types.ID(2)),
+
+			picker: picker,
+			pt:     &PeerTransport{ClusterID: types.ID(1), streamRoundTripper: &http.Transport{}},
+
+			recvc: recvc,
+			propc: propc,
+		}
+
+		sr.start()
+
+		// wait for stream to work
+		var writec chan<- raftpb.Message
+		for {
+			var ok bool
+			if writec, ok = sw.messageChanToSend(); ok {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+
+		writec <- tt.m
+		var m raftpb.Message
+		select {
+		case m = <-tt.msgChan:
+		case <-time.After(time.Second):
+			t.Fatalf("#%d: failed to receive message from the channel", i)
+		}
+		if !reflect.DeepEqual(m, tt.m) {
+			t.Fatalf("#%d: message expected %+v, got = %+v", i, tt.m, m)
+		}
+
+		sr.stop()
+	}
 }

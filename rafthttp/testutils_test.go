@@ -9,6 +9,7 @@ import (
 
 	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/raft/raftpb"
+	"github.com/gyuho/db/version"
 )
 
 // (etcd rafthttp.fakeRaft)
@@ -70,6 +71,23 @@ func (wfc *fakeWriterFlusherCloser) getClosed() bool {
 	defer wfc.mu.Unlock()
 
 	return wfc.closed
+}
+
+// (etcd rafthttp.fakeStreamHandler)
+type fakeStreamHandler struct {
+	sw *streamWriter
+}
+
+func (h *fakeStreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add(HeaderServerVersion, version.ServerVersion)
+	w.(http.Flusher).Flush()
+	c := newCloseNotifier()
+	h.sw.attachOutgoingConn(&outgoingConn{
+		Writer:  w,
+		Flusher: w.(http.Flusher),
+		Closer:  c,
+	})
+	<-c.closeNotify()
 }
 
 // (etcd rafthttp.nopReadCloser)
