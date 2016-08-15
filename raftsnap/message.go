@@ -19,10 +19,10 @@ import (
 //
 // (etcd snap.Message)
 type Message struct {
-	RaftMessage raftpb.Message
-	ReadCloser  io.ReadCloser
-	TotalSize   int64
-	closec      chan bool
+	raftpb.Message
+	ReadCloser io.ReadCloser
+	TotalSize  int64
+	closec     chan bool
 }
 
 // NewMessage returns a new Message from raftpb.Message.
@@ -30,10 +30,10 @@ type Message struct {
 // (etcd snap.NewMessage)
 func NewMessage(msg raftpb.Message, rc io.ReadCloser, rcSize int64) *Message {
 	return &Message{
-		RaftMessage: msg,
-		ReadCloser:  ioutil.NewExactReadCloser(rc, rcSize),
-		TotalSize:   int64(msg.Size()) + rcSize,
-		closec:      make(chan bool, 1),
+		Message:    msg,
+		ReadCloser: ioutil.NewExactReadCloser(rc, rcSize),
+		TotalSize:  int64(msg.Size()) + rcSize,
+		closec:     make(chan bool, 1),
 	}
 }
 
