@@ -1,14 +1,18 @@
 package rafthttp
 
 import (
+	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gyuho/db/pkg/types"
+	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/raftsnap"
 )
 
@@ -57,5 +61,58 @@ func testSnapshotSend(t *testing.T, sm *raftsnap.Message) (bool, []os.FileInfo) 
 
 // (etcd rafthttp.TestSnapshotSend)
 func Test_snapshotSender_snapshotSenderHandler(t *testing.T) {
+	tests := []struct {
+		msg  raftpb.Message
+		rc   io.ReadCloser
+		size int64
 
+		wsent  bool
+		wfiles int
+	}{
+		{ // sent, received with no error
+			msg:  raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT, To: 1},
+			rc:   stringReaderCloser{strings.NewReader("testdata")},
+			size: 8, // size of 'testdata'
+
+			wsent:  true,
+			wfiles: 1,
+		},
+
+		{ // send, and error
+			msg:  raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT, To: 1},
+			rc:   &errorReaderCloser{errors.New("snapshot error")},
+			size: 1,
+
+			wsent:  false,
+			wfiles: 0,
+		},
+
+		{ // send less than given snapshot size
+			msg:  raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT, To: 1},
+			rc:   stringReaderCloser{strings.NewReader("testdata")},
+			size: 100000,
+
+			wsent:  false,
+			wfiles: 0,
+		},
+
+		{ // send less than actual snapshot length
+			msg:  raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT, To: 1},
+			rc:   stringReaderCloser{strings.NewReader("testdata")},
+			size: 1,
+
+			wsent:  false,
+			wfiles: 0,
+		},
+	}
+
+	for i, tt := range tests {
+		sent, files := testSnapshotSend(t, raftsnap.NewMessage(tt.msg, tt.rc, tt.size))
+		if sent != tt.wsent {
+			t.Fatalf("#%d: wsent expected %v, got %v", i, tt.wsent, sent)
+		}
+		if len(files) != tt.wfiles {
+			t.Fatalf("#%d: wfiles expected %d, got %d", i, tt.wfiles, len(files))
+		}
+	}
 }
