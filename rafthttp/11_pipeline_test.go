@@ -15,15 +15,15 @@ import (
 	"github.com/gyuho/db/version"
 )
 
-func startTestPeerPipeline(pt *PeerTransport, picker *urlPicker) *peerPipeline {
-	p := &peerPipeline{
+func startTestPipeline(transport *Transport, picker *urlPicker) *pipeline {
+	p := &pipeline{
 		peerID: types.ID(1),
 		status: newPeerStatus(types.ID(1)),
 
 		r: &fakeRaft{},
 
-		picker: picker,
-		pt:     pt,
+		picker:    picker,
+		transport: transport,
 
 		errc: make(chan error, 1),
 	}
@@ -32,12 +32,12 @@ func startTestPeerPipeline(pt *PeerTransport, picker *urlPicker) *peerPipeline {
 }
 
 // (etcd rafthttp.TestPipelineSend)
-func Test_peerPipeline_start(t *testing.T) {
+func Test_pipeline_start(t *testing.T) {
 	tr := &roundTripperRecorder{}
-	pt := &PeerTransport{peerPipelineRoundTripper: tr}
+	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPeerPipeline(pt, picker)
+	pn := startTestPipeline(transport, picker)
 
 	pn.raftMessageChan <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
 
@@ -51,12 +51,12 @@ func Test_peerPipeline_start(t *testing.T) {
 }
 
 // (etcd rafthttp.TestPipelineKeepSendingWhenPostError)
-func Test_peerPipeline_send_error(t *testing.T) {
+func Test_pipeline_send_error(t *testing.T) {
 	tr := &respRoundTripper{rec: scheduleutil.NewRecorderStream(), err: fmt.Errorf("roundtrip error")}
-	pt := &PeerTransport{peerPipelineRoundTripper: tr}
+	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPeerPipeline(pt, picker)
+	pn := startTestPipeline(transport, picker)
 	defer pn.stop()
 
 	for i := 0; i < 50; i++ {
@@ -70,17 +70,17 @@ func Test_peerPipeline_send_error(t *testing.T) {
 }
 
 // (etcd rafthttp.TestPipelineExceedMaximumServing)
-func Test_peerPipeline_send_maximum(t *testing.T) {
+func Test_pipeline_send_maximum(t *testing.T) {
 	tr := newRoundTripperBlocker()
-	pt := &PeerTransport{peerPipelineRoundTripper: tr}
+	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPeerPipeline(pt, picker)
+	pn := startTestPipeline(transport, picker)
 	defer pn.stop()
 
 	scheduleutil.WaitSchedule()
 
-	for i := 0; i < connPerPipeline+peerPipelineBufferN; i++ {
+	for i := 0; i < connPerPipeline+pipelineBufferN; i++ {
 		select {
 		case pn.raftMessageChan <- raftpb.Message{}:
 		default:
@@ -111,12 +111,12 @@ func Test_peerPipeline_send_maximum(t *testing.T) {
 }
 
 // (etcd rafthttp.TestPipelinePost)
-func Test_peerPipeline_send_post(t *testing.T) {
+func Test_pipeline_send_post(t *testing.T) {
 	tr := &roundTripperRecorder{}
-	pt := &PeerTransport{ClusterID: types.ID(1), peerPipelineRoundTripper: tr}
+	transport := &Transport{ClusterID: types.ID(1), pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPeerPipeline(pt, picker)
+	pn := startTestPipeline(transport, picker)
 	if err := pn.post([]byte("testdata")); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func Test_peerPipeline_send_post(t *testing.T) {
 }
 
 // (etcd rafthttp.TestPipelinePostBad)
-func Test_peerPipeline_send_post_bad(t *testing.T) {
+func Test_pipeline_send_post_bad(t *testing.T) {
 	tests := []struct {
 		u    string
 		code int
@@ -158,9 +158,9 @@ func Test_peerPipeline_send_post_bad(t *testing.T) {
 		{"http://localhost:2380", http.StatusCreated, nil},
 	}
 	for i, tt := range tests {
-		pt := &PeerTransport{peerPipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
+		transport := &Transport{pipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
 		picker := newURLPicker(types.MustNewURLs([]string{tt.u}))
-		pn := startTestPeerPipeline(pt, picker)
+		pn := startTestPipeline(transport, picker)
 
 		err := pn.post([]byte("testdata"))
 		pn.stop()
@@ -172,7 +172,7 @@ func Test_peerPipeline_send_post_bad(t *testing.T) {
 }
 
 // (etcd rafthttp.TestPipelinePostErrorc)
-func Test_peerPipeline_send_post_error(t *testing.T) {
+func Test_pipeline_send_post_error(t *testing.T) {
 	tests := []struct {
 		u    string
 		code int
@@ -181,9 +181,9 @@ func Test_peerPipeline_send_post_error(t *testing.T) {
 		{"http://localhost:2380", http.StatusForbidden, nil},
 	}
 	for i, tt := range tests {
-		pt := &PeerTransport{peerPipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
+		transport := &Transport{pipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
 		picker := newURLPicker(types.MustNewURLs([]string{tt.u}))
-		pn := startTestPeerPipeline(pt, picker)
+		pn := startTestPipeline(transport, picker)
 
 		pn.post([]byte("testdata"))
 		pn.stop()
@@ -197,12 +197,12 @@ func Test_peerPipeline_send_post_error(t *testing.T) {
 }
 
 // (etcd rafthttp.TestStopBlockedPipeline)
-func Test_peerPipeline_stop_blocked(t *testing.T) {
+func Test_pipeline_stop_blocked(t *testing.T) {
 	tr := newRoundTripperBlocker()
-	pt := &PeerTransport{peerPipelineRoundTripper: tr}
+	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPeerPipeline(pt, picker)
+	pn := startTestPipeline(transport, picker)
 
 	for i := 0; i < connPerPipeline*10; i++ {
 		pn.raftMessageChan <- raftpb.Message{}

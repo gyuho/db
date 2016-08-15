@@ -18,9 +18,9 @@ import (
 func Test_streamReader_dial_request(t *testing.T) {
 	tr := &roundTripperRecorder{}
 	sr := &streamReader{
-		peerID: types.ID(2),
-		picker: newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
-		pt:     &PeerTransport{From: types.ID(1), ClusterID: types.ID(1), streamRoundTripper: tr},
+		peerID:    types.ID(2),
+		picker:    newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
+		transport: &Transport{From: types.ID(1), ClusterID: types.ID(1), streamRoundTripper: tr},
 	}
 	_, err := sr.dial()
 	if err == nil {
@@ -70,10 +70,10 @@ func Test_streamReader_dial_result(t *testing.T) {
 		}
 
 		sr := &streamReader{
-			peerID: types.ID(2),
-			picker: newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
-			pt:     &PeerTransport{ClusterID: types.ID(1), streamRoundTripper: tr},
-			errc:   make(chan error, 1),
+			peerID:    types.ID(2),
+			picker:    newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
+			transport: &Transport{ClusterID: types.ID(1), streamRoundTripper: tr},
+			errc:      make(chan error, 1),
 		}
 
 		_, err := sr.dial()
@@ -94,11 +94,11 @@ func Test_streamReader_stop_on_connect(t *testing.T) {
 
 	tr := &respRoundTripperWait{rt: &respRoundTripper{code: http.StatusOK, header: h}}
 	sr := &streamReader{
-		peerID: types.ID(2),
-		status: newPeerStatus(types.ID(2)),
-		picker: newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
-		pt:     &PeerTransport{ClusterID: types.ID(1), streamRoundTripper: tr},
-		errc:   make(chan error, 1),
+		peerID:    types.ID(2),
+		status:    newPeerStatus(types.ID(2)),
+		picker:    newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
+		transport: &Transport{ClusterID: types.ID(1), streamRoundTripper: tr},
+		errc:      make(chan error, 1),
 	}
 	tr.onResp = func() {
 		go sr.stop()
@@ -158,8 +158,8 @@ func Test_streamReader_streamWriter(t *testing.T) {
 			peerID: types.ID(2),
 			status: newPeerStatus(types.ID(2)),
 
-			picker: picker,
-			pt:     &PeerTransport{ClusterID: types.ID(1), streamRoundTripper: &http.Transport{}},
+			picker:    picker,
+			transport: &Transport{ClusterID: types.ID(1), streamRoundTripper: &http.Transport{}},
 
 			recvc: recvc,
 			propc: propc,

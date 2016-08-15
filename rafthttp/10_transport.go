@@ -12,10 +12,10 @@ import (
 	"github.com/gyuho/db/raftsnap"
 )
 
-// PeerTransporter defines rafthttp transport layer.
+// Transporter defines rafthttp transport layer.
 //
 // (etcd rafthttp.Transporter)
-type PeerTransporter interface {
+type Transporter interface {
 	// Start starts transporter.
 	// Start must be called first.
 	//
@@ -74,10 +74,10 @@ type PeerTransporter interface {
 	AddPeerRemote(id types.ID, urls []string)
 }
 
-// PeerTransport implements PeerTransporter. It sends and receives raft messages to/from peers.
+// Transport implements Transporter. It sends and receives raft messages to/from peers.
 //
 // (etcd rafthttp.Transport)
-type PeerTransport struct {
+type Transport struct {
 	TLSInfo     tlsutil.TLSInfo
 	DialTimeout time.Duration
 
@@ -90,36 +90,36 @@ type PeerTransport struct {
 
 	errc chan error
 
-	streamRoundTripper             http.RoundTripper
-	peerPipelineRoundTripper       http.RoundTripper
-	peerPipelineRoundTripperProber probing.Prober
+	streamRoundTripper         http.RoundTripper
+	pipelineRoundTripper       http.RoundTripper
+	pipelineRoundTripperProber probing.Prober
 
 	mu          sync.RWMutex
 	peers       map[types.ID]Peer
 	peerRemotes map[types.ID]*peerRemote
 }
 
-func (pt *PeerTransport) ErrChan() chan error {
-	return pt.errc
+func (tr *Transport) ErrChan() chan error {
+	return tr.errc
 }
 
-func (pt *PeerTransport) Start() error {
+func (tr *Transport) Start() error {
 	var err error
 
-	pt.streamRoundTripper, err = NewStreamRoundTripper(pt.TLSInfo, pt.DialTimeout)
+	tr.streamRoundTripper, err = NewStreamRoundTripper(tr.TLSInfo, tr.DialTimeout)
 	if err != nil {
 		return err
 	}
 
 	// allow more idle connections
-	pt.peerPipelineRoundTripper, err = NewRoundTripper(pt.TLSInfo, pt.DialTimeout)
+	tr.pipelineRoundTripper, err = NewRoundTripper(tr.TLSInfo, tr.DialTimeout)
 	if err != nil {
 		return err
 	}
-	pt.peerPipelineRoundTripperProber = probing.NewProber(pt.peerPipelineRoundTripper)
+	tr.pipelineRoundTripperProber = probing.NewProber(tr.pipelineRoundTripper)
 
-	pt.peers = make(map[types.ID]Peer)
-	pt.peerRemotes = make(map[types.ID]*peerRemote)
+	tr.peers = make(map[types.ID]Peer)
+	tr.peerRemotes = make(map[types.ID]*peerRemote)
 
 	return nil
 }
@@ -132,11 +132,11 @@ func (pt *PeerTransport) Start() error {
 //
 
 // CutPeer drops messages to the specified peer.
-func (pt *PeerTransport) CutPeer(id types.ID) {
-	pt.mu.RLock()
-	p, pok := pt.peers[id]
-	r, rok := pt.peerRemotes[id]
-	pt.mu.RUnlock()
+func (tr *Transport) CutPeer(id types.ID) {
+	tr.mu.RLock()
+	p, pok := tr.peers[id]
+	r, rok := tr.peerRemotes[id]
+	tr.mu.RUnlock()
 
 	if pok {
 		p.(Pausable).Pause()
@@ -147,11 +147,11 @@ func (pt *PeerTransport) CutPeer(id types.ID) {
 }
 
 // MendPeer recovers the dropping message to the given peer.
-func (pt *PeerTransport) MendPeer(id types.ID) {
-	pt.mu.RLock()
-	p, pok := pt.peers[id]
-	r, rok := pt.peerRemotes[id]
-	pt.mu.RUnlock()
+func (tr *Transport) MendPeer(id types.ID) {
+	tr.mu.RLock()
+	p, pok := tr.peers[id]
+	r, rok := tr.peerRemotes[id]
+	tr.mu.RUnlock()
 
 	if pok {
 		p.(Pausable).Resume()
@@ -161,77 +161,77 @@ func (pt *PeerTransport) MendPeer(id types.ID) {
 	}
 }
 
-func (pt *PeerTransport) Stop() {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
+func (tr *Transport) Stop() {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 
-	for _, p := range pt.peers {
+	for _, p := range tr.peers {
 		_ = p
 	}
-	for _, r := range pt.peerRemotes {
+	for _, r := range tr.peerRemotes {
 		_ = r
 	}
 
-	if tr, ok := pt.streamRoundTripper.(*http.Transport); ok {
+	if tr, ok := tr.streamRoundTripper.(*http.Transport); ok {
 		tr.CloseIdleConnections()
 	}
-	if tr, ok := pt.peerPipelineRoundTripper.(*http.Transport); ok {
+	if tr, ok := tr.pipelineRoundTripper.(*http.Transport); ok {
 		tr.CloseIdleConnections()
 	}
-	pt.peerPipelineRoundTripperProber.RemoveAll()
+	tr.pipelineRoundTripperProber.RemoveAll()
 
-	pt.peers = nil
-	pt.peerRemotes = nil
+	tr.peers = nil
+	tr.peerRemotes = nil
 
 	return
 }
 
-func (pt *PeerTransport) HTTPHandler() http.Handler {
+func (tr *Transport) HTTPHandler() http.Handler {
 
 	return nil
 }
 
-func (pt *PeerTransport) SendMessagesToPeer(msgs []raftpb.Message) {
+func (tr *Transport) SendMessagesToPeer(msgs []raftpb.Message) {
 
 	return
 }
 
-func (pt *PeerTransport) SendSnapshotToPeer(msgs raftsnap.Message) {
+func (tr *Transport) SendSnapshotToPeer(msgs raftsnap.Message) {
 
 	return
 }
 
-func (pt *PeerTransport) AddPeer(id types.ID, urls []string) {
+func (tr *Transport) AddPeer(id types.ID, urls []string) {
 
 	return
 }
 
-func (pt *PeerTransport) RemovePeer(id types.ID) {
+func (tr *Transport) RemovePeer(id types.ID) {
 
 	return
 }
 
-func (pt *PeerTransport) RemoveAllPeers() {
+func (tr *Transport) RemoveAllPeers() {
 
 	return
 }
 
-func (pt *PeerTransport) UpdatePeer(id types.ID, urls []string) {
+func (tr *Transport) UpdatePeer(id types.ID, urls []string) {
 
 	return
 }
 
-func (pt *PeerTransport) ActiveSince(id types.ID) time.Time {
-	pt.mu.RLock()
-	defer pt.mu.RUnlock()
+func (tr *Transport) ActiveSince(id types.ID) time.Time {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
 
-	if p, ok := pt.peers[id]; ok {
+	if p, ok := tr.peers[id]; ok {
 		return p.activeSince()
 	}
 	return time.Time{}
 }
 
-func (pt *PeerTransport) AddPeerRemote(id types.ID, urls []string) {
+func (tr *Transport) AddPeerRemote(id types.ID, urls []string) {
 
 	return
 }

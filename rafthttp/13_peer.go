@@ -36,10 +36,12 @@ type peer struct {
 	status *peerStatus
 	r      Raft
 
-	picker       *urlPicker
-	streamWriter *streamWriter
-	peerPipeline *peerPipeline
-	streamReader *streamReader
+	picker *urlPicker
+
+	streamWriter   *streamWriter
+	pipeline       *pipeline
+	streamReader   *streamReader
+	snapshotSender *snapshotSender
 
 	sendc chan raftpb.Message
 	recvc chan raftpb.Message

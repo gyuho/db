@@ -9,7 +9,7 @@ type peerRemote struct {
 	peerID types.ID
 	status *peerStatus
 
-	peerPipeline *peerPipeline
+	pipeline *pipeline
 }
 
 func (r *peerRemote) Pause() {

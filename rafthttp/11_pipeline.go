@@ -11,20 +11,20 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// peerPipeline contains PeerTransport.
-// peerPipeline handles a series of HTTP clients, and sends thoses to remote peers.
+// pipeline contains Transport.
+// pipeline handles a series of HTTP clients, and sends thoses to remote peers.
 // It is only used when the stream has not been established.
 //
 // (etcd rafthttp.pipeline)
-type peerPipeline struct {
+type pipeline struct {
 	peerID types.ID
 	status *peerStatus
 
 	r Raft
 
-	picker *urlPicker
-	pt     *PeerTransport
-	errc   chan error
+	picker    *urlPicker
+	transport *Transport
+	errc      chan error
 
 	raftMessageChan chan raftpb.Message
 	stopc           chan struct{}
@@ -32,8 +32,8 @@ type peerPipeline struct {
 	connWg sync.WaitGroup
 }
 
-func (p *peerPipeline) start() {
-	p.raftMessageChan = make(chan raftpb.Message, peerPipelineBufferN)
+func (p *pipeline) start() {
+	p.raftMessageChan = make(chan raftpb.Message, pipelineBufferN)
 	p.stopc = make(chan struct{})
 	p.connWg.Add(connPerPipeline)
 
@@ -41,18 +41,18 @@ func (p *peerPipeline) start() {
 		go p.handle()
 	}
 
-	logger.Infof("started peerPipeline to peer %s", p.peerID)
+	logger.Infof("started pipeline to peer %s", p.peerID)
 }
 
-func (p *peerPipeline) stop() {
+func (p *pipeline) stop() {
 	close(p.stopc)
 	p.connWg.Wait()
-	logger.Infof("stopped peerPipeline to peer %s", p.peerID)
+	logger.Infof("stopped pipeline to peer %s", p.peerID)
 }
 
-func (p *peerPipeline) post(data []byte) error {
+func (p *pipeline) post(data []byte) error {
 	targetURL := p.picker.pick()
-	req := createPostRequest(targetURL, PrefixRaft, bytes.NewBuffer(data), HeaderContentProtobuf, p.pt.From, p.pt.ClusterID, p.pt.PeerURLs)
+	req := createPostRequest(targetURL, PrefixRaft, bytes.NewBuffer(data), HeaderContentProtobuf, p.transport.From, p.transport.ClusterID, p.transport.PeerURLs)
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	req = req.WithContext(ctx)
@@ -66,7 +66,7 @@ func (p *peerPipeline) post(data []byte) error {
 		}
 	}()
 
-	resp, err := p.pt.peerPipelineRoundTripper.RoundTrip(req)
+	resp, err := p.transport.pipelineRoundTripper.RoundTrip(req)
 	close(donec)
 	if err != nil {
 		p.picker.unreachable(targetURL)
@@ -92,7 +92,7 @@ func (p *peerPipeline) post(data []byte) error {
 	return nil
 }
 
-func (p *peerPipeline) handle() {
+func (p *pipeline) handle() {
 	defer p.connWg.Done()
 
 	for {
