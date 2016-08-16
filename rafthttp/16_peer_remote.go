@@ -6,6 +6,7 @@ import (
 )
 
 // peerRemote handles newly joined peers.
+// It is the leader from the newly joined peer node's viewpoint.
 //
 // (etcd rafthttp.remote)
 type peerRemote struct {
@@ -29,7 +30,6 @@ func (r *peerRemote) Resume() {
 
 // (etcd rafthttp.startRemote)
 func startRemote(peerID types.ID, peerURLs types.URLs, tr *Transport) *peerRemote {
-
 	pipeline := &pipeline{
 		peerID:    peerID,
 		status:    newPeerStatus(peerID),
