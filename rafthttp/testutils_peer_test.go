@@ -9,12 +9,14 @@ import (
 	"github.com/gyuho/db/raftsnap"
 )
 
+// (etcd rafthttp.fakePeerGetter)
 type fakePeerGetter struct {
 	peers map[types.ID]Peer
 }
 
 func (pg *fakePeerGetter) Get(id types.ID) Peer { return pg.peers[id] }
 
+// (etcd rafthttp.fakePeer)
 type fakePeer struct {
 	msgs     []raftpb.Message
 	snapMsgs []raftsnap.Message
@@ -23,6 +25,7 @@ type fakePeer struct {
 	paused   bool
 }
 
+// (etcd rafthttp.newFakePeer)
 func newFakePeer() *fakePeer {
 	fakeURL, _ := url.Parse("http://localhost")
 	return &fakePeer{

@@ -33,13 +33,27 @@ func newStreamHandler(tr Transporter, r Raft, pg peerGetter, id, clusterID types
 }
 
 func (hd *streamHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if req.Method != "POST" {
-		rw.Header().Set("Allow", "POST")
+	if req.Method != "GET" {
+		rw.Header().Set("Allow", "GET")
 		http.Error(rw, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	rw.Header().Set(HeaderServerVersion, version.ServerVersion)
 	rw.Header().Set(HeaderClusterID, hd.clusterID.String())
+
+	if err := checkClusterCompatibilityFromHeader(req.Header, hd.clusterID); err != nil {
+		http.Error(rw, err.Error(), http.StatusPreconditionFailed)
+		return
+	}
+
+	switch path.Dir(req.URL.Path) {
+	case PrefixRaftStreamMessage:
+	default:
+		errMsg := fmt.Sprintf("unexpected stream request path %q", req.URL.Path)
+		logger.Warningln(errMsg)
+		http.Error(rw, errMsg, http.StatusNotFound)
+		return
+	}
 
 	if from, err := types.IDFromString(req.Header.Get(HeaderFromID)); err != nil { // ???
 		if urls := req.Header.Get(HeaderPeerURLs); urls != "" {
@@ -55,6 +69,7 @@ func (hd *streamHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, errMsg, http.StatusNotFound)
 		return
 	}
+
 	if hd.r.IsIDRemoved(uint64(from)) {
 		errMsg := fmt.Sprintf("rejected stream from peer %s since it was removed", from)
 		logger.Warningln(errMsg)

@@ -36,6 +36,11 @@ func (hd *pipelineHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 	rw.Header().Set(HeaderClusterID, hd.clusterID.String())
 
+	if err := checkClusterCompatibilityFromHeader(req.Header, hd.clusterID); err != nil {
+		http.Error(rw, err.Error(), http.StatusPreconditionFailed)
+		return
+	}
+
 	if from, err := types.IDFromString(req.Header.Get(HeaderFromID)); err != nil { // ???
 		if urls := req.Header.Get(HeaderPeerURLs); urls != "" {
 			hd.tr.AddPeerRemote(from, strings.Split(urls, ","))

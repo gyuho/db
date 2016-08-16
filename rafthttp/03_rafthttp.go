@@ -2,8 +2,11 @@ package rafthttp
 
 import (
 	"errors"
+	"net/http"
 	"path"
 	"time"
+
+	"github.com/gyuho/db/pkg/types"
 )
 
 var (
@@ -66,10 +69,11 @@ const (
 )
 
 var (
+	streamTypeMessage       = "message"
 	PrefixRaft              = "/raft"                          // (etcd rafthttp.RaftPrefix)
 	PrefixRaftProbing       = path.Join(PrefixRaft, "probing") // (etcd rafthttp.ProbingPrefix)
 	PrefixRaftStream        = path.Join(PrefixRaft, "stream")  // (etcd rafthttp.RaftStreamPrefix)
-	PrefixRaftStreamMessage = path.Join(PrefixRaft, "stream", "message")
+	PrefixRaftStreamMessage = path.Join(PrefixRaft, "stream", streamTypeMessage)
 	PrefixRaftSnapshot      = path.Join(PrefixRaft, "snapshot") // (etcd rafthttp.RaftSnapshotPrefix)
 )
 
@@ -84,3 +88,12 @@ var (
 	HeaderServerVersion = "X-rafthttp-Server-Version" // X-Server-Version
 	HeaderPeerURLs      = "X-rafthttp-PeerURLs"       // X-PeerURLs
 )
+
+// (etcd rafthttp.checkClusterCompatibilityFromHeader)
+func checkClusterCompatibilityFromHeader(header http.Header, clusterID types.ID) error {
+	if gclusterID := header.Get(HeaderClusterID); gclusterID != clusterID.String() {
+		logger.Errorf("request cluster ID mismatch (got %s want %s)", gclusterID, clusterID)
+		return ErrClusterIDMismatch
+	}
+	return nil
+}
