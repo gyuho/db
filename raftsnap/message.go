@@ -22,7 +22,7 @@ type Message struct {
 	raftpb.Message
 	ReadCloser io.ReadCloser
 	TotalSize  int64
-	closeC     chan bool
+	closec     chan bool
 }
 
 // NewMessage returns a new Message from raftpb.Message.
@@ -33,7 +33,7 @@ func NewMessage(msg raftpb.Message, rc io.ReadCloser, rcSize int64) *Message {
 		Message:    msg,
 		ReadCloser: ioutil.NewExactReadCloser(rc, rcSize),
 		TotalSize:  int64(msg.Size()) + rcSize,
-		closeC:     make(chan bool, 1),
+		closec:     make(chan bool, 1),
 	}
 }
 
@@ -43,7 +43,7 @@ func NewMessage(msg raftpb.Message, rc io.ReadCloser, rcSize int64) *Message {
 //
 // (etcd snap.Message.CloseNotify)
 func (m Message) CloseNotify() <-chan bool {
-	return m.closeC
+	return m.closec
 }
 
 // CloseWithError closes with error.
@@ -55,8 +55,9 @@ func (m Message) CloseWithError(err error) {
 	}
 
 	if err != nil {
-		m.closeC <- false
+		m.closec <- false
 		return
 	}
-	m.closeC <- true
+
+	m.closec <- true
 }

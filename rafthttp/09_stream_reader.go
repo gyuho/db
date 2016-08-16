@@ -24,14 +24,14 @@ type streamReader struct {
 	peerID types.ID
 	status *peerStatus
 
-	picker *urlPicker
-	pt     *PeerTransport
+	picker    *urlPicker
+	transport *Transport
 
-	recvc chan<- raftpb.Message
-	propc chan<- raftpb.Message
-	stopc chan struct{}
-	donec chan struct{}
-	errc  chan<- error
+	incomingMessageCh         chan<- raftpb.Message // recvc
+	incomingProposalMessageCh chan<- raftpb.Message // propc
+	stopc                     chan struct{}
+	donec                     chan struct{}
+	errc                      chan<- error
 
 	mu     sync.Mutex
 	paused bool
@@ -74,7 +74,7 @@ func (sr *streamReader) stop() {
 func (sr *streamReader) dial() (io.ReadCloser, error) {
 	targetURL := sr.picker.pick()
 	uu := targetURL
-	uu.Path = path.Join(PrefixRaftStreamMessage, sr.pt.From.String())
+	uu.Path = path.Join(PrefixRaftStreamMessage, sr.transport.From.String())
 
 	req, err := http.NewRequest("GET", uu.String(), nil)
 	if err != nil {
@@ -83,12 +83,12 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	}
 
 	// req.Header.Set(HeaderContentType, contentType)
-	req.Header.Set(HeaderFromID, sr.pt.From.String())
+	req.Header.Set(HeaderFromID, sr.transport.From.String())
 	req.Header.Set(HeaderToID, sr.peerID.String())
-	req.Header.Set(HeaderClusterID, sr.pt.ClusterID.String())
+	req.Header.Set(HeaderClusterID, sr.transport.ClusterID.String())
 	req.Header.Set(HeaderServerVersion, version.ServerVersion)
 
-	setHeaderPeerURLs(req, sr.pt.PeerURLs)
+	setHeaderPeerURLs(req, sr.transport.PeerURLs)
 
 	sr.mu.Lock()
 	select {
@@ -102,7 +102,7 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	sr.cancel = cancel
 	sr.mu.Unlock()
 
-	resp, err := sr.pt.streamRoundTripper.RoundTrip(req)
+	resp, err := sr.transport.streamRoundTripper.RoundTrip(req)
 	if err != nil {
 		sr.picker.unreachable(targetURL)
 		return nil, err
@@ -121,7 +121,7 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	case http.StatusNotFound:
 		netutil.GracefulClose(resp)
 		sr.picker.unreachable(targetURL)
-		return nil, fmt.Errorf("peer %s failed to find local member %s", sr.peerID, sr.pt.From)
+		return nil, fmt.Errorf("peer %s failed to find local member %s", sr.peerID, sr.transport.From)
 
 	case http.StatusPreconditionFailed:
 		bts, err := ioutil.ReadAll(resp.Body)
@@ -151,7 +151,16 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 
 func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
 	sr.mu.Lock()
-	sr.closer = rc
+	select {
+	case <-sr.stopc:
+		sr.mu.Unlock()
+		if err := rc.Close(); err != nil {
+			return err
+		}
+		return io.EOF
+	default:
+		sr.closer = rc
+	}
 	sr.mu.Unlock()
 
 	dec := raftpb.NewMessageBinaryDecoder(rc)
@@ -176,9 +185,9 @@ func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
 			continue
 		}
 
-		recvc := sr.recvc
+		recvc := sr.incomingMessageCh
 		if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
-			recvc = sr.propc
+			recvc = sr.incomingProposalMessageCh
 		}
 
 		select {
@@ -196,7 +205,7 @@ func (sr *streamReader) start() {
 	sr.stopc = make(chan struct{})
 	sr.donec = make(chan struct{})
 	if sr.errc == nil {
-		sr.errc = sr.pt.errc
+		sr.errc = sr.transport.errc
 	}
 
 	logger.Infof("started streamReader to peer %s", sr.peerID)

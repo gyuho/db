@@ -5,6 +5,7 @@ import (
 	"io"
 )
 
+// (etcd ioutil.limitedBufferReader)
 type limitedBufferReader struct {
 	r           io.Reader
 	totalBytesN int
@@ -21,6 +22,8 @@ func (r *limitedBufferReader) Read(p []byte) (n int, err error) {
 
 // NewLimitedBufferReader returns io.Reader that reads from the given reader
 // but returns at most n bytes.
+//
+// (etcd ioutil.NewLimitedBufferReader)
 func NewLimitedBufferReader(r io.Reader, totalBytesN int) io.Reader {
 	return &limitedBufferReader{
 		r:           r,
@@ -36,6 +39,8 @@ var (
 // NewExactReadCloser returns a ReadCloser of which Read returns errors
 // if the underlying reader does not read back exactly the requested number
 // of bytes.
+//
+// (etcd ioutil.NewExactReadCloser)
 func NewExactReadCloser(rc io.ReadCloser, totalBytesN int64) io.ReadCloser {
 	return &exactReadCloser{
 		rc:          rc,
@@ -43,6 +48,7 @@ func NewExactReadCloser(rc io.ReadCloser, totalBytesN int64) io.ReadCloser {
 	}
 }
 
+// (etcd ioutil.exactReadCloser)
 type exactReadCloser struct {
 	rc          io.ReadCloser
 	totalBytesN int64
