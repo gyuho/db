@@ -19,8 +19,8 @@ type peerGetter interface {
 //
 // (etcd rafthttp.Peer)
 type Peer interface {
-	sendMessageToPeer(msgs raftpb.Message)
-	sendSnapshotToPeer(msgs raftsnap.Message)
+	sendMessageToPeer(msg raftpb.Message)
+	sendSnapshotToPeer(msg raftsnap.Message)
 
 	updatePeer(urls types.URLs)
 
@@ -185,6 +185,20 @@ func (p *peer) sendMessageToPeer(msg raftpb.Message) {
 		return
 	}
 
+	writec, name := p.pick(msg)
+	select {
+	case writec <- msg:
+	default:
+		p.r.ReportUnreachable(msg.To)
+		if msg.Type == raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT {
+			p.r.ReportSnapshot(msg.To, raftpb.SNAPSHOT_STATUS_FAILED)
+		}
+
+		logger.Warningf("dropped %q(%s) from %s since sending buffer is full", msg.Type, name, types.ID(msg.From))
+		if p.status.isActive() {
+			logger.Warningf("%s network is bad/overloaded", p.peerID)
+		}
+	}
 }
 
 // (etcd rafthttp.peer.sendSnap)

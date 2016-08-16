@@ -45,12 +45,12 @@ type Transporter interface {
 	// AddPeer adds a peer with given peer URLs to the transport.
 	//
 	// (etcd rafthttp.Transporter.AddPeer)
-	AddPeer(id types.ID, urls []string)
+	AddPeer(peerID types.ID, urls []string)
 
 	// RemovePeer removes the peer with the given ID.
 	//
 	// (etcd rafthttp.Transporter.RemovePeer)
-	RemovePeer(id types.ID)
+	RemovePeer(peerID types.ID)
 
 	// RemoveAllPeers removes all existing peers in transporter.
 	//
@@ -60,18 +60,18 @@ type Transporter interface {
 	// UpdatePeer updates the peer with given ID and URLs.
 	//
 	// (etcd rafthttp.Transporter.UpdatePeer)
-	UpdatePeer(id types.ID, urls []string)
+	UpdatePeer(peerID types.ID, urls []string)
 
 	// ActiveSince returns the time that the connection with the peer became active.
 	// If the connection is currently inactive, it returns zero time.
 	//
 	// (etcd rafthttp.Transporter.ActiveSince)
-	ActiveSince(id types.ID) time.Time
+	ActiveSince(peerID types.ID) time.Time
 
 	// AddPeerRemote adds a remote peer with given URLs.
 	//
 	// (etcd rafthttp.Transporter.AddRemote)
-	AddPeerRemote(id types.ID, urls []string)
+	AddPeerRemote(peerID types.ID, urls []string)
 }
 
 // Transport implements Transporter. It sends and receives raft messages to/from peers.
@@ -125,10 +125,10 @@ func (tr *Transport) Start() error {
 }
 
 // CutPeer drops messages to the specified peer.
-func (tr *Transport) CutPeer(id types.ID) {
+func (tr *Transport) CutPeer(peerID types.ID) {
 	tr.mu.RLock()
-	p, pok := tr.peers[id]
-	r, rok := tr.peerRemotes[id]
+	p, pok := tr.peers[peerID]
+	r, rok := tr.peerRemotes[peerID]
 	tr.mu.RUnlock()
 
 	if pok {
@@ -140,10 +140,10 @@ func (tr *Transport) CutPeer(id types.ID) {
 }
 
 // MendPeer recovers the dropping message to the given peer.
-func (tr *Transport) MendPeer(id types.ID) {
+func (tr *Transport) MendPeer(peerID types.ID) {
 	tr.mu.RLock()
-	p, pok := tr.peers[id]
-	r, rok := tr.peerRemotes[id]
+	p, pok := tr.peers[peerID]
+	r, rok := tr.peerRemotes[peerID]
 	tr.mu.RUnlock()
 
 	if pok {
