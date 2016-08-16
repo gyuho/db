@@ -85,18 +85,18 @@ type Transport struct {
 	ClusterID types.ID   // (etcd rafthttp.Transport.ClusterID)
 	PeerURLs  types.URLs // (etcd rafthttp.Transport.URLs)
 
-	Raft            Raft
-	RaftSnapshotter *raftsnap.Snapshotter
+	Raft            Raft                  // (etcd rafthttp.Transport.Raft)
+	RaftSnapshotter *raftsnap.Snapshotter // (etcd rafthttp.Transport.Snapshotter)
 
-	errc chan error
+	errc chan error // (etcd rafthttp.Transport.ErrorC)
 
-	streamRoundTripper         http.RoundTripper
-	pipelineRoundTripper       http.RoundTripper
-	pipelineRoundTripperProber probing.Prober
+	streamRoundTripper         http.RoundTripper // (etcd rafthttp.Transport.streamRt)
+	pipelineRoundTripper       http.RoundTripper // (etcd rafthttp.Transport.pipelineRt)
+	pipelineRoundTripperProber probing.Prober    // (etcd rafthttp.Transport.prober)
 
 	mu          sync.RWMutex
-	peers       map[types.ID]Peer
-	peerRemotes map[types.ID]*peerRemote
+	peers       map[types.ID]Peer        // (etcd rafthttp.Transport.peers)
+	peerRemotes map[types.ID]*peerRemote // (etcd rafthttp.Transport.remotes)
 }
 
 func (tr *Transport) ErrChan() chan error {
