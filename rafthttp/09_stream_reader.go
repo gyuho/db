@@ -27,11 +27,11 @@ type streamReader struct {
 	picker    *urlPicker
 	transport *Transport
 
-	recvc chan<- raftpb.Message
-	propc chan<- raftpb.Message
-	stopc chan struct{}
-	donec chan struct{}
-	errc  chan<- error
+	incomingMessageCh         chan<- raftpb.Message // recvc
+	incomingProposalMessageCh chan<- raftpb.Message // propc
+	stopc                     chan struct{}
+	donec                     chan struct{}
+	errc                      chan<- error
 
 	mu     sync.Mutex
 	paused bool
@@ -185,9 +185,9 @@ func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
 			continue
 		}
 
-		recvc := sr.recvc
+		recvc := sr.incomingMessageCh
 		if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
-			recvc = sr.propc
+			recvc = sr.incomingProposalMessageCh
 		}
 
 		select {

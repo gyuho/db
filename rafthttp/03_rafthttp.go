@@ -69,11 +69,13 @@ const (
 )
 
 var (
-	streamTypeMessage       = "message"
+	messageTypeMessage  = "message"  // (etcd rafthttp.streamMsg)
+	messageTypePipeline = "pipeline" // (etcd rafthttp.pipelineMsg)
+
 	PrefixRaft              = "/raft"                          // (etcd rafthttp.RaftPrefix)
 	PrefixRaftProbing       = path.Join(PrefixRaft, "probing") // (etcd rafthttp.ProbingPrefix)
 	PrefixRaftStream        = path.Join(PrefixRaft, "stream")  // (etcd rafthttp.RaftStreamPrefix)
-	PrefixRaftStreamMessage = path.Join(PrefixRaft, "stream", streamTypeMessage)
+	PrefixRaftStreamMessage = path.Join(PrefixRaft, "stream", messageTypeMessage)
 	PrefixRaftSnapshot      = path.Join(PrefixRaft, "snapshot") // (etcd rafthttp.RaftSnapshotPrefix)
 )
 

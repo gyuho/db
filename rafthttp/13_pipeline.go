@@ -13,7 +13,7 @@ import (
 
 // pipeline contains Transport.
 // pipeline handles a series of HTTP clients, and sends thoses to remote peers.
-// It is only used when the stream has not been established.
+// It is only used when the stream has not been established, or for snapshot sending.
 //
 // (etcd rafthttp.pipeline)
 type pipeline struct {
