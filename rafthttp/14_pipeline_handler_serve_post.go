@@ -72,7 +72,7 @@ func (hd *pipelineHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		default:
 			errMsg := fmt.Sprintf("failed to process raft message (%v)", err)
 			logger.Warningln(errMsg)
-			http.Error(rw, errMsg, http.StatusBadRequest)
+			http.Error(rw, errMsg, http.StatusInternalServerError)
 			rw.(http.Flusher).Flush()
 
 			// disconnect the http stream
