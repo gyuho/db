@@ -93,6 +93,7 @@ func (s *snapshotSender) post(req *http.Request) error {
 			errc <- err
 			return
 		}
+
 		netutil.GracefulClose(resp)
 	}()
 
