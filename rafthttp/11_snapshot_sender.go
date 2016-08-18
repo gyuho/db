@@ -7,8 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/coreos/etcd/pkg/httputil"
 	dbioutil "github.com/gyuho/db/pkg/ioutil"
+	"github.com/gyuho/db/pkg/netutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/raftsnap"
@@ -93,7 +93,7 @@ func (s *snapshotSender) post(req *http.Request) error {
 			errc <- err
 			return
 		}
-		httputil.GracefulClose(resp)
+		netutil.GracefulClose(resp)
 	}()
 
 	select {
