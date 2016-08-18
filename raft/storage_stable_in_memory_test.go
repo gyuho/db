@@ -82,7 +82,7 @@ func Test_StorageStableInMemory_Term(t *testing.T) {
 		{3, nil, 3, false},
 		{4, nil, 4, false},
 		{5, nil, 5, false},
-		{6, nil, 0, true},
+		{6, ErrUnavailable, 0, false},
 	}
 
 	for i, tt := range tests {

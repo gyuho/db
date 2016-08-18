@@ -132,6 +132,8 @@ func (sr *storageRaftLog) term(index uint64) (uint64, error) {
 		return tm, nil
 	case ErrCompacted:
 		return 0, err
+	case ErrUnavailable:
+		return 0, err
 	default:
 		panic(err)
 	}

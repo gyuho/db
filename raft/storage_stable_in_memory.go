@@ -86,6 +86,9 @@ func (ms *StorageStableInMemory) Term(index uint64) (uint64, error) {
 	if firstEntryIndexInStorage > index {
 		return 0, ErrCompacted
 	}
+	if int(index-firstEntryIndexInStorage) >= len(ms.snapshotEntries) {
+		return 0, ErrUnavailable
+	}
 
 	return ms.snapshotEntries[index-firstEntryIndexInStorage].Term, nil
 }
