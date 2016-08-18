@@ -75,9 +75,13 @@ func (e *fakeWriterToResponse) WriteTo(rw http.ResponseWriter) { rw.WriteHeader(
 // (etcd rafthttp.fakeWriteFlushCloser)
 type fakeWriterFlusherCloser struct {
 	mu      sync.Mutex
-	written int
-	closed  bool
 	err     error
+	written int
+	closed  chan struct{}
+}
+
+func newFakeWriterFlusherCloser(err error) *fakeWriterFlusherCloser {
+	return &fakeWriterFlusherCloser{err: err, closed: make(chan struct{})}
 }
 
 func (wfc *fakeWriterFlusherCloser) Write(p []byte) (n int, err error) {
@@ -93,8 +97,7 @@ func (wfc *fakeWriterFlusherCloser) Flush() {}
 func (wfc *fakeWriterFlusherCloser) Close() error {
 	wfc.mu.Lock()
 	defer wfc.mu.Unlock()
-
-	wfc.closed = true
+	close(wfc.closed)
 	return wfc.err
 }
 
@@ -106,10 +109,12 @@ func (wfc *fakeWriterFlusherCloser) getWritten() int {
 }
 
 func (wfc *fakeWriterFlusherCloser) getClosed() bool {
-	wfc.mu.Lock()
-	defer wfc.mu.Unlock()
-
-	return wfc.closed
+	select {
+	case <-wfc.closed:
+		return true
+	default:
+		return false
+	}
 }
 
 //////////////////////////////////////////////////////////////

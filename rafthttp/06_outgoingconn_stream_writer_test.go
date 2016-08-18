@@ -3,6 +3,7 @@ package rafthttp
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/pkg/types"
@@ -20,7 +21,7 @@ func Test_streamWriter_attatchOutgoingConn(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		prev := wfc
 
-		wfc = &fakeWriterFlusherCloser{}
+		wfc = newFakeWriterFlusherCloser(nil)
 		sw.attachOutgoingConn(&outgoingConn{Writer: wfc, Flusher: wfc, Closer: wfc})
 
 		for j := 0; j < 3; j++ {
@@ -70,17 +71,16 @@ func Test_streamWriter_attatchOutgoingConn_bad(t *testing.T) {
 	sw := startStreamWriter(types.ID(1), newPeerStatus(types.ID(1)), &fakeRaft{})
 	defer sw.stop()
 
-	wfc := &fakeWriterFlusherCloser{err: errors.New("test")}
+	wfc := newFakeWriterFlusherCloser(errors.New("test"))
 	sw.attachOutgoingConn(&outgoingConn{Writer: wfc, Flusher: wfc, Closer: wfc})
 
 	sw.raftMessageChan <- raftpb.Message{}
-
-	scheduleutil.WaitSchedule()
-
+	select {
+	case <-wfc.closed:
+	case <-time.After(time.Second):
+		t.Fatal("failed to close the underlying connection in time")
+	}
 	if _, working := sw.messageChanToSend(); working {
 		t.Fatalf("working expected false, got %v", working)
-	}
-	if !wfc.getClosed() {
-		t.Fatalf("closed expected true, got %v", wfc.getClosed())
 	}
 }
