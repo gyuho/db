@@ -102,7 +102,8 @@ func (sw *streamWriter) run() {
 
 		raftMessageChan chan raftpb.Message
 		heartbeatChan   <-chan time.Time
-		tickc           = time.Tick(ConnReadTimeout / 3)
+
+		tickc = time.Tick(ConnReadTimeout / 3)
 	)
 
 	logger.Infof("started streamWriter to peer %s", sw.peerID)
@@ -144,7 +145,6 @@ func (sw *streamWriter) run() {
 			logger.Warningf("failed to encode message; closing streamWriter to peer %s (%v)", sw.peerID, err)
 			sw.closeWriter()
 			raftMessageChan, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
-
 			sw.r.ReportUnreachable(msg.To)
 
 		case <-heartbeatChan:

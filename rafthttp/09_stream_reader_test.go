@@ -20,7 +20,7 @@ func Test_streamReader_dial_request(t *testing.T) {
 	sr := &streamReader{
 		peerID:    types.ID(2),
 		picker:    newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
-		transport: &Transport{From: types.ID(1), ClusterID: types.ID(1), streamRoundTripper: tr},
+		transport: &Transport{Sender: types.ID(1), ClusterID: types.ID(1), streamRoundTripper: tr},
 	}
 	_, err := sr.dial()
 	if err == nil {

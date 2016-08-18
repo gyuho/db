@@ -37,7 +37,7 @@ type snapshotSender struct {
 // (etcd rafthttp.newSnapshotSender)
 func newSnapshotSender(transport *Transport, to types.ID, status *peerStatus, picker *urlPicker) *snapshotSender {
 	return &snapshotSender{
-		from:      transport.From,
+		from:      transport.Sender,
 		to:        to,
 		clusterID: transport.ClusterID,
 

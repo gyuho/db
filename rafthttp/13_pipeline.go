@@ -52,7 +52,7 @@ func (p *pipeline) stop() {
 
 func (p *pipeline) post(data []byte) error {
 	targetURL := p.picker.pick()
-	req := createPostRequest(targetURL, PrefixRaft, bytes.NewBuffer(data), HeaderContentProtobuf, p.transport.From, p.transport.ClusterID, p.transport.PeerURLs)
+	req := createPostRequest(targetURL, PrefixRaft, bytes.NewBuffer(data), HeaderContentProtobuf, p.transport.Sender, p.transport.ClusterID, p.transport.PeerURLs)
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	req = req.WithContext(ctx)

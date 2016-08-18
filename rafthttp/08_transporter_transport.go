@@ -81,7 +81,7 @@ type Transport struct {
 	TLSInfo     tlsutil.TLSInfo
 	DialTimeout time.Duration
 
-	From      types.ID   // (etcd rafthttp.Transport.ID)
+	Sender    types.ID   // (etcd rafthttp.Transport.ID)
 	ClusterID types.ID   // (etcd rafthttp.Transport.ClusterID)
 	PeerURLs  types.URLs // (etcd rafthttp.Transport.URLs)
 

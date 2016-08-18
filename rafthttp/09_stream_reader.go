@@ -74,7 +74,7 @@ func (sr *streamReader) stop() {
 func (sr *streamReader) dial() (io.ReadCloser, error) {
 	targetURL := sr.picker.pick()
 	uu := targetURL
-	uu.Path = path.Join(PrefixRaftStreamMessage, sr.transport.From.String())
+	uu.Path = path.Join(PrefixRaftStreamMessage, sr.transport.Sender.String())
 
 	req, err := http.NewRequest("GET", uu.String(), nil)
 	if err != nil {
@@ -83,7 +83,7 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	}
 
 	// req.Header.Set(HeaderContentType, contentType)
-	req.Header.Set(HeaderFromID, sr.transport.From.String())
+	req.Header.Set(HeaderFromID, sr.transport.Sender.String())
 	req.Header.Set(HeaderToID, sr.peerID.String())
 	req.Header.Set(HeaderClusterID, sr.transport.ClusterID.String())
 	req.Header.Set(HeaderServerVersion, version.ServerVersion)
@@ -121,7 +121,7 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	case http.StatusNotFound:
 		netutil.GracefulClose(resp)
 		sr.picker.unreachable(targetURL)
-		return nil, fmt.Errorf("peer %s failed to find local member %s", sr.peerID, sr.transport.From)
+		return nil, fmt.Errorf("peer %s failed to find local member %s", sr.peerID, sr.transport.Sender)
 
 	case http.StatusPreconditionFailed:
 		bts, err := ioutil.ReadAll(resp.Body)
