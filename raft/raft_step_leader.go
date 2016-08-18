@@ -551,6 +551,15 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			followerProgress.becomeProbe()
 		}
 
+		// only pause when we know for sure the probing would fail
+		// OR
+		// when we want to ensure one inflight
+		//
+		// if unreachable, probing should continue to probe to find
+		// the follower when it's back online
+		//
+		// followerProgress.pause()
+
 		raftLogger.Warningf(`
 
 	%s
