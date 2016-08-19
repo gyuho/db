@@ -82,6 +82,7 @@ func NewListenerStoppable(scheme, addr string, tlsConfig *tls.Config, stopc <-ch
 	return ls, nil
 }
 
+// ErrListenerStopped is returned when the listener is stopped.
 var ErrListenerStopped = errors.New("listener stopped")
 
 func (ln *listenerStoppable) Accept() (net.Conn, error) {
