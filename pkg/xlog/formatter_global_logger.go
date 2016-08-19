@@ -6,6 +6,15 @@ import (
 	"sync"
 )
 
+// SetGlobalMaxLogLevel sets max log levels of all loggers.
+func SetGlobalMaxLogLevel(lvl LogLevel) {
+	xlogger.mu.Lock()
+	for _, lg := range xlogger.loggers {
+		lg.maxLvl = lvl
+	}
+	xlogger.mu.Unlock()
+}
+
 // Formatter defines log-format (printer) interface.
 type Formatter interface {
 	// WriteFlush writes the log and flush it to disk.
@@ -44,9 +53,7 @@ func init() {
 	// to overwrite standard logger
 	log.SetFlags(0)
 	log.SetPrefix("")
-	log.SetOutput(stdLogWriter{
-		l: NewLogger("", INFO),
-	})
+	log.SetOutput(stdLogWriter{l: NewLogger("", INFO)})
 
 	SetFormatter(NewDefaultFormatter(os.Stderr))
 }
@@ -57,13 +64,4 @@ func GetLogger(name string) (*Logger, bool) {
 	lg, ok := xlogger.loggers[name]
 	xlogger.mu.Unlock()
 	return lg, ok
-}
-
-// SetGlobalMaxLogLevel sets max log levels of all loggers.
-func SetGlobalMaxLogLevel(lvl LogLevel) {
-	xlogger.mu.Lock()
-	for _, lg := range xlogger.loggers {
-		lg.maxLvl = lvl
-	}
-	xlogger.mu.Unlock()
 }
