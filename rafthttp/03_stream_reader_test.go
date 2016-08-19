@@ -167,7 +167,7 @@ func Test_streamReader_streamWriter(t *testing.T) {
 			picker:    picker,
 			transport: &Transport{ClusterID: types.ID(1), streamRoundTripper: &http.Transport{}},
 
-			recvc:         recvc,
+			recvc: recvc,
 			propc: propc,
 		}
 

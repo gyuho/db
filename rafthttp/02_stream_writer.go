@@ -103,8 +103,8 @@ func (sw *streamWriter) run() {
 
 		batchedN int
 
-		msgc          chan raftpb.Message
-		heartbeatChan <-chan time.Time
+		msgc   chan raftpb.Message
+		heartc <-chan time.Time
 
 		tickc = time.Tick(ConnReadTimeout / 3)
 	)
@@ -129,7 +129,7 @@ func (sw *streamWriter) run() {
 				logger.Warningf("closed an existing streamWriter to peer %s", sw.peerID)
 			}
 			logger.Infof("established streamWriter to peer %s", sw.peerID)
-			msgc, heartbeatChan = sw.msgc, tickc
+			msgc, heartc = sw.msgc, tickc
 
 		case msg := <-msgc:
 			err := messageBinaryEncoder.Encode(&msg)
@@ -150,10 +150,10 @@ func (sw *streamWriter) run() {
 
 			logger.Warningf("failed to encode message; closing streamWriter to peer %s (%v)", sw.peerID, err)
 			sw.closeWriter()
-			msgc, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
+			msgc, heartc = nil, nil // so that, 'select' doesn't select these cases
 			sw.r.ReportUnreachable(msg.To)
 
-		case <-heartbeatChan:
+		case <-heartc:
 			err := messageBinaryEncoder.Encode(&emptyLeaderHeartbeat)
 			if err == nil {
 				httpFlusher.Flush()
@@ -166,7 +166,7 @@ func (sw *streamWriter) run() {
 
 			logger.Warningf("failed to encode heartbeat; closing streamWriter to peer %s (%v)", sw.peerID, err)
 			sw.closeWriter()
-			msgc, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
+			msgc, heartc = nil, nil // so that, 'select' doesn't select these cases
 
 		case <-sw.stopc:
 			sw.closeWriter()
