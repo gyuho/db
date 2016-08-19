@@ -16,6 +16,17 @@ import (
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
+type config struct {
+	id  uint64
+	url string
+
+	peerIDs  []uint64
+	peerURLs []string
+
+	walDir  string
+	dataDir string
+}
+
 type raftNode struct {
 	id  uint64
 	url url.URL
@@ -43,17 +54,6 @@ type raftNode struct {
 	stopc         chan struct{}
 	stopListenerc chan struct{}
 	donec         chan struct{}
-}
-
-type config struct {
-	id  uint64
-	url string
-
-	peerIDs  []uint64
-	peerURLs []string
-
-	walDir  string
-	dataDir string
 }
 
 func newRaftNode(cfg config, propc <-chan []byte) *raftNode {
