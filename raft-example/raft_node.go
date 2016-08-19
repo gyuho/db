@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"time"
 
 	"github.com/gyuho/db/pkg/fileutil"
@@ -23,8 +24,7 @@ type config struct {
 	peerIDs  []uint64
 	peerURLs []string
 
-	walDir  string
-	dataDir string
+	dir string
 }
 
 type raftNode struct {
@@ -35,7 +35,7 @@ type raftNode struct {
 	peerURLs types.URLs
 
 	walDir  string
-	dataDir string
+	snapDir string
 
 	electionTickN  int
 	heartbeatTickN int
@@ -67,8 +67,8 @@ func newRaftNode(cfg config, propc <-chan []byte) *raftNode {
 		peerIDs:  cfg.peerIDs,
 		peerURLs: purls,
 
-		walDir:  cfg.walDir,
-		dataDir: cfg.dataDir,
+		walDir:  filepath.Join(cfg.dir, "wal"),
+		snapDir: filepath.Join(cfg.dir, "snap"),
 
 		electionTickN:  10,
 		heartbeatTickN: 1,
