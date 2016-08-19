@@ -24,7 +24,7 @@ type store struct {
 	data map[string]string
 }
 
-func NewStore(propc chan<- string, recvc <-chan *string, errc chan error) *store {
+func newStore(propc chan<- string, recvc <-chan *string, errc chan error) *store {
 	s := &store{
 		propc: propc,
 		recvc: recvc,
@@ -39,14 +39,14 @@ func NewStore(propc chan<- string, recvc <-chan *string, errc chan error) *store
 	return s
 }
 
-func (s *store) Get(key string) (string, bool) {
+func (s *store) get(key string) (string, bool) {
 	s.mu.RLock()
 	v, ok := s.data[key]
 	s.mu.RUnlock()
 	return v, ok
 }
 
-func (s *store) Propose(ctx context.Context, k, v string) {
+func (s *store) propose(ctx context.Context, k, v string) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(kv{Key: k, Val: v}); err != nil {
 		s.errc <- err
@@ -71,7 +71,7 @@ func (s *store) Propose(ctx context.Context, k, v string) {
 	}
 }
 
-func (s *store) Stop() {
+func (s *store) stop() {
 	close(s.stopc)
 	<-s.donec
 }

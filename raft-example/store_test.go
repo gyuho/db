@@ -11,8 +11,8 @@ func Test_store(t *testing.T) {
 	recvc := make(chan *string)
 	errc := make(chan error)
 
-	s := NewStore(propc, recvc, errc)
-	defer s.Stop()
+	s := newStore(propc, recvc, errc)
+	defer s.stop()
 
 	donec := make(chan struct{})
 	go func() {
@@ -20,12 +20,12 @@ func Test_store(t *testing.T) {
 		str := <-propc
 		recvc <- &str
 	}()
-	s.Propose(context.TODO(), "foo", "bar")
+	s.propose(context.TODO(), "foo", "bar")
 	<-donec
 
 	time.Sleep(10 * time.Millisecond)
 
-	val, ok := s.Get("foo")
+	val, ok := s.get("foo")
 	if !ok {
 		t.Fatal("ok expected true, got false")
 	}
