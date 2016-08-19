@@ -16,7 +16,7 @@ import (
 //
 // (etcd rafthttp.NewListener)
 func NewStreamListener(u url.URL, tlsConfig *tls.Config) (net.Listener, error) {
-	return netutil.NewListenerWithTimeout(u.Host, u.Scheme, tlsConfig, ConnWriteTimeout, ConnReadTimeout)
+	return netutil.NewListenerWithTimeout(u.Scheme, u.Host, tlsConfig, ConnWriteTimeout, ConnReadTimeout)
 }
 
 // NewStreamRoundTripper returns a roundTripper used to send requests to its peers.
