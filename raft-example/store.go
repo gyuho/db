@@ -65,8 +65,6 @@ func (s *store) propose(ctx context.Context, kv keyValue) {
 
 		case <-s.donec:
 			return
-
-		default:
 		}
 	}
 }
