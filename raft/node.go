@@ -17,6 +17,8 @@ type Node interface {
 
 	// Tick increments the internal logical clock in the Node, by a single tick.
 	// Election timeouts and heartbeat timeouts are in units of ticks.
+	// Code that imports raft.Node should call Tick periodically.
+	// There is no Tick calls within raft package.
 	//
 	// (etcd raft.Node.Tick)
 	Tick()

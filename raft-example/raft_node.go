@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/pkg/netutil"
@@ -24,6 +25,9 @@ type raftNode struct {
 
 	walDir  string
 	dataDir string
+
+	electionTickN  int
+	heartbeatTickN int
 
 	lastIndex uint64
 
@@ -65,6 +69,9 @@ func newRaftNode(cfg config, propc <-chan []byte) *raftNode {
 
 		walDir:  cfg.walDir,
 		dataDir: cfg.dataDir,
+
+		electionTickN:  10,
+		heartbeatTickN: 1,
 
 		lastIndex: 0,
 
@@ -130,8 +137,8 @@ func (rnd *raftNode) start() {
 
 	cfg := &raft.Config{
 		ID:                      rnd.id,
-		ElectionTickNum:         10,
-		HeartbeatTimeoutTickNum: 1,
+		ElectionTickNum:         rnd.electionTickN,
+		HeartbeatTimeoutTickNum: rnd.heartbeatTickN,
 		StorageStable:           rnd.storageMemory,
 		MaxEntryNumPerMsg:       1024 * 1024,
 		MaxInflightMsgNum:       256,
@@ -165,7 +172,86 @@ func (rnd *raftNode) start() {
 	go rnd.startServe()
 }
 
+func (rnd *raftNode) handleProposal() {
+	for rnd.propc != nil {
+		select {
+		case prop := <-rnd.propc:
+			rnd.node.Propose(context.TODO(), prop)
+
+		case <-rnd.stopc:
+			rnd.propc = nil
+			return
+		}
+	}
+}
+
+func (rnd *raftNode) handleEntriesToCommit(ents []raftpb.Entry) bool {
+	for i := range ents {
+		switch ents[i].Type {
+		case raftpb.ENTRY_TYPE_NORMAL:
+			if len(ents[i].Data) == 0 {
+				// ignore empty message
+				break
+			}
+			select {
+			case rnd.commitc <- ents[i].Data:
+			case <-rnd.stopc:
+				return false
+			}
+		case raftpb.ENTRY_TYPE_CONFIG_CHANGE: // TODO
+
+		}
+
+		if ents[i].Index == rnd.lastIndex { // special nil commit to signal that replay has finished
+			select {
+			case rnd.commitc <- nil:
+			case <-rnd.stopc:
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 func (rnd *raftNode) startRaft() {
+	defer rnd.wal.Close()
+
+	ticker := time.NewTicker(time.Duration(rnd.electionTickN) * time.Millisecond)
+	defer ticker.Stop()
+
+	go rnd.handleProposal()
+
+	// handle Ready
+	for {
+		select {
+		case <-ticker.C:
+			rnd.node.Tick()
+
+		case rd := <-rnd.node.Ready():
+			rnd.wal.Save(rd.HardStateToSave, rd.EntriesToAppend)
+			rnd.storageMemory.Append(rd.EntriesToAppend...)
+			rnd.transport.Send(rd.MessagesToSend)
+
+			// handle already-committed entries
+			if ok := rnd.handleEntriesToCommit(rd.EntriesToCommit); !ok {
+				logger.Warningln("stopping...")
+				rnd.stop()
+				return
+			}
+
+			rnd.node.Advance()
+
+		case err := <-rnd.transport.Errc:
+			rnd.errc <- err
+			logger.Warningln("stopping;", err)
+			rnd.stop()
+			return
+
+		case <-rnd.stopc:
+			return
+		}
+	}
 }
 
 func (rnd *raftNode) startServe() {
