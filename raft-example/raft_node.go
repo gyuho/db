@@ -38,7 +38,7 @@ type config struct {
 	dataDir string
 }
 
-func newRaftNode(cfg config, propc <-chan []byte) (<-chan []byte, <-chan error) {
+func newRaftNode(cfg config, propc <-chan []byte) *raftNode {
 	commitc, errc := make(chan []byte), make(chan error)
 	rnd := &raftNode{
 		id:       cfg.id,
@@ -64,10 +64,22 @@ func newRaftNode(cfg config, propc <-chan []byte) (<-chan []byte, <-chan error) 
 	}
 
 	go rnd.start()
+	return rnd
+}
 
-	return commitc, errc
+func (rnd *raftNode) stop() {
+	close(rnd.stopc)
+	<-rnd.donec
 }
 
 func (rnd *raftNode) start() {
+
+}
+
+func (rnd *raftNode) startServe() {
+
+}
+
+func (rnd *raftNode) startRaft() {
 
 }
