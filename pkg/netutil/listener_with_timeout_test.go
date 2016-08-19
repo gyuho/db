@@ -8,7 +8,7 @@ import (
 
 // (etcd pkg.transport.TestNewTimeoutListener)
 func Test_NewListenerWithTimeout(t *testing.T) {
-	l, err := NewListenerWithTimeout("127.0.0.1:0", "http", nil, time.Hour, time.Hour)
+	l, err := NewListenerWithTimeout("http", "127.0.0.1:0", nil, time.Hour, time.Hour)
 	if err != nil {
 		t.Fatalf("unexpected NewListenerWithTimeout error: %v", err)
 	}

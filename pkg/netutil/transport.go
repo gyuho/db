@@ -10,19 +10,6 @@ import (
 	"github.com/gyuho/db/pkg/tlsutil"
 )
 
-/*
-https://golang.org/pkg/net/http/#RoundTripper
-RoundTripper is an interface representing the ability to execute a single HTTP transaction,
-obtaining the Response for a given Request.
-A RoundTripper must be safe for concurrent use by multiple goroutines.
-
-type http.RoundTripper interface {
-	RoundTrip(*Request) (*Response, error)
-}
-
-http.Transport implements this interface.
-*/
-
 // (etcd pkg.transport.unixListener)
 type transportUnix struct {
 	*http.Transport
