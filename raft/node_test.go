@@ -76,8 +76,8 @@ func Test_node_Step(t *testing.T) {
 		msgType := raftpb.MESSAGE_TYPE(i)
 
 		nd := &node{
-			incomingProposalMessageCh: make(chan raftpb.Message, 1),
-			incomingMessageCh:         make(chan raftpb.Message, 1),
+			propc: make(chan raftpb.Message, 1),
+			recvc: make(chan raftpb.Message, 1),
 		}
 		nd.Step(context.TODO(), raftpb.Message{Type: msgType})
 
@@ -85,20 +85,20 @@ func Test_node_Step(t *testing.T) {
 		switch msgType {
 		case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER:
 			select {
-			case <-nd.incomingProposalMessageCh:
+			case <-nd.propc:
 			default:
-				t.Fatalf("received unexpected message %q from incomingProposalMessageCh", msgType)
+				t.Fatalf("received unexpected message %q from propc", msgType)
 			}
 
 		default:
 			select {
-			case <-nd.incomingMessageCh:
+			case <-nd.recvc:
 				if raftpb.IsInternalMessage(msgType) {
-					t.Fatalf("internal message %q SHOULD NOT BE passed to incomingMessageCh", msgType)
+					t.Fatalf("internal message %q SHOULD NOT BE passed to recvc", msgType)
 				}
 			default:
 				if !raftpb.IsInternalMessage(msgType) {
-					t.Fatalf("non-internal message %q SHOULD BE passed to incomingMessageCh", msgType)
+					t.Fatalf("non-internal message %q SHOULD BE passed to recvc", msgType)
 				}
 			}
 		}
@@ -108,11 +108,11 @@ func Test_node_Step(t *testing.T) {
 // (etcd raft.TestNodeStepUnblock)
 func Test_node_Step_unblock(t *testing.T) {
 	nd := &node{
-		incomingProposalMessageCh: make(chan raftpb.Message),
-		doneCh: make(chan struct{}),
+		propc: make(chan raftpb.Message),
+		donec: make(chan struct{}),
 	}
 
-	stopFunc := func() { close(nd.doneCh) }
+	stopFunc := func() { close(nd.donec) }
 	ctx, cancel := context.WithCancel(context.Background())
 
 	tests := []struct {
@@ -144,8 +144,8 @@ func Test_node_Step_unblock(t *testing.T) {
 			}
 
 			select {
-			case <-nd.doneCh:
-				nd.doneCh = make(chan struct{})
+			case <-nd.donec:
+				nd.donec = make(chan struct{})
 			default:
 			}
 
