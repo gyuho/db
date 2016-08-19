@@ -6,29 +6,25 @@ import (
 	"time"
 )
 
-func Test_store(t *testing.T) {
-	propc := make(chan []byte)
-	commitc := make(chan []byte)
-	errc := make(chan error)
-
-	s := newStore(propc, commitc, errc)
-	defer s.stop()
+func Test_dataStore(t *testing.T) {
+	ds := newDataStore()
+	defer ds.stop()
 
 	donec := make(chan struct{})
 	go func() {
 		defer close(donec)
 
-		bts := <-propc
+		bts := <-ds.propc
 
 		// assume this is agreed by consensus
-		commitc <- bts
+		ds.commitc <- bts
 	}()
-	s.propose(context.TODO(), keyValue{"foo", "bar"})
+	ds.propose(context.TODO(), keyValue{"foo", "bar"})
 	<-donec
 
 	time.Sleep(10 * time.Millisecond)
 
-	val, ok := s.get("foo")
+	val, ok := ds.get("foo")
 	if !ok {
 		t.Fatal("ok expected true, got false")
 	}
@@ -36,8 +32,8 @@ func Test_store(t *testing.T) {
 		t.Fatalf("value expected %q, got %q", "bar", val)
 	}
 
-	close(errc)
-	if err := <-errc; err != nil {
+	close(ds.errc)
+	if err := <-ds.errc; err != nil {
 		t.Fatal(err)
 	}
 }

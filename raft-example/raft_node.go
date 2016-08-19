@@ -47,25 +47,21 @@ type raftNode struct {
 	node          raft.Node
 	transport     *rafthttp.Transport
 
-	propc   <-chan []byte // propc to receive proposals
-	commitc chan<- []byte // commitc to send ready-to-commit entries
-	errc    chan<- error
+	propc   chan []byte // propc to receive proposals FROM
+	commitc chan []byte // commitc to send ready-to-commit entries TO
+	errc    chan error
 
 	stopc         chan struct{}
 	stopListenerc chan struct{}
 	donec         chan struct{}
 }
 
-func newRaftNode(cfg config, propc <-chan []byte) *raftNode {
-	url := types.MustNewURL(cfg.url)
-	purls := types.MustNewURLs(cfg.peerURLs)
-
-	commitc, errc := make(chan []byte), make(chan error)
+func newRaftNode(cfg config) *raftNode {
 	rnd := &raftNode{
 		id:       cfg.id,
-		url:      url,
+		url:      types.MustNewURL(cfg.url),
 		peerIDs:  cfg.peerIDs,
-		peerURLs: purls,
+		peerURLs: types.MustNewURLs(cfg.peerURLs),
 
 		walDir:  filepath.Join(cfg.dir, "wal"),
 		snapDir: filepath.Join(cfg.dir, "snap"),
@@ -80,9 +76,9 @@ func newRaftNode(cfg config, propc <-chan []byte) *raftNode {
 		node:          nil,
 		transport:     nil,
 
-		propc:   propc,
-		commitc: commitc,
-		errc:    errc,
+		propc:   make(chan []byte),
+		commitc: make(chan []byte),
+		errc:    make(chan error),
 
 		stopc:         make(chan struct{}),
 		stopListenerc: make(chan struct{}),

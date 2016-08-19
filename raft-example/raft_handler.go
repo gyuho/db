@@ -7,7 +7,7 @@ import (
 )
 
 type raftHandler struct {
-	s *store
+	ds *dataStore
 }
 
 func (hd *raftHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -21,7 +21,7 @@ func (hd *raftHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 		kv := keyValue{Key: key, Val: string(val)}
-		hd.s.propose(context.TODO(), kv)
+		hd.ds.propose(context.TODO(), kv)
 		logger.Printf("proposed %+v", kv)
 
 		// not yet committed, so subsetquent GET may return stale data
@@ -32,7 +32,7 @@ func (hd *raftHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	case "GET":
 		key := req.RequestURI
-		if val, ok := hd.s.get(key); ok {
+		if val, ok := hd.ds.get(key); ok {
 			rw.Write([]byte(val))
 			return
 		}
@@ -47,9 +47,10 @@ func (hd *raftHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func startRaftHandler(addr string, propc chan<- []byte, commitc <-chan []byte, errc chan error) {
+func startRaftHandler(addr string) {
+	ds := newDataStore()
 	go func() {
-		err := <-errc
+		err := <-ds.errc
 		if err != nil {
 			logger.Panic(err)
 		}
@@ -59,7 +60,7 @@ func startRaftHandler(addr string, propc chan<- []byte, commitc <-chan []byte, e
 	srv := http.Server{
 		Addr: addr,
 		Handler: &raftHandler{
-			s: newStore(propc, commitc, errc),
+			ds: ds,
 		},
 	}
 	if err := srv.ListenAndServe(); err != nil {
