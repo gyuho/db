@@ -7,20 +7,23 @@ import (
 )
 
 func Test_store(t *testing.T) {
-	propc := make(chan string)
-	recvc := make(chan *string)
+	propc := make(chan []byte)
+	commitc := make(chan []byte)
 	errc := make(chan error)
 
-	s := newStore(propc, recvc, errc)
+	s := newStore(propc, commitc, errc)
 	defer s.stop()
 
 	donec := make(chan struct{})
 	go func() {
 		defer close(donec)
-		str := <-propc
-		recvc <- &str
+
+		bts := <-propc
+
+		// assume this is agreed by consensus
+		commitc <- bts
 	}()
-	s.propose(context.TODO(), "foo", "bar")
+	s.propose(context.TODO(), keyValue{"foo", "bar"})
 	<-donec
 
 	time.Sleep(10 * time.Millisecond)

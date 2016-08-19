@@ -7,15 +7,15 @@ import (
 	"sync"
 )
 
-type kv struct {
+type keyValue struct {
 	Key string
 	Val string
 }
 
 type store struct {
-	propc chan<- string
-	recvc <-chan *string
-	errc  chan error
+	propc   chan<- []byte
+	commitc <-chan []byte
+	errc    chan error
 
 	stopc chan struct{}
 	donec chan struct{}
@@ -24,18 +24,18 @@ type store struct {
 	data map[string]string
 }
 
-func newStore(propc chan<- string, recvc <-chan *string, errc chan error) *store {
+func newStore(propc chan<- []byte, commitc <-chan []byte, errc chan error) *store {
 	s := &store{
-		propc: propc,
-		recvc: recvc,
-		errc:  errc,
+		propc:   propc,
+		commitc: commitc,
+		errc:    errc,
 
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),
 
 		data: make(map[string]string),
 	}
-	go s.read()
+	go s.readCommit()
 	return s
 }
 
@@ -46,13 +46,13 @@ func (s *store) get(key string) (string, bool) {
 	return v, ok
 }
 
-func (s *store) propose(ctx context.Context, k, v string) {
+func (s *store) propose(ctx context.Context, kv keyValue) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(kv{Key: k, Val: v}); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(kv); err != nil {
 		s.errc <- err
 		return
 	}
-	data := string(buf.Bytes())
+	data := buf.Bytes()
 
 	for {
 		select {
@@ -76,26 +76,31 @@ func (s *store) stop() {
 	<-s.donec
 }
 
-func (s *store) read() {
+func (s *store) readCommit() {
 	for {
 		select {
-		case sp := <-s.recvc:
-			if sp == nil {
+		case cc := <-s.commitc:
+			if len(cc) == 0 {
 				continue
 			}
-			var data kv
-			if err := gob.NewDecoder(bytes.NewBufferString(*sp)).Decode(&data); err != nil {
+			var kv keyValue
+			if err := gob.NewDecoder(bytes.NewBuffer(cc)).Decode(&kv); err != nil {
 				logger.Panic(err)
 			}
 			s.mu.Lock()
-			s.data[data.Key] = data.Val
+			s.data[kv.Key] = kv.Val
 			s.mu.Unlock()
 
 		case err := <-s.errc:
-			logger.Panic(err)
+			if err != nil {
+				logger.Panic(err)
+			}
 
 		case <-s.stopc:
 			close(s.donec)
+			return
+
+		case <-s.donec:
 			return
 		}
 	}
