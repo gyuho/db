@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 )
 
 type listenerUnix struct {
@@ -102,6 +103,11 @@ func (ln *listenerStoppable) Accept() (net.Conn, error) {
 	case err := <-errc:
 		return nil, err
 	case conn := <-connc:
+		tc, ok := conn.(*net.TCPConn)
+		if ok {
+			tc.SetKeepAlive(true)
+			tc.SetKeepAlivePeriod(3 * time.Minute)
+		}
 		return conn, nil
 	}
 }
