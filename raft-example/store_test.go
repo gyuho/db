@@ -32,4 +32,9 @@ func Test_store(t *testing.T) {
 	if val != "bar" {
 		t.Fatalf("value expected %q, got %q", "bar", val)
 	}
+
+	close(errc)
+	if err := <-errc; err != nil {
+		t.Fatal(err)
+	}
 }
