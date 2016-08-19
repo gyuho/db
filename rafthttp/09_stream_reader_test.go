@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/pkg/testutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
@@ -16,7 +17,7 @@ import (
 
 // (etcd rafthttp.TestStreamReaderDialRequest)
 func Test_streamReader_dial_request(t *testing.T) {
-	tr := &roundTripperRecorder{}
+	tr := &roundTripperRecorder{rec: scheduleutil.NewRecorderBuffered()}
 	sr := &streamReader{
 		peerID:    types.ID(2),
 		picker:    newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"})),
@@ -27,7 +28,12 @@ func Test_streamReader_dial_request(t *testing.T) {
 		t.Fatalf("expected error, got %v", err)
 	}
 
-	req := tr.Request()
+	act, err := tr.rec.Wait(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := act[0].Parameters[0].(*http.Request)
+
 	wurl := "http://localhost:2380" + PrefixRaftStreamMessage + "/1"
 	if req.URL.String() != wurl {
 		t.Fatalf("URL expected %s, got %s", wurl, req.URL.String())

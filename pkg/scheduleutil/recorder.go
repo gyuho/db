@@ -33,6 +33,8 @@ type Recorder interface {
 }
 
 // recorderBuffered appends all Actions to a slice.
+//
+// (etcd pkg.testutil.RecorderBuffered)
 type recorderBuffered struct {
 	mu      sync.Mutex
 	actions []Action
@@ -82,7 +84,10 @@ func (r *recorderBuffered) Chan() <-chan Action {
 }
 
 ///////////////////////////////////////////
+
+//
 // to satisfy Wait interface
+//
 
 func (r *recorderBuffered) Register(id uint64) <-chan interface{} {
 	r.Record(Action{Name: "Register"})
@@ -98,7 +103,9 @@ func (r *recorderBuffered) IsRegistered(id uint64) bool {
 
 ///////////////////////////////////////////
 
-// RecorderStream writes all Actions to an unbuffered channel
+// recorderStream writes all Actions to an unbuffered channel
+//
+// (etcd pkg.testutil.recorderStream)
 type recorderStream struct {
 	ch chan Action
 }

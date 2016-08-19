@@ -78,16 +78,24 @@ type fakeWriterFlusherCloser struct {
 	err     error
 	written int
 	closed  chan struct{}
+	writec  chan struct{}
 }
 
 func newFakeWriterFlusherCloser(err error) *fakeWriterFlusherCloser {
-	return &fakeWriterFlusherCloser{err: err, closed: make(chan struct{})}
+	return &fakeWriterFlusherCloser{
+		err:    err,
+		closed: make(chan struct{}),
+		writec: make(chan struct{}, 1),
+	}
 }
 
 func (wfc *fakeWriterFlusherCloser) Write(p []byte) (n int, err error) {
 	wfc.mu.Lock()
 	defer wfc.mu.Unlock()
-
+	select {
+	case wfc.writec <- struct{}{}:
+	default:
+	}
 	wfc.written += len(p)
 	return len(p), wfc.err
 }
@@ -95,8 +103,6 @@ func (wfc *fakeWriterFlusherCloser) Write(p []byte) (n int, err error) {
 func (wfc *fakeWriterFlusherCloser) Flush() {}
 
 func (wfc *fakeWriterFlusherCloser) Close() error {
-	wfc.mu.Lock()
-	defer wfc.mu.Unlock()
 	close(wfc.closed)
 	return wfc.err
 }

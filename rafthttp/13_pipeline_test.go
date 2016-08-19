@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
@@ -33,7 +32,7 @@ func startTestPipeline(transport *Transport, picker *urlPicker) *pipeline {
 
 // (etcd rafthttp.TestPipelineSend)
 func Test_pipeline_start(t *testing.T) {
-	tr := &roundTripperRecorder{}
+	tr := &roundTripperRecorder{rec: scheduleutil.NewRecorderBuffered()}
 	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
@@ -41,13 +40,9 @@ func Test_pipeline_start(t *testing.T) {
 
 	pn.raftMessageChan <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
 
-	scheduleutil.WaitSchedule()
+	tr.rec.Wait(1)
 
 	pn.stop()
-
-	if tr.Request() == nil {
-		t.Fatal("sender fails to post the data")
-	}
 }
 
 // (etcd rafthttp.TestPipelineKeepSendingWhenPostError)
@@ -78,17 +73,12 @@ func Test_pipeline_send_maximum(t *testing.T) {
 	pn := startTestPipeline(transport, picker)
 	defer pn.stop()
 
-	scheduleutil.WaitSchedule()
-
 	for i := 0; i < connPerPipeline+pipelineBufferN; i++ {
 		select {
 		case pn.raftMessageChan <- raftpb.Message{}:
-		default:
+		case <-time.After(10 * time.Millisecond):
 			t.Fatal("failed to send out message")
 		}
-
-		// force the sender to grab data
-		testutil.WaitSchedule()
 	}
 
 	// try to send a data when we are sure the buffer is full
@@ -100,19 +90,17 @@ func Test_pipeline_send_maximum(t *testing.T) {
 
 	tr.unblock()
 
-	scheduleutil.WaitSchedule()
-
 	// It could send new data after previous ones succeed
 	select {
 	case pn.raftMessageChan <- raftpb.Message{}:
-	default:
+	case <-time.After(10 * time.Millisecond):
 		t.Fatal("failed to send out message")
 	}
 }
 
 // (etcd rafthttp.TestPipelinePost)
 func Test_pipeline_send_post(t *testing.T) {
-	tr := &roundTripperRecorder{}
+	tr := &roundTripperRecorder{rec: scheduleutil.NewRecorderBuffered()}
 	transport := &Transport{ClusterID: types.ID(1), pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
@@ -120,24 +108,30 @@ func Test_pipeline_send_post(t *testing.T) {
 	if err := pn.post([]byte("testdata")); err != nil {
 		t.Fatal(err)
 	}
+	act, err := tr.rec.Wait(1)
+	if err != nil {
+		t.Fatal(err)
+	}
 	pn.stop()
 
-	if g := tr.Request().Method; g != "POST" {
+	req := act[0].Parameters[0].(*http.Request)
+
+	if g := req.Method; g != "POST" {
 		t.Fatalf("method = %s, want %s", g, "POST")
 	}
-	if g := tr.Request().URL.String(); g != "http://localhost:2380/raft" {
+	if g := req.URL.String(); g != "http://localhost:2380/raft" {
 		t.Fatalf("url = %s, want %s", g, "http://localhost:2380/raft")
 	}
-	if g := tr.Request().Header.Get(HeaderContentType); g != HeaderContentProtobuf {
+	if g := req.Header.Get(HeaderContentType); g != HeaderContentProtobuf {
 		t.Fatalf("content type = %s, want %s", g, HeaderContentProtobuf)
 	}
-	if g := tr.Request().Header.Get(HeaderServerVersion); g != version.ServerVersion {
+	if g := req.Header.Get(HeaderServerVersion); g != version.ServerVersion {
 		t.Fatalf("version = %s, want %s", g, version.ServerVersion)
 	}
-	if g := tr.Request().Header.Get(HeaderClusterID); g != "1" {
+	if g := req.Header.Get(HeaderClusterID); g != "1" {
 		t.Fatalf("cluster id = %s, want %s", g, "1")
 	}
-	b, err := ioutil.ReadAll(tr.Request().Body)
+	b, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		t.Fatalf("unexpected ReadAll error: %v", err)
 	}

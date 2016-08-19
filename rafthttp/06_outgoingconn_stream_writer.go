@@ -62,7 +62,11 @@ func startStreamWriter(peerID types.ID, status *peerStatus, r Raft) *streamWrite
 func (sw *streamWriter) closeWriter() bool {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
+	return sw.unsafeCloseWriter()
+}
 
+// (etcd rafthttp.streamWriter.closeUnlocked)
+func (sw *streamWriter) unsafeCloseWriter() bool {
 	logger.Warningf("closing streamWriter to peer %s", sw.peerID)
 	if !sw.working {
 		logger.Infof("streamWriter to peer %s is already not working", sw.peerID)
@@ -112,18 +116,21 @@ func (sw *streamWriter) run() {
 		// if multiple cases are available, it selects randomly
 		select {
 		case conn := <-sw.outgoingConnChan:
-			sw.closeWriter()
 			messageBinaryEncoder = raftpb.NewMessageBinaryEncoder(conn.Writer)
 			httpFlusher = conn.Flusher
 
 			sw.mu.Lock()
+			closed := sw.unsafeCloseWriter()
 			sw.status.activate()
 			sw.closer = conn.Closer
 			sw.working = true
 			sw.mu.Unlock()
 
-			raftMessageChan, heartbeatChan = sw.raftMessageChan, tickc
+			if closed {
+				logger.Warningf("closed an existing streamWriter to peer %s", sw.peerID)
+			}
 			logger.Infof("established streamWriter to peer %s", sw.peerID)
+			raftMessageChan, heartbeatChan = sw.raftMessageChan, tickc
 
 		case msg := <-raftMessageChan:
 			err := messageBinaryEncoder.Encode(&msg)

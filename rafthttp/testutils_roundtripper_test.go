@@ -12,21 +12,14 @@ import (
 
 // (etcd rafthttp.roundTripperRecorder)
 type roundTripperRecorder struct {
-	mu  sync.Mutex
-	req *http.Request
+	rec scheduleutil.Recorder
 }
 
 func (t *roundTripperRecorder) RoundTrip(req *http.Request) (*http.Response, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.req = req
+	if t.rec != nil {
+		t.rec.Record(scheduleutil.Action{Name: "req", Parameters: []interface{}{req}})
+	}
 	return &http.Response{StatusCode: http.StatusNoContent, Body: &nopReaderCloser{}}, nil
-}
-
-func (t *roundTripperRecorder) Request() *http.Request {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.req
 }
 
 //////////////////////////////////////////////////////////////

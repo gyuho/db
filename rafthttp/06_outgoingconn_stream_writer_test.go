@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gyuho/db/pkg/scheduleutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 )
@@ -24,35 +23,27 @@ func Test_streamWriter_attatchOutgoingConn(t *testing.T) {
 		wfc = newFakeWriterFlusherCloser(nil)
 		sw.attachOutgoingConn(&outgoingConn{Writer: wfc, Flusher: wfc, Closer: wfc})
 
-		for j := 0; j < 3; j++ {
-			scheduleutil.WaitSchedule()
-
-			// previous connection should be closed; if not wait
-			if prev != nil && !prev.getClosed() {
-				continue
-			}
-			if _, working := sw.messageChanToSend(); !working {
-				continue
+		if prev != nil {
+			select {
+			case <-prev.closed:
+			case <-time.After(time.Second):
+				t.Fatalf("#%d: close of previous connection timed out", i)
 			}
 		}
 
-		// previous connection must be closed
-		if prev != nil && !prev.getClosed() {
-			t.Fatalf("previous outgoingConn must be closed, got %v", prev.getClosed())
+		msgc, working := sw.messageChanToSend()
+		if !working {
+			t.Fatalf("#%d: working expected true, got %v", i, working)
+		}
+		msgc <- raftpb.Message{}
+
+		select {
+		case <-wfc.writec:
+		case <-time.After(time.Second):
+			t.Fatalf("#%d: failed to write to the underlying connection", i)
 		}
 		if _, working := sw.messageChanToSend(); !working {
 			t.Fatalf("working expected true, got %v", working)
-		}
-
-		sw.raftMessageChan <- raftpb.Message{}
-
-		scheduleutil.WaitSchedule()
-
-		if _, working := sw.messageChanToSend(); !working {
-			t.Fatalf("working expected true, got %v", working)
-		}
-		if wfc.getWritten() == 0 {
-			t.Fatalf("should have written, got %d", wfc.getWritten())
 		}
 	}
 
