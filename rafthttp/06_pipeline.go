@@ -26,14 +26,14 @@ type pipeline struct {
 	transport *Transport
 	errc      chan error
 
-	raftMessageChan chan raftpb.Message
-	stopc           chan struct{}
+	msgc  chan raftpb.Message
+	stopc chan struct{}
 
 	connWg sync.WaitGroup
 }
 
 func (p *pipeline) start() {
-	p.raftMessageChan = make(chan raftpb.Message, pipelineBufferN)
+	p.msgc = make(chan raftpb.Message, pipelineBufferN)
 	p.stopc = make(chan struct{})
 	p.connWg.Add(connPerPipeline)
 
@@ -97,7 +97,7 @@ func (p *pipeline) handle() {
 
 	for {
 		select {
-		case msg := <-p.raftMessageChan:
+		case msg := <-p.msgc:
 			bts, err := msg.Marshal()
 			if err != nil {
 				p.status.deactivate(failureType{source: "pipeline message", action: "write", err: err})

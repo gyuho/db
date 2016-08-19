@@ -49,10 +49,10 @@ type peer struct {
 	streamReader   *streamReader
 	snapshotSender *snapshotSender
 
-	sendc                     chan raftpb.Message
-	incomingMessageCh         chan raftpb.Message // recv
-	incomingProposalMessageCh chan raftpb.Message // propc
-	stopc                     chan struct{}
+	sendc chan raftpb.Message
+	recvc chan raftpb.Message
+	propc chan raftpb.Message
+	stopc chan struct{}
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -99,9 +99,9 @@ func startPeer(transport *Transport, peerID types.ID, peerURLs types.URLs) *peer
 
 		snapshotSender: newSnapshotSender(transport, peerID, status, picker),
 
-		sendc:                     make(chan raftpb.Message),
-		incomingMessageCh:         make(chan raftpb.Message, receiveBufferN),
-		incomingProposalMessageCh: make(chan raftpb.Message, maxPendingProposalN),
+		sendc: make(chan raftpb.Message),
+		recvc: make(chan raftpb.Message, receiveBufferN),
+		propc: make(chan raftpb.Message, maxPendingProposalN),
 		stopc: make(chan struct{}),
 
 		cancel: cancel,
@@ -110,7 +110,7 @@ func startPeer(transport *Transport, peerID types.ID, peerURLs types.URLs) *peer
 	go func() {
 		for {
 			select {
-			case msg := <-p.incomingMessageCh: // case m := <-n.recvc:
+			case msg := <-p.recvc: // case m := <-n.recvc:
 				if err := r.Process(ctx, msg); err != nil {
 					logger.Warningf("failed to process raft message (%v)", err)
 				}
@@ -119,10 +119,10 @@ func startPeer(transport *Transport, peerID types.ID, peerURLs types.URLs) *peer
 			}
 		}
 	}()
-	go func() { // to avoid blocking incomingMessageCh
+	go func() { // to avoid blocking recvc
 		for {
 			select {
-			case msg := <-p.incomingProposalMessageCh: // case m := <-propc:
+			case msg := <-p.propc: // case m := <-propc:
 				if err := r.Process(ctx, msg); err != nil {
 					logger.Warningf("failed to process raft proposal message (%v)", err)
 				}
@@ -133,12 +133,12 @@ func startPeer(transport *Transport, peerID types.ID, peerURLs types.URLs) *peer
 	}()
 
 	p.streamReader = &streamReader{
-		peerID:                    peerID,
-		status:                    status,
-		picker:                    picker,
-		transport:                 transport,
-		incomingMessageCh:         p.incomingMessageCh,
-		incomingProposalMessageCh: p.incomingProposalMessageCh,
+		peerID:    peerID,
+		status:    status,
+		picker:    picker,
+		transport: transport,
+		recvc:     p.recvc,
+		propc:     p.propc,
 	}
 	p.streamReader.start()
 
@@ -152,28 +152,15 @@ func (p *peer) pick(msg raftpb.Message) (chan<- raftpb.Message, string) {
 	// Considering MsgSnap may have a big size, e.g., 1G, and will block
 	// stream for a long time, only use one of the N pipelines to send MsgSnap.
 	if msg.Type == raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT {
-		return p.pipeline.raftMessageChan, messageTypePipeline
+		return p.pipeline.msgc, messageTypePipeline
 	}
 
 	if writec, ok := p.streamWriter.messageChanToSend(); ok {
 		return writec, messageTypeMessage
 	}
 
-	return p.pipeline.raftMessageChan, messageTypePipeline
+	return p.pipeline.msgc, messageTypePipeline
 }
-
-// / pick picks a chan for sending the given message. The picked chan and the picked chan
-// // string name are returned.
-// func (p *peer) pick(m raftpb.Message) (writec chan<- raftpb.Message, picked string) {
-
-// 	if isMsgSnap(m) {
-// 		return p.pipeline.msgc, pipelineMsg
-// 	} else if writec, ok = p.msgAppV2Writer.writec(); ok && isMsgApp(m) {
-// 		return writec, streamAppV2
-// 	} else if writec, ok = p.writer.writec(); ok {
-// 		return writec, streamMsg
-// 	}
-// 	return p.pipeline.msgc, pipelineMsg
 
 // (etcd rafthttp.peer.send)
 func (p *peer) sendMessageToPeer(msg raftpb.Message) {

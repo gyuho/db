@@ -50,7 +50,7 @@ func startRemote(peerID types.ID, peerURLs types.URLs, tr *Transport) *peerRemot
 
 func (r *peerRemote) send(msg raftpb.Message) {
 	select {
-	case r.pipeline.raftMessageChan <- msg:
+	case r.pipeline.msgc <- msg:
 	default:
 		logger.Warningf("dropped %q from %s since sending buffer is full", msg.Type, types.ID(msg.From))
 		if r.status.isActive() {

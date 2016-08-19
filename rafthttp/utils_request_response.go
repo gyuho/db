@@ -52,7 +52,7 @@ func createPostRequest(target url.URL, path string, rd io.Reader, contentType st
 func checkPostResponse(resp *http.Response, body []byte, req *http.Request, peerID types.ID) error {
 	switch resp.StatusCode {
 	case http.StatusPreconditionFailed:
-		switch strings.TrimSuffix(string(body), "\n") {
+		switch strings.TrimSpace(string(body)) {
 		case ErrClusterIDMismatch.Error():
 			logger.Errorf("request was ignored (%v, remote[%s]=%s, local=%s)", ErrClusterIDMismatch, peerID, resp.Header.Get(HeaderClusterID), req.Header.Get(HeaderClusterID))
 			return ErrClusterIDMismatch

@@ -58,7 +58,7 @@ func (tr *Transport) HTTPHandler() http.Handler {
 	return mux
 }
 
-func (tr *Transport) SendMessagesToPeer(msgs []raftpb.Message) {
+func (tr *Transport) Send(msgs []raftpb.Message) {
 	for _, msg := range msgs {
 		if msg.To == 0 {
 			continue // ignore intentionally dropped message
@@ -84,7 +84,7 @@ func (tr *Transport) SendMessagesToPeer(msgs []raftpb.Message) {
 	}
 }
 
-func (tr *Transport) SendSnapshotToPeer(msg raftsnap.Message) {
+func (tr *Transport) SendSnapshot(msg raftsnap.Message) {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 

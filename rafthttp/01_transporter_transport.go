@@ -32,15 +32,15 @@ type Transporter interface {
 	// (etcd rafthttp.Transporter.Handler)
 	HTTPHandler() http.Handler
 
-	// SendMessagesToPeer sends messages to its remote peers.
+	// Send sends messages to its remote peers.
 	//
 	// (etcd rafthttp.Transporter.Send)
-	SendMessagesToPeer(msgs []raftpb.Message)
+	Send(msgs []raftpb.Message)
 
-	// SendSnapshotToPeer sends snapshot to its remote peers.
+	// SendSnapshot sends snapshot to its remote peers.
 	//
 	// (etcd rafthttp.Transporter.SendSnapshot)
-	SendSnapshotToPeer(msg raftsnap.Message)
+	SendSnapshot(msg raftsnap.Message)
 
 	// AddPeer adds a peer with given peer URLs to the transport.
 	//
@@ -97,10 +97,6 @@ type Transport struct {
 	mu          sync.RWMutex
 	peers       map[types.ID]Peer        // (etcd rafthttp.Transport.peers)
 	peerRemotes map[types.ID]*peerRemote // (etcd rafthttp.Transport.remotes)
-}
-
-func (tr *Transport) ErrChan() chan error {
-	return tr.errc
 }
 
 func (tr *Transport) Start() error {

@@ -34,9 +34,9 @@ func Test_Transport_send(t *testing.T) {
 		{Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, To: 2},
 		{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, To: 2},
 	}
-	tr.SendMessagesToPeer(wmsgsIgnored)
-	tr.SendMessagesToPeer(wmsgsTo1)
-	tr.SendMessagesToPeer(wmsgsTo2)
+	tr.Send(wmsgsIgnored)
+	tr.Send(wmsgsTo1)
+	tr.Send(wmsgsTo2)
 
 	if !reflect.DeepEqual(peer1.msgs, wmsgsTo1) {
 		t.Fatalf("msgs to peer 1 = %+v, want %+v", peer1.msgs, wmsgsTo1)
@@ -62,14 +62,14 @@ func Test_Transport_Cut_Mend(t *testing.T) {
 		{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND, To: 1},
 	}
 
-	tr.SendMessagesToPeer(wmsgsTo)
+	tr.Send(wmsgsTo)
 	if len(peer1.msgs) > 0 {
 		t.Fatalf("msgs expected to be ignored, got %+v", peer1.msgs)
 	}
 
 	tr.MendPeer(types.ID(1))
 
-	tr.SendMessagesToPeer(wmsgsTo)
+	tr.Send(wmsgsTo)
 	if !reflect.DeepEqual(peer1.msgs, wmsgsTo) {
 		t.Fatalf("msgs to peer 1 = %+v, want %+v", peer1.msgs, wmsgsTo)
 	}

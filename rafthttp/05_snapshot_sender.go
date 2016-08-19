@@ -23,12 +23,10 @@ type snapshotSender struct {
 	to        types.ID
 	clusterID types.ID
 
-	status *peerStatus
-
+	status    *peerStatus
 	picker    *urlPicker
 	transport *Transport
-
-	r Raft
+	r         Raft
 
 	stopc chan struct{}
 	errc  chan error
@@ -41,12 +39,10 @@ func newSnapshotSender(transport *Transport, to types.ID, status *peerStatus, pi
 		to:        to,
 		clusterID: transport.ClusterID,
 
-		status: status,
-
+		status:    status,
 		picker:    picker,
 		transport: transport,
-
-		r: transport.Raft,
+		r:         transport.Raft,
 
 		stopc: make(chan struct{}),
 		errc:  transport.errc,

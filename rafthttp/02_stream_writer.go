@@ -26,8 +26,8 @@ type streamWriter struct {
 
 	r Raft
 
-	outgoingConnChan chan *outgoingConn
-	raftMessageChan  chan raftpb.Message
+	connc chan *outgoingConn
+	msgc  chan raftpb.Message
 
 	stopc chan struct{}
 	donec chan struct{}
@@ -44,8 +44,8 @@ func startStreamWriter(peerID types.ID, status *peerStatus, r Raft) *streamWrite
 		status: status,
 		r:      r,
 
-		outgoingConnChan: make(chan *outgoingConn),
-		raftMessageChan:  make(chan raftpb.Message, streamBufferN),
+		connc: make(chan *outgoingConn),
+		msgc:  make(chan raftpb.Message, streamBufferN),
 
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),
@@ -75,13 +75,12 @@ func (sw *streamWriter) unsafeCloseWriter() bool {
 
 	sw.closer.Close()
 
-	if len(sw.raftMessageChan) > 0 {
+	if len(sw.msgc) > 0 {
 		// messages were sent to channel, but we just closed it
 		sw.r.ReportUnreachable(uint64(sw.peerID))
 	}
 
-	// reset
-	sw.raftMessageChan = make(chan raftpb.Message, streamBufferN)
+	sw.msgc = make(chan raftpb.Message, streamBufferN)
 	sw.working = false
 
 	logger.Warningf("closed streamWriter to peer %s", sw.peerID)
@@ -104,8 +103,8 @@ func (sw *streamWriter) run() {
 
 		batchedN int
 
-		raftMessageChan chan raftpb.Message
-		heartbeatChan   <-chan time.Time
+		msgc          chan raftpb.Message
+		heartbeatChan <-chan time.Time
 
 		tickc = time.Tick(ConnReadTimeout / 3)
 	)
@@ -115,7 +114,7 @@ func (sw *streamWriter) run() {
 		// select doesn't select nil channel
 		// if multiple cases are available, it selects randomly
 		select {
-		case conn := <-sw.outgoingConnChan:
+		case conn := <-sw.connc:
 			messageBinaryEncoder = raftpb.NewMessageBinaryEncoder(conn.Writer)
 			httpFlusher = conn.Flusher
 
@@ -130,14 +129,14 @@ func (sw *streamWriter) run() {
 				logger.Warningf("closed an existing streamWriter to peer %s", sw.peerID)
 			}
 			logger.Infof("established streamWriter to peer %s", sw.peerID)
-			raftMessageChan, heartbeatChan = sw.raftMessageChan, tickc
+			msgc, heartbeatChan = sw.msgc, tickc
 
-		case msg := <-raftMessageChan:
+		case msg := <-msgc:
 			err := messageBinaryEncoder.Encode(&msg)
 			if err == nil {
 				// no message is left in the channel
 				// or buffered(batched) streams are beyond the half of buffer size
-				if len(raftMessageChan) == 0 || batchedN > streamBufferN/2 {
+				if len(msgc) == 0 || batchedN > streamBufferN/2 {
 					httpFlusher.Flush()
 					batchedN = 0
 				} else { // do not flush yet
@@ -151,7 +150,7 @@ func (sw *streamWriter) run() {
 
 			logger.Warningf("failed to encode message; closing streamWriter to peer %s (%v)", sw.peerID, err)
 			sw.closeWriter()
-			raftMessageChan, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
+			msgc, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
 			sw.r.ReportUnreachable(msg.To)
 
 		case <-heartbeatChan:
@@ -167,7 +166,7 @@ func (sw *streamWriter) run() {
 
 			logger.Warningf("failed to encode heartbeat; closing streamWriter to peer %s (%v)", sw.peerID, err)
 			sw.closeWriter()
-			raftMessageChan, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
+			msgc, heartbeatChan = nil, nil // so that, 'select' doesn't select these cases
 
 		case <-sw.stopc:
 			sw.closeWriter()
@@ -180,7 +179,7 @@ func (sw *streamWriter) run() {
 // (etcd rafthttp.streamWriter.attach)
 func (sw *streamWriter) attachOutgoingConn(conn *outgoingConn) bool {
 	select {
-	case sw.outgoingConnChan <- conn:
+	case sw.connc <- conn:
 		return true
 	case <-sw.donec:
 		return false
@@ -192,5 +191,5 @@ func (sw *streamWriter) messageChanToSend() (chan<- raftpb.Message, bool) {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 
-	return sw.raftMessageChan, sw.working
+	return sw.msgc, sw.working
 }

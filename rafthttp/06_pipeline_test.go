@@ -14,7 +14,7 @@ import (
 	"github.com/gyuho/db/version"
 )
 
-func startTestPipeline(transport *Transport, picker *urlPicker) *pipeline {
+func testStartPipeline(transport *Transport, picker *urlPicker) *pipeline {
 	p := &pipeline{
 		peerID: types.ID(1),
 		status: newPeerStatus(types.ID(1)),
@@ -36,9 +36,9 @@ func Test_pipeline_start(t *testing.T) {
 	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPipeline(transport, picker)
+	pn := testStartPipeline(transport, picker)
 
-	pn.raftMessageChan <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
+	pn.msgc <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
 
 	tr.rec.Wait(1)
 
@@ -51,11 +51,11 @@ func Test_pipeline_send_error(t *testing.T) {
 	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPipeline(transport, picker)
+	pn := testStartPipeline(transport, picker)
 	defer pn.stop()
 
 	for i := 0; i < 50; i++ {
-		pn.raftMessageChan <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
+		pn.msgc <- raftpb.Message{Type: raftpb.MESSAGE_TYPE_LEADER_APPEND}
 	}
 
 	_, err := tr.rec.Wait(50)
@@ -70,12 +70,12 @@ func Test_pipeline_send_maximum(t *testing.T) {
 	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPipeline(transport, picker)
+	pn := testStartPipeline(transport, picker)
 	defer pn.stop()
 
 	for i := 0; i < connPerPipeline+pipelineBufferN; i++ {
 		select {
-		case pn.raftMessageChan <- raftpb.Message{}:
+		case pn.msgc <- raftpb.Message{}:
 		case <-time.After(10 * time.Millisecond):
 			t.Fatal("failed to send out message")
 		}
@@ -83,7 +83,7 @@ func Test_pipeline_send_maximum(t *testing.T) {
 
 	// try to send a data when we are sure the buffer is full
 	select {
-	case pn.raftMessageChan <- raftpb.Message{}:
+	case pn.msgc <- raftpb.Message{}:
 		t.Fatal("unexpected message sendout")
 	default:
 	}
@@ -92,7 +92,7 @@ func Test_pipeline_send_maximum(t *testing.T) {
 
 	// It could send new data after previous ones succeed
 	select {
-	case pn.raftMessageChan <- raftpb.Message{}:
+	case pn.msgc <- raftpb.Message{}:
 	case <-time.After(10 * time.Millisecond):
 		t.Fatal("failed to send out message")
 	}
@@ -104,7 +104,7 @@ func Test_pipeline_send_post(t *testing.T) {
 	transport := &Transport{ClusterID: types.ID(1), pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPipeline(transport, picker)
+	pn := testStartPipeline(transport, picker)
 	if err := pn.post([]byte("testdata")); err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func Test_pipeline_send_post_bad(t *testing.T) {
 	for i, tt := range tests {
 		transport := &Transport{pipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
 		picker := newURLPicker(types.MustNewURLs([]string{tt.u}))
-		pn := startTestPipeline(transport, picker)
+		pn := testStartPipeline(transport, picker)
 
 		err := pn.post([]byte("testdata"))
 		pn.stop()
@@ -177,7 +177,7 @@ func Test_pipeline_send_post_error(t *testing.T) {
 	for i, tt := range tests {
 		transport := &Transport{pipelineRoundTripper: newRespRoundTripper(tt.code, tt.err)}
 		picker := newURLPicker(types.MustNewURLs([]string{tt.u}))
-		pn := startTestPipeline(transport, picker)
+		pn := testStartPipeline(transport, picker)
 
 		pn.post([]byte("testdata"))
 		pn.stop()
@@ -196,10 +196,10 @@ func Test_pipeline_stop_blocked(t *testing.T) {
 	transport := &Transport{pipelineRoundTripper: tr}
 
 	picker := newURLPicker(types.MustNewURLs([]string{"http://localhost:2380"}))
-	pn := startTestPipeline(transport, picker)
+	pn := testStartPipeline(transport, picker)
 
 	for i := 0; i < connPerPipeline*10; i++ {
-		pn.raftMessageChan <- raftpb.Message{}
+		pn.msgc <- raftpb.Message{}
 	}
 
 	donec := make(chan struct{})

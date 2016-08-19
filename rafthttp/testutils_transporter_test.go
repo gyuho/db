@@ -18,8 +18,8 @@ func NewNopTransporter() Transporter {
 
 func (s *nopTransporter) Start() error                            { return nil }
 func (s *nopTransporter) HTTPHandler() http.Handler               { return nil }
-func (s *nopTransporter) SendMessagesToPeer(m []raftpb.Message)   {}
-func (s *nopTransporter) SendSnapshotToPeer(msg raftsnap.Message) {}
+func (s *nopTransporter) Send(m []raftpb.Message)   {}
+func (s *nopTransporter) SendSnapshot(msg raftsnap.Message) {}
 func (s *nopTransporter) AddPeerRemote(id types.ID, us []string)  {}
 func (s *nopTransporter) AddPeer(id types.ID, us []string)        {}
 func (s *nopTransporter) RemovePeer(id types.ID)                  {}

@@ -27,11 +27,11 @@ type streamReader struct {
 	picker    *urlPicker
 	transport *Transport
 
-	incomingMessageCh         chan<- raftpb.Message // recvc
-	incomingProposalMessageCh chan<- raftpb.Message // propc
-	stopc                     chan struct{}
-	donec                     chan struct{}
-	errc                      chan<- error
+	recvc chan<- raftpb.Message
+	propc chan<- raftpb.Message
+	stopc chan struct{}
+	donec chan struct{}
+	errc  chan<- error
 
 	mu     sync.Mutex
 	paused bool
@@ -52,9 +52,10 @@ func (sr *streamReader) resume() {
 }
 
 func (sr *streamReader) close() {
-	if sr.closer != nil {
-		sr.closer.Close()
+	if sr.closer == nil {
+		return
 	}
+	sr.closer.Close()
 	sr.closer = nil
 }
 
@@ -129,11 +130,10 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 			sr.picker.unreachable(targetURL)
 			return nil, err
 		}
-
 		netutil.GracefulClose(resp)
 		sr.picker.unreachable(targetURL)
 
-		switch strings.TrimSuffix(string(bts), "\n") {
+		switch strings.TrimSpace(string(bts)) {
 		case ErrClusterIDMismatch.Error():
 			logger.Errorf("request was ignored (%v, remote[%s]=%s, local=%s)", ErrClusterIDMismatch, sr.peerID, resp.Header.Get(HeaderClusterID), req.Header.Get(HeaderClusterID))
 			return nil, ErrClusterIDMismatch
@@ -164,7 +164,6 @@ func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
 	sr.mu.Unlock()
 
 	dec := raftpb.NewMessageBinaryDecoder(rc)
-
 	for {
 		msg, err := dec.Decode()
 		if err != nil {
@@ -185,9 +184,9 @@ func (sr *streamReader) decodeLoop(rc io.ReadCloser) error {
 			continue
 		}
 
-		recvc := sr.incomingMessageCh
+		recvc := sr.recvc
 		if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
-			recvc = sr.incomingProposalMessageCh
+			recvc = sr.propc
 		}
 
 		select {

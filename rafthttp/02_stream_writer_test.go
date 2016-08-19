@@ -65,7 +65,7 @@ func Test_streamWriter_attatchOutgoingConn_bad(t *testing.T) {
 	wfc := newFakeWriterFlusherCloser(errors.New("test"))
 	sw.attachOutgoingConn(&outgoingConn{Writer: wfc, Flusher: wfc, Closer: wfc})
 
-	sw.raftMessageChan <- raftpb.Message{}
+	sw.msgc <- raftpb.Message{}
 	select {
 	case <-wfc.closed:
 	case <-time.After(time.Second):
