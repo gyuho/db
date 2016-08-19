@@ -204,7 +204,7 @@ func (sr *streamReader) start() {
 	sr.stopc = make(chan struct{})
 	sr.donec = make(chan struct{})
 	if sr.errc == nil {
-		sr.errc = sr.transport.errc
+		sr.errc = sr.transport.Errc
 	}
 
 	logger.Infof("started streamReader to peer %s", sr.peerID)

@@ -36,7 +36,7 @@ func startRemote(peerID types.ID, peerURLs types.URLs, tr *Transport) *peerRemot
 		r:         tr.Raft,
 		picker:    newURLPicker(peerURLs),
 		transport: tr,
-		errc:      tr.errc,
+		errc:      tr.Errc,
 	}
 
 	pipeline.start()

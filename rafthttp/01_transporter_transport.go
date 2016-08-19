@@ -88,7 +88,7 @@ type Transport struct {
 	Raft            Raft                  // (etcd rafthttp.Transport.Raft)
 	RaftSnapshotter *raftsnap.Snapshotter // (etcd rafthttp.Transport.Snapshotter)
 
-	errc chan error // (etcd rafthttp.Transport.ErrorC)
+	Errc chan error // (etcd rafthttp.Transport.ErrorC)
 
 	streamRoundTripper         http.RoundTripper // (etcd rafthttp.Transport.streamRt)
 	pipelineRoundTripper       http.RoundTripper // (etcd rafthttp.Transport.pipelineRt)

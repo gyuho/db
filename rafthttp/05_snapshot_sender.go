@@ -45,7 +45,7 @@ func newSnapshotSender(transport *Transport, to types.ID, status *peerStatus, pi
 		r:         transport.Raft,
 
 		stopc: make(chan struct{}),
-		errc:  transport.errc,
+		errc:  transport.Errc,
 	}
 }
 
