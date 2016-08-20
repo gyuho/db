@@ -19,10 +19,12 @@ func main() {
 		defer wg.Done()
 		start(1)
 	}()
+
 	go func() {
 		defer wg.Done()
 		start(2)
 	}()
+
 	go func() {
 		defer wg.Done()
 		start(3)
@@ -32,7 +34,7 @@ func main() {
 }
 
 func init() {
-	xlog.SetGlobalMaxLogLevel(xlog.INFO)
+	xlog.SetGlobalMaxLogLevel(xlog.WARN)
 }
 
 func start(id uint64) {

@@ -146,7 +146,7 @@ func (sw *streamWriter) run() {
 			}
 
 			// error, so deactivate
-			sw.status.deactivate(failureType{source: "streamWriter message", action: "encode message", err: err})
+			sw.status.deactivate(failureType{Source: "streamWriter message", Action: "encode message", Err: err.Error()})
 
 			logger.Warningf("failed to encode message; closing streamWriter to peer %s (%v)", sw.peerID, err)
 			sw.closeWriter()
@@ -162,7 +162,7 @@ func (sw *streamWriter) run() {
 			}
 
 			// error, so deactivate
-			sw.status.deactivate(failureType{source: "streamWriter message", action: "encode heartbeat", err: err})
+			sw.status.deactivate(failureType{Source: "streamWriter message", Action: "encode heartbeat", Err: err.Error()})
 
 			logger.Warningf("failed to encode heartbeat; closing streamWriter to peer %s (%v)", sw.peerID, err)
 			sw.closeWriter()

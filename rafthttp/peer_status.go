@@ -44,15 +44,15 @@ func (s *peerStatus) deactivate(ft failureType) {
 }
 
 type failureType struct {
-	source string `json:"source"`
-	action string `json:"action"`
-	err    error  `json:"error"`
+	Source string `json:"source"`
+	Action string `json:"action"`
+	Err    string `json:"error"`
 }
 
 func (ft failureType) String() string {
-	w := bytes.NewBuffer(nil)
-	json.NewEncoder(w).Encode(ft)
-	return strings.TrimSpace(w.String())
+	buf := bytes.NewBuffer(nil)
+	json.NewEncoder(buf).Encode(ft)
+	return strings.TrimSpace(buf.String())
 }
 
 func (s *peerStatus) isActive() bool {

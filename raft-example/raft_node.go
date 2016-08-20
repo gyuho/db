@@ -153,7 +153,7 @@ func (rnd *raftNode) replayWAL() *raftwal.WAL {
 }
 
 func (rnd *raftNode) start() {
-	logger.Println("startRaftNode %s at", types.ID(rnd.id), rnd.dir)
+	logger.Printf("startRaftNode %s at %s", types.ID(rnd.id), rnd.dir)
 
 	walExist := fileutil.DirHasFiles(rnd.walDir)
 	rnd.wal = rnd.replayWAL()
@@ -187,7 +187,7 @@ func (rnd *raftNode) start() {
 
 	for i := range rnd.peerIDs {
 		if rnd.peerIDs[i] != rnd.id { // do not add self as peer
-			rnd.transport.AddPeer(types.ID(rnd.peerIDs[i]), rnd.peerURLs.StringSlice())
+			rnd.transport.AddPeer(types.ID(rnd.peerIDs[i]), []string{rnd.peerURLs[i].String()})
 		}
 	}
 
@@ -291,13 +291,25 @@ func (rnd *raftNode) stop() {
 	rnd.transport.Stop()
 
 	logger.Warningln("closing stopc...")
-	close(rnd.stopc)
+	select {
+	case <-rnd.stopc:
+	default:
+		close(rnd.stopc)
+	}
 
 	logger.Warningln("closing stopListenerc...")
-	close(rnd.stopListenerc)
+	select {
+	case <-rnd.stopListenerc:
+	default:
+		close(rnd.stopListenerc)
+	}
 
 	logger.Warningln("closing donec")
-	close(rnd.donec)
+	select {
+	case <-rnd.donec:
+	default:
+		close(rnd.donec)
+	}
 }
 
 func (rnd *raftNode) startPeerHandler() {
