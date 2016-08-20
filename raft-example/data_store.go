@@ -13,6 +13,7 @@ type keyValue struct {
 }
 
 type dataStore struct {
+	// shared with raftNode
 	propc   chan []byte // propc to write proposals TO
 	commitc chan []byte // commitc to receive ready-to-commit data FROM
 	errc    chan error
@@ -24,11 +25,11 @@ type dataStore struct {
 	store map[string]string
 }
 
-func newDataStore() *dataStore {
+func newDataStore(propc, commitc chan []byte, errc chan error) *dataStore {
 	ds := &dataStore{
-		propc:   make(chan []byte),
-		commitc: make(chan []byte),
-		errc:    make(chan error),
+		propc:   propc,
+		commitc: commitc,
+		errc:    errc,
 
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),

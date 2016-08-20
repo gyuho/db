@@ -47,8 +47,8 @@ func (hd *raftHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func startRaftHandler(addr string) {
-	ds := newDataStore()
+func startRaftHandler(addr string, propc, commitc chan []byte, errc chan error) {
+	ds := newDataStore(propc, commitc, errc)
 	go func() {
 		err := <-ds.errc
 		if err != nil {

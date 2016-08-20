@@ -7,7 +7,7 @@ import (
 )
 
 func Test_dataStore(t *testing.T) {
-	ds := newDataStore()
+	ds := newDataStore(make(chan []byte), make(chan []byte), make(chan error))
 	defer ds.stop()
 
 	donec := make(chan struct{})

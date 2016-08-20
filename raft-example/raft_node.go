@@ -47,6 +47,7 @@ type raftNode struct {
 	node          raft.Node
 	transport     *rafthttp.Transport
 
+	// shared channel with dataStore
 	propc   chan []byte // propc to receive proposals FROM
 	commitc chan []byte // commitc to send ready-to-commit entries TO
 	errc    chan error
@@ -56,7 +57,7 @@ type raftNode struct {
 	donec         chan struct{}
 }
 
-func newRaftNode(cfg config) *raftNode {
+func newRaftNode(cfg config, propc, commitc chan []byte, errc chan error) *raftNode {
 	rnd := &raftNode{
 		id:       cfg.id,
 		url:      types.MustNewURL(cfg.url),
@@ -76,9 +77,9 @@ func newRaftNode(cfg config) *raftNode {
 		node:          nil,
 		transport:     nil,
 
-		propc:   make(chan []byte),
-		commitc: make(chan []byte),
-		errc:    make(chan error),
+		propc:   propc,
+		commitc: commitc,
+		errc:    errc,
 
 		stopc:         make(chan struct{}),
 		stopListenerc: make(chan struct{}),
