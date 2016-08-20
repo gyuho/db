@@ -260,7 +260,11 @@ func (rnd *raftNode) startRaft() {
 			// handle already-committed entries
 			if ok := rnd.handleEntriesToCommit(rd.EntriesToCommit); !ok {
 				logger.Warningf("stopping %s", types.ID(rnd.id))
-				rnd.stop()
+				select {
+				case <-rnd.stopc:
+				default:
+					rnd.stop()
+				}
 				return
 			}
 
@@ -269,7 +273,11 @@ func (rnd *raftNode) startRaft() {
 		case err := <-rnd.transport.Errc:
 			rnd.errc <- err
 			logger.Warningln("stopping %s;", types.ID(rnd.id), err)
-			rnd.stop()
+			select {
+			case <-rnd.stopc:
+			default:
+				rnd.stop()
+			}
 			return
 
 		case <-rnd.stopc:
