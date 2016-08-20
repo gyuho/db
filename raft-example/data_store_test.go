@@ -15,8 +15,8 @@ func Test_dataStore(t *testing.T) {
 		defer close(donec)
 
 		bts := <-ds.propc
-
 		// assume this is agreed by consensus
+
 		ds.commitc <- bts
 	}()
 	ds.propose(context.TODO(), keyValue{"foo", "bar"})

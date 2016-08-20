@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -18,8 +21,9 @@ import (
 )
 
 type config struct {
-	id  uint64
-	url string
+	id               uint64
+	clientURL        string
+	advertisePeerURL string
 
 	peerIDs  []uint64
 	peerURLs []string
@@ -28,12 +32,14 @@ type config struct {
 }
 
 type raftNode struct {
-	id  uint64
-	url url.URL
+	id               uint64
+	clientURL        url.URL
+	advertisePeerURL url.URL
 
 	peerIDs  []uint64
 	peerURLs types.URLs
 
+	dir     string
 	walDir  string
 	snapDir string
 
@@ -58,13 +64,16 @@ type raftNode struct {
 	donec         chan struct{}
 }
 
-func newRaftNode(cfg config, propc, commitc chan []byte, errc chan error) *raftNode {
+func startRaftNode(cfg config, propc, commitc chan []byte, errc chan error) *raftNode {
 	rnd := &raftNode{
-		id:       cfg.id,
-		url:      types.MustNewURL(cfg.url),
+		id:               cfg.id,
+		clientURL:        types.MustNewURL(cfg.clientURL),
+		advertisePeerURL: types.MustNewURL(cfg.advertisePeerURL),
+
 		peerIDs:  cfg.peerIDs,
 		peerURLs: types.MustNewURLs(cfg.peerURLs),
 
+		dir:     cfg.dir,
 		walDir:  filepath.Join(cfg.dir, "wal"),
 		snapDir: filepath.Join(cfg.dir, "snap"),
 
@@ -86,6 +95,8 @@ func newRaftNode(cfg config, propc, commitc chan []byte, errc chan error) *raftN
 		stopListenerc: make(chan struct{}),
 		donec:         make(chan struct{}),
 	}
+	logger.Println("startRaftNode with", rnd.dir)
+
 	go rnd.start()
 	return rnd
 }
@@ -167,7 +178,7 @@ func (rnd *raftNode) start() {
 	}
 
 	go rnd.startRaft()
-	go rnd.startServe()
+	go rnd.startPeerHandler()
 }
 
 func (rnd *raftNode) handleProposal() {
@@ -196,8 +207,9 @@ func (rnd *raftNode) handleEntriesToCommit(ents []raftpb.Entry) bool {
 			case <-rnd.stopc:
 				return false
 			}
-		case raftpb.ENTRY_TYPE_CONFIG_CHANGE: // TODO
 
+		case raftpb.ENTRY_TYPE_CONFIG_CHANGE:
+			// TODO
 		}
 
 		if ents[i].Index == rnd.lastIndex { // special nil commit to signal that replay has finished
@@ -252,8 +264,15 @@ func (rnd *raftNode) startRaft() {
 	}
 }
 
-func (rnd *raftNode) startServe() {
-	ln, err := netutil.NewListenerStoppable(rnd.url.Scheme, rnd.url.Host, nil, rnd.stopListenerc)
+func (rnd *raftNode) stop() {
+	rnd.transport.Stop()
+	close(rnd.stopc)
+	close(rnd.stopListenerc)
+	<-rnd.donec
+}
+
+func (rnd *raftNode) startPeerHandler() {
+	ln, err := netutil.NewListenerStoppable(rnd.advertisePeerURL.Scheme, rnd.advertisePeerURL.Host, nil, rnd.stopListenerc)
 	if err != nil {
 		logger.Panic(err)
 	}
@@ -270,23 +289,67 @@ func (rnd *raftNode) startServe() {
 	<-rnd.donec
 }
 
-func (rnd *raftNode) stop() {
-	rnd.transport.Stop()
-	close(rnd.stopc)
-	close(rnd.stopListenerc)
-	<-rnd.donec
+type clientHandler struct {
+	ds *dataStore
 }
 
-// type rafthttp.Raft interface {
-// 	Process(ctx context.Context, msg raftpb.Message) error
-// 	IsIDRemoved(id uint64) bool
-// 	ReportUnreachable(id uint64)
-// 	ReportSnapshot(id uint64, status raftpb.SNAPSHOT_STATUS)
-// }
+func (hd *clientHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case "PUT":
+		key := req.RequestURI
+		val, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			logger.Warningf("failed to read on PUT (%v)", err)
+			http.Error(rw, "PUT failure", http.StatusBadRequest)
+			return
+		}
+		kv := keyValue{Key: key, Val: string(val)}
+		hd.ds.propose(context.TODO(), kv)
+		logger.Printf("proposed %+v", kv)
 
-func (rnd *raftNode) Process(ctx context.Context, msg raftpb.Message) error {
-	return rnd.node.Step(ctx, msg)
+		// not yet committed, so subsetquent GET may return stale data
+		rw.WriteHeader(http.StatusNoContent)
+
+	case "POST": // TODO
+	case "DELETE": // TODO
+
+	case "GET":
+		key := req.RequestURI
+		if val, ok := hd.ds.get(key); ok {
+			fmt.Fprintln(rw, val)
+			// rw.Write([]byte(val))
+			return
+		}
+		http.Error(rw, "GET failure", http.StatusNotFound)
+
+	default:
+		rw.Header().Set("Allow", "PUT")
+		rw.Header().Add("Allow", "GET")
+		rw.Header().Add("Allow", "POST")
+		rw.Header().Add("Allow", "DELETE")
+		http.Error(rw, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
-func (rnd *raftNode) IsIDRemoved(id uint64) bool                              { return false }
-func (rnd *raftNode) ReportUnreachable(id uint64)                             {}
-func (rnd *raftNode) ReportSnapshot(id uint64, status raftpb.SNAPSHOT_STATUS) {}
+
+func (rnd *raftNode) startClientHandler() {
+	ds := newDataStore(rnd.propc, rnd.commitc, rnd.errc)
+	go func() {
+		err := <-ds.errc
+		if err != nil {
+			logger.Panic(err)
+		}
+	}()
+
+	_, port, err := net.SplitHostPort(rnd.clientURL.Host)
+	if err != nil {
+		logger.Panic(err)
+	}
+	logger.Printf("startClientHandler with %q", rnd.clientURL.String())
+	srv := http.Server{
+		Addr:    ":" + port,
+		Handler: &clientHandler{ds: ds},
+	}
+	if err := srv.ListenAndServe(); err != nil {
+		logger.Panic(err)
+	}
+}

@@ -1,6 +1,38 @@
 // raft-example shows how to use raft package.
 package main
 
-import "github.com/gyuho/db/pkg/xlog"
+import (
+	"io/ioutil"
+	"os"
 
-var logger = xlog.NewLogger("example", xlog.INFO)
+	"github.com/gyuho/db/pkg/xlog"
+)
+
+func main() {
+	xlog.SetGlobalMaxLogLevel(xlog.INFO)
+
+	propc, commitc := make(chan []byte), make(chan []byte)
+	errc := make(chan error)
+
+	dir, err := ioutil.TempDir(os.TempDir(), "example.data")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dir)
+
+	cfg := config{
+		id:               1,
+		clientURL:        "http://localhost:2379",
+		advertisePeerURL: "http://localhost:2380",
+
+		peerIDs:  []uint64{1},
+		peerURLs: []string{"http://localhost:2380"},
+
+		dir: dir,
+	}
+	rnd := startRaftNode(cfg, propc, commitc, errc)
+	rnd.startClientHandler()
+
+	// curl -L http://localhost:2379/foo -XPUT -d bar
+	// curl -L http://localhost:2379/foo
+}
