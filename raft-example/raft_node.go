@@ -48,9 +48,10 @@ type raftNode struct {
 	transport     *rafthttp.Transport
 
 	// shared channel with dataStore
-	propc   chan []byte // propc to receive proposals FROM
-	commitc chan []byte // commitc to send ready-to-commit entries TO
+	propc   chan []byte // propc to receive proposals "FROM"
+	commitc chan []byte // commitc to send ready-to-commit entries "TO"
 	errc    chan error
+	///////////////////////////////
 
 	stopc         chan struct{}
 	stopListenerc chan struct{}

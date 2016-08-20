@@ -14,9 +14,10 @@ type keyValue struct {
 
 type dataStore struct {
 	// shared with raftNode
-	propc   chan []byte // propc to write proposals TO
-	commitc chan []byte // commitc to receive ready-to-commit data FROM
+	propc   chan []byte // propc to write proposals "TO"
+	commitc chan []byte // commitc to receive ready-to-commit data "FROM"
 	errc    chan error
+	///////////////////////////////
 
 	stopc chan struct{}
 	donec chan struct{}

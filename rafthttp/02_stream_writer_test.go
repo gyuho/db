@@ -31,10 +31,10 @@ func Test_streamWriter_attatchOutgoingConn(t *testing.T) {
 			}
 		}
 
-		msgc, working := sw.messageChanToSend()
-		if !working {
-			t.Fatalf("#%d: working expected true, got %v", i, working)
-		}
+		// if prev != nil, the new msgc is ready since prev has closed
+		// if prev == nil, the first connection may be pending, but the first
+		// msgc is already available since it's set on calling startStreamwriter
+		msgc, _ := sw.messageChanToSend()
 		msgc <- raftpb.Message{}
 
 		select {
