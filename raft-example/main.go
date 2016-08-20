@@ -4,7 +4,9 @@ package main
 import (
 	"io/ioutil"
 	"os"
+	"syscall"
 
+	"github.com/gyuho/db/pkg/osutil"
 	"github.com/gyuho/db/pkg/xlog"
 )
 
@@ -31,8 +33,12 @@ func main() {
 		dir: dir,
 	}
 	rnd := startRaftNode(cfg, propc, commitc, errc)
-	rnd.startClientHandler()
+	osutil.RegisterInterruptHandler(rnd.stop)
+	osutil.WaitForInterruptSignals(syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
+	go rnd.startClientHandler()
+
+	<-rnd.donec
 	// curl -L http://localhost:2379/foo -XPUT -d bar
 	// curl -L http://localhost:2379/foo
 }

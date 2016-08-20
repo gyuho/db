@@ -265,10 +265,17 @@ func (rnd *raftNode) startRaft() {
 }
 
 func (rnd *raftNode) stop() {
+	logger.Warningln("stopping transport...")
 	rnd.transport.Stop()
+
+	logger.Warningln("closing stopc...")
 	close(rnd.stopc)
+
+	logger.Warningln("closing stopListenerc...")
 	close(rnd.stopListenerc)
-	<-rnd.donec
+
+	logger.Warningln("closing donec")
+	close(rnd.donec)
 }
 
 func (rnd *raftNode) startPeerHandler() {
