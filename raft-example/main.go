@@ -34,7 +34,7 @@ func main() {
 }
 
 func init() {
-	xlog.SetGlobalMaxLogLevel(xlog.WARN)
+	xlog.SetGlobalMaxLogLevel(xlog.INFO)
 }
 
 func start(id uint64) {
@@ -64,3 +64,14 @@ func start(id uint64) {
 	<-rnd.donec
 	logger.Println("done!", id)
 }
+
+/*
+curl -L http://localhost:12379/foo -XPUT -d bar
+curl -L http://localhost:12379/foo
+
+curl -L http://localhost:22379/foo -XPUT -d bar
+curl -L http://localhost:22379/foo
+
+curl -L http://localhost:32379/foo -XPUT -d bar
+curl -L http://localhost:32379/foo
+*/

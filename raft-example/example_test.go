@@ -38,7 +38,9 @@ func Example() {
 
 	<-rnd.donec
 	logger.Println("done!")
-
-	// curl -L http://localhost:2379/foo -XPUT -d bar
-	// curl -L http://localhost:2379/foo
 }
+
+/*
+curl -L http://localhost:2379/foo -XPUT -d bar
+curl -L http://localhost:2379/foo
+*/

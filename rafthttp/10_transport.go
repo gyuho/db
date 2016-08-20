@@ -51,7 +51,7 @@ func (tr *Transport) Stop() {
 
 func (tr *Transport) HTTPHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle(PrefixRaftStream, newStreamHandler(tr, tr.Raft, tr, tr.Sender, tr.ClusterID))
+	mux.Handle(PrefixRaftStream+"/", newStreamHandler(tr, tr.Raft, tr, tr.Sender, tr.ClusterID)) // +"/" is necessary
 	mux.Handle(PrefixRaftSnapshot, newSnapshotSenderHandler(tr, tr.Raft, tr.RaftSnapshotter, tr.ClusterID))
 	mux.Handle(PrefixRaft, newPipelineHandler(tr, tr.Raft, tr.ClusterID))
 	mux.Handle(PrefixRaftProbing, probing.NewHTTPHealthHandler())
