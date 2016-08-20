@@ -7,7 +7,7 @@ import (
 )
 
 func Test_dataStore(t *testing.T) {
-	ds := newDataStore(make(chan []byte), make(chan []byte), make(chan error))
+	ds := newDataStore(make(chan []byte), make(chan []byte))
 	defer ds.stop()
 
 	donec := make(chan struct{})
@@ -30,10 +30,5 @@ func Test_dataStore(t *testing.T) {
 	}
 	if val != "bar" {
 		t.Fatalf("value expected %q, got %q", "bar", val)
-	}
-
-	close(ds.errc)
-	if err := <-ds.errc; err != nil {
-		t.Fatal(err)
 	}
 }

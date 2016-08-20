@@ -56,15 +56,29 @@ type raftNode struct {
 	// shared channel with dataStore
 	propc   chan []byte // propc to receive proposals "FROM"
 	commitc chan []byte // commitc to send ready-to-commit entries "TO"
-	errc    chan error
 	///////////////////////////////
 
+	errc          chan error
 	stopc         chan struct{}
 	stopListenerc chan struct{}
 	donec         chan struct{}
 }
 
-func startRaftNode(cfg config, propc, commitc chan []byte, errc chan error) *raftNode {
+// type rafthttp.Raft interface {
+// 	Process(ctx context.Context, msg raftpb.Message) error
+// 	IsIDRemoved(id uint64) bool
+// 	ReportUnreachable(id uint64)
+// 	ReportSnapshot(id uint64, status raftpb.SNAPSHOT_STATUS)
+// }
+
+func (rnd *raftNode) Process(ctx context.Context, msg raftpb.Message) error {
+	return rnd.node.Step(ctx, msg)
+}
+func (rnd *raftNode) IsIDRemoved(id uint64) bool                              { return false }
+func (rnd *raftNode) ReportUnreachable(id uint64)                             {}
+func (rnd *raftNode) ReportSnapshot(id uint64, status raftpb.SNAPSHOT_STATUS) {}
+
+func startRaftNode(cfg config) *raftNode {
 	rnd := &raftNode{
 		id:               cfg.id,
 		clientURL:        types.MustNewURL(cfg.clientURL),
@@ -87,16 +101,14 @@ func startRaftNode(cfg config, propc, commitc chan []byte, errc chan error) *raf
 		node:          nil,
 		transport:     nil,
 
-		propc:   propc,
-		commitc: commitc,
-		errc:    errc,
+		propc:   make(chan []byte, 100),
+		commitc: make(chan []byte, 100),
 
+		errc:          make(chan error),
 		stopc:         make(chan struct{}),
 		stopListenerc: make(chan struct{}),
 		donec:         make(chan struct{}),
 	}
-	logger.Println("startRaftNode with", rnd.dir)
-
 	go rnd.start()
 	return rnd
 }
@@ -141,6 +153,8 @@ func (rnd *raftNode) replayWAL() *raftwal.WAL {
 }
 
 func (rnd *raftNode) start() {
+	logger.Println("startRaftNode %s at", types.ID(rnd.id), rnd.dir)
+
 	walExist := fileutil.DirHasFiles(rnd.walDir)
 	rnd.wal = rnd.replayWAL()
 
@@ -245,7 +259,7 @@ func (rnd *raftNode) startRaft() {
 
 			// handle already-committed entries
 			if ok := rnd.handleEntriesToCommit(rd.EntriesToCommit); !ok {
-				logger.Warningln("stopping...")
+				logger.Warningf("stopping %s", types.ID(rnd.id))
 				rnd.stop()
 				return
 			}
@@ -254,7 +268,7 @@ func (rnd *raftNode) startRaft() {
 
 		case err := <-rnd.transport.Errc:
 			rnd.errc <- err
-			logger.Warningln("stopping;", err)
+			logger.Warningln("stopping %s;", types.ID(rnd.id), err)
 			rnd.stop()
 			return
 
@@ -339,7 +353,7 @@ func (hd *clientHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (rnd *raftNode) startClientHandler() {
-	ds := newDataStore(rnd.propc, rnd.commitc, rnd.errc)
+	ds := newDataStore(rnd.propc, rnd.commitc)
 	go func() {
 		err := <-ds.errc
 		if err != nil {
@@ -351,7 +365,8 @@ func (rnd *raftNode) startClientHandler() {
 	if err != nil {
 		logger.Panic(err)
 	}
-	logger.Printf("startClientHandler with %q", rnd.clientURL.String())
+
+	logger.Printf("startClientHandler %s with %q", types.ID(rnd.id), rnd.clientURL.String())
 	srv := http.Server{
 		Addr:    ":" + port,
 		Handler: &clientHandler{ds: ds},
