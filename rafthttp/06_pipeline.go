@@ -100,7 +100,7 @@ func (p *pipeline) handle() {
 		case msg := <-p.msgc:
 			bts, err := msg.Marshal()
 			if err != nil {
-				p.status.deactivate(failureType{source: "pipeline message", action: "write", err: err})
+				p.status.deactivate(failureType{Source: "pipeline message", Action: "write", Err: err.Error()})
 				p.r.ReportUnreachable(msg.To)
 				if msg.Type == raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT {
 					p.r.ReportSnapshot(msg.To, raftpb.SNAPSHOT_STATUS_FAILED)
@@ -109,7 +109,7 @@ func (p *pipeline) handle() {
 			}
 
 			if err := p.post(bts); err != nil {
-				p.status.deactivate(failureType{source: "pipeline message", action: "post", err: err})
+				p.status.deactivate(failureType{Source: "pipeline message", Action: "post", Err: err.Error()})
 				p.r.ReportUnreachable(msg.To)
 				if msg.Type == raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT {
 					p.r.ReportSnapshot(msg.To, raftpb.SNAPSHOT_STATUS_FAILED)

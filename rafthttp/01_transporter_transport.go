@@ -88,7 +88,7 @@ type Transport struct {
 	Raft            Raft                  // (etcd rafthttp.Transport.Raft)
 	RaftSnapshotter *raftsnap.Snapshotter // (etcd rafthttp.Transport.Snapshotter)
 
-	errc chan error // (etcd rafthttp.Transport.ErrorC)
+	Errc chan error // (etcd rafthttp.Transport.ErrorC)
 
 	streamRoundTripper         http.RoundTripper // (etcd rafthttp.Transport.streamRt)
 	pipelineRoundTripper       http.RoundTripper // (etcd rafthttp.Transport.pipelineRt)
@@ -101,7 +101,6 @@ type Transport struct {
 
 func (tr *Transport) Start() error {
 	var err error
-
 	tr.streamRoundTripper, err = NewStreamRoundTripper(tr.TLSInfo, tr.DialTimeout)
 	if err != nil {
 		return err
@@ -112,11 +111,11 @@ func (tr *Transport) Start() error {
 	if err != nil {
 		return err
 	}
+
 	tr.pipelineRoundTripperProber = probing.NewProber(tr.pipelineRoundTripper)
 
 	tr.peers = make(map[types.ID]Peer)
 	tr.peerRemotes = make(map[types.ID]*peerRemote)
-
 	return nil
 }
 

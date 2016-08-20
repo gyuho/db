@@ -100,13 +100,27 @@ Package mvcc ...
 Package rsm is a replicated state machine built on top of consensus protocol.
 It is also an applying machine of those replicated commands.
 
-
-
-
-
-
-
-
+etcdserver.NewServer creates a new etcdserver.EtcdServer.
+ 1. mkdir cfg.DataDir
+    - MemberDir   = DataDir/member
+    - WALDir      = MemberDir/wal
+    - SnapDir     = MemberDir/snap
+    - BackendPath = SnapDir/db
+ 2. if WALExist, newCluster
+    - setBackend
+    - startNode
+ 3. if WALExist, !newCluster
+    - setBackend
+    - restartNode
+ 4. start EtcdServer
+ 5. raftNode.start
+ 6. for-loop keeps receiving from raft.Ready channel
+ 7. sends Ready to applyc
+ 8. receive Ready from applyc
+ 9. EtcdServer applies these Ready
+10. If Ready.Snapshot is not empty, save,apply Snapshot
+11. trigger snapshot whenever applied index > last index in Raft
+12. r.Advance
 
 =================================================================================
 

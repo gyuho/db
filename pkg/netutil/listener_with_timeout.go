@@ -56,7 +56,7 @@ func (l *listenerWithTimeout) Accept() (net.Conn, error) {
 // it will return timeout error.
 //
 // (etcd pkg.transport.NewTimeoutListener)
-func NewListenerWithTimeout(addr, scheme string, tlsConfig *tls.Config, writeTimeout, readTimeout time.Duration) (l net.Listener, err error) {
+func NewListenerWithTimeout(scheme, addr string, tlsConfig *tls.Config, writeTimeout, readTimeout time.Duration) (l net.Listener, err error) {
 	switch scheme {
 	case "unix", "unixs":
 		l, err = NewListenerUnix(addr)

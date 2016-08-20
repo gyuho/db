@@ -135,6 +135,8 @@ func ExistFileOrDir(name string) bool {
 
 // DirHasFiles returns true only when the directory exists
 // and it is non-empty.
+//
+// (etcd wal.Exist)
 func DirHasFiles(dir string) bool {
 	ns, err := ReadDir(dir)
 	if err != nil {

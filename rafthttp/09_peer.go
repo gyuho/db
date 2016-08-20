@@ -83,7 +83,7 @@ func startPeer(transport *Transport, peerID types.ID, peerURLs types.URLs) *peer
 		r:         r,
 		picker:    picker,
 		transport: transport,
-		errc:      transport.errc,
+		errc:      transport.Errc,
 	}
 	pipeline.start()
 

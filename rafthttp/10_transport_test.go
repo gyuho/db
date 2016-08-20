@@ -140,7 +140,7 @@ func Test_Transport_err(t *testing.T) {
 		pipelineRoundTripper:       newRespRoundTripper(http.StatusForbidden, nil),
 		pipelineRoundTripperProber: probing.NewProber(nil),
 		peers: make(map[types.ID]Peer),
-		errc:  errc,
+		Errc:  errc,
 	}
 	tr.AddPeer(1, []string{"http://localhost:2380"})
 	defer tr.Stop()

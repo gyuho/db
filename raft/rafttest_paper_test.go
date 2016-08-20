@@ -5,7 +5,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gyuho/db/pkg/xlog"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
@@ -366,11 +365,6 @@ func Test_raft_paper_candidate_election_timeout_randomized(t *testing.T) {
 
 // (etcd raft.TestFollowersElectioinTimeoutNonconflict)
 func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
-	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
-	defer func() {
-		raftLogger.SetLogger(xlog.NewLogger("raft", defaultLogLevel))
-	}()
-
 	raftNodes := make([]*raftNode, 5)
 	ids := generateIDs(5)
 	for i := range raftNodes {
@@ -407,11 +401,6 @@ func Test_raft_paper_follower_election_timeout_no_conflict(t *testing.T) {
 
 // (etcd raft.TestCandidatesElectionTimeoutNonconflict)
 func Test_raft_paper_candidate_election_timeout_no_conflict(t *testing.T) {
-	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.CRITICAL))
-	defer func() {
-		raftLogger.SetLogger(xlog.NewLogger("raft", defaultLogLevel))
-	}()
-
 	raftNodes := make([]*raftNode, 5)
 	ids := generateIDs(5)
 	for i := range raftNodes {

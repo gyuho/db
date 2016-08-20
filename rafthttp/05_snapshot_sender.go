@@ -45,7 +45,7 @@ func newSnapshotSender(transport *Transport, to types.ID, status *peerStatus, pi
 		r:         transport.Raft,
 
 		stopc: make(chan struct{}),
-		errc:  transport.errc,
+		errc:  transport.Errc,
 	}
 }
 
@@ -123,7 +123,7 @@ func (s *snapshotSender) send(msg raftsnap.Message) {
 			sendError(err, s.errc)
 		}
 
-		s.status.deactivate(failureType{source: "snapshot post", action: "post", err: err})
+		s.status.deactivate(failureType{Source: "snapshot post", Action: "post", Err: err.Error()})
 		s.picker.unreachable(targetURL)
 		s.r.ReportUnreachable(msg.To)
 		s.r.ReportSnapshot(msg.To, raftpb.SNAPSHOT_STATUS_FAILED)

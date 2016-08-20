@@ -1,8 +1,10 @@
 package netutil
 
 import (
+	"bytes"
 	"crypto/tls"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -10,9 +12,101 @@ import (
 	"github.com/gyuho/db/pkg/tlsutil"
 )
 
+func Test_NewListener(t *testing.T) {
+	// stopc := make(chan struct{})
+	// ln, err := NewListenerStoppable("http", "127.0.0.1:0", nil, stopc)
+
+	ln, err := NewListener("http", "127.0.0.1:0", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connw, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = connw.Write([]byte("hello")); err != nil {
+		t.Fatal(err)
+	}
+	if err = connw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	connl, err := ln.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bts := make([]byte, 5)
+	if _, err = connl.Read(bts); err != nil {
+		t.Fatal(err)
+	}
+	if err = connl.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(bts, []byte("hello")) {
+		t.Fatalf("expected %q, got %q", "hello", string(bts))
+	}
+}
+
+func Test_NewListenerStoppable(t *testing.T) {
+	stopc := make(chan struct{})
+	ln, err := NewListenerStoppable("http", "127.0.0.1:0", nil, stopc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connw, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = connw.Write([]byte("hello")); err != nil {
+		t.Fatal(err)
+	}
+	if err = connw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	connl, err := ln.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bts := make([]byte, 5)
+	if _, err = connl.Read(bts); err != nil {
+		t.Fatal(err)
+	}
+	if err = connl.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(bts, []byte("hello")) {
+		t.Fatalf("expected %q, got %q", "hello", string(bts))
+	}
+}
+
+func Test_NewListenerStoppable_stop(t *testing.T) {
+	stopc := make(chan struct{})
+	ln, err := NewListenerStoppable("http", "127.0.0.1:0", nil, stopc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connw, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = connw.Write([]byte("hello")); err != nil {
+		t.Fatal(err)
+	}
+
+	close(stopc)
+
+	if _, err = ln.Accept(); err != ErrListenerStopped {
+		t.Fatalf("expected %v, got %v", ErrListenerStopped, err)
+	}
+}
+
 // (etcd pkg.transport.TestNewListenerUnixSocket)
 func Test_NewListenerUnix(t *testing.T) {
-	l, err := NewListener("testsocket-address", "unix", nil)
+	l, err := NewListener("unix", "testsocket-address", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +115,7 @@ func Test_NewListenerUnix(t *testing.T) {
 
 // (etcd pkg.transport.TestNewListenerTLSEmptyInfo)
 func Test_NewListener_Empty_TLSInfo(t *testing.T) {
-	if _, err := NewListener("127.0.0.1:0", "https", nil); err == nil {
+	if _, err := NewListener("https", "127.0.0.1:0", nil); err == nil {
 		t.Fatal("err = nil, want not presented error")
 	}
 }
@@ -33,7 +127,7 @@ func testNewListenerTLSInfoAccept(t *testing.T, tlsInfo tlsutil.TLSInfo) {
 		t.Fatal(err)
 	}
 
-	ln, err := NewListener("127.0.0.1:0", "https", tlsServerCfg)
+	ln, err := NewListener("https", "127.0.0.1:0", tlsServerCfg)
 	if err != nil {
 		t.Fatal(err)
 	}

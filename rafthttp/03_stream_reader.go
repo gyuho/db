@@ -122,7 +122,7 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	case http.StatusNotFound:
 		netutil.GracefulClose(resp)
 		sr.picker.unreachable(targetURL)
-		return nil, fmt.Errorf("peer %s failed to find local member %s", sr.peerID, sr.transport.Sender)
+		return nil, fmt.Errorf("%s failed to find peer %s (%s)", sr.transport.Sender, sr.peerID, targetURL.String())
 
 	case http.StatusPreconditionFailed:
 		bts, err := ioutil.ReadAll(resp.Body)
@@ -204,7 +204,7 @@ func (sr *streamReader) start() {
 	sr.stopc = make(chan struct{})
 	sr.donec = make(chan struct{})
 	if sr.errc == nil {
-		sr.errc = sr.transport.errc
+		sr.errc = sr.transport.Errc
 	}
 
 	logger.Infof("started streamReader to peer %s", sr.peerID)
@@ -215,7 +215,7 @@ func (sr *streamReader) run() {
 	for {
 		rc, err := sr.dial()
 		if err != nil {
-			sr.status.deactivate(failureType{source: "stream dial", action: "dial", err: err})
+			sr.status.deactivate(failureType{Source: "stream dial", Action: "dial", Err: err.Error()})
 		} else {
 			sr.status.activate()
 			logger.Infof("established streamReader to peer %s", sr.peerID)
@@ -226,7 +226,7 @@ func (sr *streamReader) run() {
 			case err == io.EOF, netutil.IsClosedConnectionError(err):
 				logger.Warningf("connection lost; remote closed")
 			default:
-				sr.status.deactivate(failureType{source: "stream decodeLoop", action: "decode", err: err})
+				sr.status.deactivate(failureType{Source: "stream decodeLoop", Action: "decode", Err: err.Error()})
 			}
 		}
 

@@ -111,6 +111,8 @@ func openLastWALFile(dir string) (*fileutil.LockedFile, error) {
 }
 
 // openWAL opens a WAL file with given snapshot.
+//
+// (etcd wal.openAtIndex)
 func openWAL(dir string, snap raftwalpb.Snapshot, write bool) (*WAL, error) {
 	names, err := readWALNames(dir)
 	if err != nil {
@@ -185,11 +187,15 @@ func openWAL(dir string, snap raftwalpb.Snapshot, write bool) (*WAL, error) {
 // The returned WAL is ready for reads, and appends only after reading out
 // all of its previous records.
 // The first record will be the one after the given snapshot.
+//
+// (etcd wal.Open)
 func OpenWALWrite(dir string, snap raftwalpb.Snapshot) (*WAL, error) {
 	return openWAL(dir, snap, true)
 }
 
 // OpenWALRead opens the WAL file for reads.
+//
+// (etcd wal.OpenForRead)
 func OpenWALRead(dir string, snap raftwalpb.Snapshot) (*WAL, error) {
 	return openWAL(dir, snap, false)
 }
