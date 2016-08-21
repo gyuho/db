@@ -1,55 +1,42 @@
 package main
 
 import (
-	"context"
 	"time"
 
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// type rafthttp.Raft interface {
-// 	Process(ctx context.Context, msg raftpb.Message) error
-// 	IsIDRemoved(id uint64) bool
-// 	ReportUnreachable(id uint64)
-// 	ReportSnapshot(id uint64, status raftpb.SNAPSHOT_STATUS)
-// }
-
-func (rnd *raftNode) Process(ctx context.Context, msg raftpb.Message) error {
-	return rnd.node.Step(ctx, msg)
+// (etcd etcdserver.apply)
+type apply struct {
+	entriesToApply  []raftpb.Entry  // (etcd etcdserver.apply.entries)
+	snapshotToSave  raftpb.Snapshot // (etcd etcdserver.apply.snapshot)
+	readyToSnapshot chan struct{}   // (etcd etcdserver.apply.raftDone)
 }
-func (rnd *raftNode) IsIDRemoved(id uint64) bool                              { return false }
-func (rnd *raftNode) ReportUnreachable(id uint64)                             {}
-func (rnd *raftNode) ReportSnapshot(id uint64, status raftpb.SNAPSHOT_STATUS) {}
 
-func (rnd *raftNode) handleProposal() {
-	for rnd.propc != nil {
-		select {
-		case prop := <-rnd.propc:
-			rnd.node.Propose(context.TODO(), prop)
-
-		case <-rnd.stopc:
-			rnd.propc = nil
-			return
-		}
-	}
+// (etcd etcdserver.progress)
+type progress struct {
+	snapshotIndex uint64
+	appliedIndex  uint64
 }
 
 // (etcd etcdserver.EtcdServer.applySnapshot)
-func (rnd *raftNode) applySnapshot(ap *apply) {
+func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 	if raftpb.IsEmptySnapshot(ap.snapshotToSave) {
 		return
 	}
 
-	// TODO: progress, backend
-	// if ap.snapshotToSave.Metadata.Index <=
+	// TODO: progress
+	// TODO: save to backend
 }
 
 // (etcd etcdserver.EtcdServer.applyEntries,apply)
-func (rnd *raftNode) applyEntries(ap *apply) {
+func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 	if len(ap.entriesToApply) == 0 {
 		return
 	}
+
+	// TODO: handle progress
 
 	for i := range ap.entriesToApply {
 		switch ap.entriesToApply[i].Type {
@@ -78,20 +65,17 @@ func (rnd *raftNode) applyEntries(ap *apply) {
 	}
 }
 
-// (etcd etcdserver.EtcdServer.applyAll)
-func (rnd *raftNode) applyAll(ap *apply) {
-	rnd.applySnapshot(ap)
-	rnd.applyEntries(ap)
-
-	<-ap.readyToSnapshot
-
-	// TODO: trigger snapshot
+func (rnd *raftNode) triggerSnapshot(pr *progress) {
+	// TODO
 }
 
-type apply struct {
-	entriesToApply  []raftpb.Entry  // (etcd etcdserver.apply.entries)
-	snapshotToSave  raftpb.Snapshot // (etcd etcdserver.apply.snapshot)
-	readyToSnapshot chan struct{}   // (etcd etcdserver.apply.raftDone)
+// (etcd etcdserver.EtcdServer.applyAll)
+func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
+	rnd.applySnapshot(pr, ap)
+	rnd.applyEntries(pr, ap)
+
+	<-ap.readyToSnapshot
+	rnd.triggerSnapshot(pr)
 }
 
 // (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
@@ -116,7 +100,7 @@ func (rnd *raftNode) startRaftHandler() {
 			}
 
 			readyToSnapshot := make(chan struct{})
-			go rnd.applyAll(&apply{
+			go rnd.applyAll(nil, &apply{
 				entriesToApply:  rd.EntriesToApply,
 				snapshotToSave:  rd.SnapshotToSave,
 				readyToSnapshot: readyToSnapshot,
