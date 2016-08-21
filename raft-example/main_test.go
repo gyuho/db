@@ -39,7 +39,7 @@ func Test_basic_single_node(t *testing.T) {
 	go func() {
 		defer close(donec)
 
-		time.Sleep(time.Second)
+		time.Sleep(300 * time.Millisecond)
 		func() {
 			req, err := http.NewRequest("PUT", "http://localhost:2379/foo", strings.NewReader("bar"))
 			if err != nil {
@@ -59,7 +59,7 @@ func Test_basic_single_node(t *testing.T) {
 			fmt.Println("PUT response:", string(bts))
 		}()
 
-		time.Sleep(time.Second)
+		time.Sleep(300 * time.Millisecond)
 		func() {
 			req, err := http.NewRequest("GET", "http://localhost:2379/foo", nil)
 			if err != nil {

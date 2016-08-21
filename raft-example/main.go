@@ -15,9 +15,13 @@ import (
 	"github.com/gyuho/db/pkg/xlog"
 )
 
-func main() {
-	nodeNum := 3
+var nodeNum = 3
 
+func init() {
+	xlog.SetGlobalMaxLogLevel(xlog.INFO)
+}
+
+func main() {
 	var (
 		dataDirs   []string
 		peerIDs    []uint64
@@ -58,12 +62,12 @@ func main() {
 	   curl -L http://localhost:32379/foo -XPUT -d bar
 	   curl -L http://localhost:32379/foo
 	*/
-	time.Sleep(time.Second)
+	time.Sleep(300 * time.Millisecond)
 	donec := make(chan struct{})
 	go func() {
 		defer close(donec)
 
-		time.Sleep(time.Second)
+		time.Sleep(300 * time.Millisecond)
 		func() {
 			req, err := http.NewRequest("PUT", "http://localhost:12379/foo", strings.NewReader("bar"))
 			if err != nil {
@@ -83,7 +87,7 @@ func main() {
 			fmt.Println("PUT response:", string(bts))
 		}()
 
-		time.Sleep(time.Second)
+		time.Sleep(300 * time.Millisecond)
 		func() {
 			req, err := http.NewRequest("GET", "http://localhost:32379/foo", nil) // different node
 			if err != nil {
@@ -106,10 +110,6 @@ func main() {
 	<-donec
 
 	wg.Wait()
-}
-
-func init() {
-	xlog.SetGlobalMaxLogLevel(xlog.INFO)
 }
 
 func start(id uint64, clientURL, advertisePeerURL string, peerIDs []uint64, peerURLs []string) {
