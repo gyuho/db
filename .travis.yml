@@ -6,5 +6,5 @@ go:
     - tip
 
 script:
-    - ./script-test.sh
+    - ./run-tests.sh
 
