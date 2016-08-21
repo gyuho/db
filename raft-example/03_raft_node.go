@@ -35,7 +35,7 @@ type raftNode struct {
 	walDir  string
 	snapDir string
 
-	forceSnapshot    bool
+	periodicSnapshot bool
 	snapshotInterval time.Duration
 	snapCount        uint64
 
@@ -76,7 +76,7 @@ func startRaftNode(cfg config) *raftNode {
 		walDir:  filepath.Join(cfg.dir, "wal"),
 		snapDir: filepath.Join(cfg.dir, "snap"),
 
-		forceSnapshot:    false,
+		periodicSnapshot: false,
 		snapshotInterval: 5 * time.Second,
 		snapCount:        10000,
 
