@@ -11,7 +11,7 @@ result=$(go tool vet -shadow $TESTS 2>&1 >/dev/null)
 echo $result
 COMMENT
 
-IGNORE_PKGS="(vendor)"
+IGNORE_PKGS="(vendor|rafttest)"
 TESTS=`find . -name \*_test.go | while read a; do dirname $a; done | sort | uniq | egrep -v "$IGNORE_PKGS"`
 
 echo "Checking gofmt..."
@@ -35,14 +35,14 @@ if [ -n "${result}" ]; then
 	exit 255
 fi
 
-# echo "Checking gosimple..."
-# for path in $TESTS; do
-# 	result=`gosimple ${path} || true`
-# 	if [ -n "${result}" ]; then
-# 		echo -e "gosimple checking ${path} failed:\n${result}"
-# 		exit 255
-# 	fi
-# done
+echo "Checking gosimple..."
+for path in $TESTS; do
+	result=`gosimple ${path} || true`
+	if [ -n "${result}" ]; then
+		echo -e "gosimple checking ${path} failed:\n${result}"
+		exit 255
+	fi
+done
 
 echo "Checking unused..."
 for path in $TESTS; do

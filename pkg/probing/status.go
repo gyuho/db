@@ -53,7 +53,7 @@ func (s *status) record(rtt time.Duration, requested time.Time) {
 	s.err = nil
 
 	s.srtt = time.Duration((1-α)*float64(s.srtt) + α*float64(rtt))
-	s.clockDiff = time.Now().Sub(requested) - s.srtt/2
+	s.clockDiff = time.Since(requested) - s.srtt/2
 
 	s.mu.Unlock()
 }

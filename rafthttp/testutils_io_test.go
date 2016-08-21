@@ -107,13 +107,6 @@ func (wfc *fakeWriterFlusherCloser) Close() error {
 	return wfc.err
 }
 
-func (wfc *fakeWriterFlusherCloser) getWritten() int {
-	wfc.mu.Lock()
-	defer wfc.mu.Unlock()
-
-	return wfc.written
-}
-
 func (wfc *fakeWriterFlusherCloser) getClosed() bool {
 	select {
 	case <-wfc.closed:

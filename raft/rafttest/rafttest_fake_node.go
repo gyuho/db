@@ -68,7 +68,7 @@ func (fnd *fakeNode) start() {
 					fnd.hardState = rd.HardStateToSave
 					fnd.stableStorageInMemory.SetHardState(fnd.hardState)
 				}
-				fnd.stableStorageInMemory.Append(rd.EntriesToSave...)
+				fnd.stableStorageInMemory.Append(rd.EntriesToAppend...)
 
 				time.Sleep(time.Millisecond)
 

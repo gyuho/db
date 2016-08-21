@@ -22,7 +22,7 @@ func Test_Probe_NewHTTPHealthHandler(t *testing.T) {
 	if total := status.Total(); total < 50 || total > 150 {
 		t.Fatalf("total = %v, want around %v", total, 100)
 	}
-	if health := status.Health(); health != true {
+	if health := status.Health(); !health {
 		t.Fatalf("health = %v, want %v", health, true)
 	}
 
@@ -37,7 +37,7 @@ func Test_Probe_NewHTTPHealthHandler(t *testing.T) {
 	if loss := status.Loss(); loss < 50 || loss > 150 {
 		t.Fatalf("loss = %v, want around %v", loss, 200)
 	}
-	if health := status.Health(); health != false {
+	if health := status.Health(); health {
 		t.Fatalf("health = %v, want %v", health, false)
 	}
 }
@@ -59,7 +59,7 @@ func Test_Probe_Reset(t *testing.T) {
 	if total := status.Total(); total < 50 || total > 150 {
 		t.Fatalf("total = %v, want around %v", total, 100)
 	}
-	if health := status.Health(); health != true {
+	if health := status.Health(); !health {
 		t.Fatalf("health = %v, want %v", health, true)
 	}
 
@@ -70,7 +70,7 @@ func Test_Probe_Reset(t *testing.T) {
 	if total := status.Total(); total < 50 || total > 150 {
 		t.Fatalf("total = %v, want around %v", total, 100)
 	}
-	if health := status.Health(); health != true {
+	if health := status.Health(); !health {
 		t.Fatalf("health = %v, want %v", health, true)
 	}
 }

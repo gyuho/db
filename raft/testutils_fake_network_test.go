@@ -127,9 +127,9 @@ func (fn *fakeNetwork) recoverAll() {
 }
 
 // (etcd raft.network.drop)
-func (fn *fakeNetwork) dropConnectionByPercentage(from, to uint64, percentage float64) {
-	fn.allDroppedConnections[connection{from, to}] = percentage
-}
+// func (fn *fakeNetwork) dropConnectionByPercentage(from, to uint64, percentage float64) {
+// 	fn.allDroppedConnections[connection{from, to}] = percentage
+// }
 
 // (etcd raft.network.cut)
 func (fn *fakeNetwork) cutConnection(id1, id2 uint64) {

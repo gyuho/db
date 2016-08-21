@@ -39,18 +39,6 @@ type streamReader struct {
 	closer io.Closer
 }
 
-func (sr *streamReader) pause() {
-	sr.mu.Lock()
-	sr.paused = true
-	sr.mu.Unlock()
-}
-
-func (sr *streamReader) resume() {
-	sr.mu.Lock()
-	sr.paused = false
-	sr.mu.Unlock()
-}
-
 func (sr *streamReader) close() {
 	if sr.closer == nil {
 		return
