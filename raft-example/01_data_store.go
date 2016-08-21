@@ -85,7 +85,7 @@ func (ds *dataStore) readCommit() {
 			}
 			var kv keyValue
 			if err := gob.NewDecoder(bytes.NewBuffer(cc)).Decode(&kv); err != nil {
-				logger.Panic(err)
+				panic(err)
 			}
 			ds.mu.Lock()
 			ds.store[kv.Key] = kv.Val
@@ -93,7 +93,7 @@ func (ds *dataStore) readCommit() {
 
 		case err := <-ds.errc:
 			if err != nil {
-				logger.Panic(err)
+				panic(err)
 			}
 
 		case <-ds.stopc:

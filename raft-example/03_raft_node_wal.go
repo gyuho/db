@@ -9,19 +9,19 @@ import (
 func (rnd *raftNode) openWAL() *raftwal.WAL {
 	if !fileutil.DirHasFiles(rnd.walDir) {
 		if err := fileutil.MkdirAll(rnd.walDir); err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		w, err := raftwal.Create(rnd.walDir, nil)
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 		w.Close()
 	}
 
 	w, err := raftwal.OpenWALWrite(rnd.walDir, raftwalpb.Snapshot{})
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 	return w
 }
@@ -30,7 +30,7 @@ func (rnd *raftNode) replayWAL() *raftwal.WAL {
 	w := rnd.openWAL()
 	_, hardstate, ents, err := w.ReadAll()
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	rnd.storageMemory.Append(ents...)

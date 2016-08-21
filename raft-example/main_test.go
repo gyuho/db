@@ -5,14 +5,21 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gyuho/db/pkg/netutil"
 	"github.com/gyuho/db/pkg/xlog"
 )
 
 func Test_basic_single_node(t *testing.T) {
+	ports, err := netutil.GetFreeTCPPorts(2)
+	if err != nil {
+		panic(err)
+	}
+
 	xlog.SetGlobalMaxLogLevel(xlog.INFO)
 
 	dir, err := ioutil.TempDir(os.TempDir(), "example.data")
@@ -23,11 +30,11 @@ func Test_basic_single_node(t *testing.T) {
 
 	cfg := config{
 		id:               1,
-		clientURL:        "http://localhost:2379",
-		advertisePeerURL: "http://localhost:2380",
+		clientURL:        fmt.Sprintf("http://localhost%s", ports[0]),
+		advertisePeerURL: fmt.Sprintf("http://localhost%s", ports[1]),
 
 		peerIDs:  []uint64{1},
-		peerURLs: []string{"http://localhost:2380"},
+		peerURLs: []string{fmt.Sprintf("http://localhost%s", ports[1])},
 
 		dir: dir,
 	}
@@ -41,7 +48,7 @@ func Test_basic_single_node(t *testing.T) {
 
 		time.Sleep(300 * time.Millisecond)
 		func() {
-			req, err := http.NewRequest("PUT", "http://localhost:2379/foo", strings.NewReader("bar"))
+			req, err := http.NewRequest("PUT", path.Join(cfg.clientURL, "foo"), strings.NewReader("bar"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -61,7 +68,7 @@ func Test_basic_single_node(t *testing.T) {
 
 		time.Sleep(300 * time.Millisecond)
 		func() {
-			req, err := http.NewRequest("GET", "http://localhost:2379/foo", nil)
+			req, err := http.NewRequest("GET", path.Join(cfg.clientURL, "foo"), nil)
 			if err != nil {
 				t.Fatal(err)
 			}

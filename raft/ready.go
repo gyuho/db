@@ -38,11 +38,11 @@ type Ready struct {
 	// (etcd raft.Ready.Entries)
 	EntriesToAppend []raftpb.Entry
 
-	// EntriesToCommit specifies the entries to commit, which have already been
-	// saved in stable storage.
+	// EntriesToApply are committed entries, which have already been
+	// saved in stable storage, so ready to apply.
 	//
 	// (etcd raft.Ready.CommittedEntries)
-	EntriesToCommit []raftpb.Entry
+	EntriesToApply []raftpb.Entry
 
 	// MessagesToSend is outbound messages to be sent AFTER EntriesToAppend are committed
 	// to the stable storage. If it contains raftpb.LEADER_SNAPSHOT_REQUEST, the application
@@ -65,7 +65,7 @@ func (rd Ready) ContainsUpdates() bool {
 		!raftpb.IsEmptyHardState(rd.HardStateToSave) ||
 		!raftpb.IsEmptySnapshot(rd.SnapshotToSave) ||
 		len(rd.EntriesToAppend) > 0 ||
-		len(rd.EntriesToCommit) > 0 ||
+		len(rd.EntriesToApply) > 0 ||
 		len(rd.MessagesToSend) > 0 ||
 		rd.ReadState.Index != 0
 }
@@ -74,7 +74,7 @@ func (rd Ready) ContainsUpdates() bool {
 func newReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState raftpb.HardState) Ready {
 	rd := Ready{
 		EntriesToAppend: rnd.storageRaftLog.unstableEntries(),
-		EntriesToCommit: rnd.storageRaftLog.nextEntriesToApply(),
+		EntriesToApply:  rnd.storageRaftLog.nextEntriesToApply(),
 		MessagesToSend:  rnd.mailbox,
 	}
 

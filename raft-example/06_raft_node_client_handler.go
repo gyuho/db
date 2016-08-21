@@ -59,13 +59,13 @@ func (rnd *raftNode) startClientHandler() {
 	go func() {
 		err := <-ds.errc
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 	}()
 
 	_, port, err := net.SplitHostPort(rnd.clientURL.Host)
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	logger.Printf("startClientHandler %s with %q", types.ID(rnd.id), rnd.clientURL.String())
@@ -74,6 +74,6 @@ func (rnd *raftNode) startClientHandler() {
 		Handler: &clientHandler{ds: ds},
 	}
 	if err := srv.ListenAndServe(); err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 }

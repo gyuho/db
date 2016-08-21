@@ -84,7 +84,7 @@ type Node interface {
 	// it must apply all pending configuration changes if any.
 	//
 	//   nr := <-nd.Ready()
-	//   go apply(nr.EntriesToCommit)
+	//   go apply(nr.EntriesToApply)
 	//   if nr.SoftState.NodeState == Candidate { waitAllApplied() }
 	//   nd.Advance()
 	//

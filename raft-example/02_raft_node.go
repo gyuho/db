@@ -40,9 +40,12 @@ type raftNode struct {
 	lastIndex uint64
 
 	storageMemory *raft.StorageStableInMemory
-	wal           *raftwal.WAL
-	node          raft.Node
-	transport     *rafthttp.Transport
+
+	// TODO: storage interface
+	wal *raftwal.WAL
+
+	node      raft.Node
+	transport *rafthttp.Transport
 
 	// shared channel with dataStore
 	propc   chan []byte // propc to receive proposals "FROM"
