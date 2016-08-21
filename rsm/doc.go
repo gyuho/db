@@ -119,7 +119,11 @@ etcdserver.NewServer creates a new etcdserver.EtcdServer.
  8. receive Ready from applyc
  9. EtcdServer applies these Ready
 10. If Ready.Snapshot is not empty, save,apply Snapshot
-11. trigger snapshot whenever applied index > last index in Raft
+11. trigger snapshot in the background
+    - after commit
+    - <-apply.raftDone
+    - s.triggerSnapshot(ep)
+    - ep.appliedi-ep.snapi > s.snapCount
 12. r.Advance
 
 =================================================================================
