@@ -42,7 +42,6 @@ func (rnd *raftNode) applySnapshot(ap *apply) {
 	}
 
 	// TODO: progress, backend
-
 	// if ap.snapshotToSave.Metadata.Index <=
 }
 
@@ -66,7 +65,7 @@ func (rnd *raftNode) applyEntries(ap *apply) {
 			}
 
 		case raftpb.ENTRY_TYPE_CONFIG_CHANGE:
-			// TODO
+			// TODO: support config change
 		}
 
 		if ap.entriesToApply[i].Index == rnd.lastIndex { // special nil commit to signal that replay has finished
@@ -112,19 +111,16 @@ func (rnd *raftNode) startRaftHandler() {
 
 		case rd := <-rnd.node.Ready(): // ready to commit
 			isLeader := false
-			if rd.SoftState != nil {
-				if rd.SoftState.NodeState == raftpb.NODE_STATE_LEADER {
-					isLeader = true
-				}
+			if rd.SoftState != nil && rd.SoftState.NodeState == raftpb.NODE_STATE_LEADER {
+				isLeader = true
 			}
 
 			readyToSnapshot := make(chan struct{})
-			ap := &apply{
+			go rnd.applyAll(&apply{
 				entriesToApply:  rd.EntriesToApply,
 				snapshotToSave:  rd.SnapshotToSave,
 				readyToSnapshot: readyToSnapshot,
-			}
-			go rnd.applyAll(ap)
+			})
 
 			// (Raft §10.2.1 Writing to the leader’s disk in parallel, p.141)
 			// leader writes the new log entry to disk before replicating the entry
@@ -147,11 +143,15 @@ func (rnd *raftNode) startRaftHandler() {
 				}
 
 				// etcdserver/raft.go: r.raftStorage.ApplySnapshot(rd.Snapshot)
-				rnd.storageMemory.ApplySnapshot(rd.SnapshotToSave)
+				if err := rnd.storageMemory.ApplySnapshot(rd.SnapshotToSave); err != nil {
+					panic(err)
+				}
 			}
 
 			// etcdserver/raft.go: r.raftStorage.Append(rd.Entries)
-			rnd.storageMemory.Append(rd.EntriesToAppend...)
+			if err := rnd.storageMemory.Append(rd.EntriesToAppend...); err != nil {
+				panic(err)
+			}
 
 			if !isLeader {
 				rnd.transport.Send(rd.MessagesToSend)
