@@ -35,8 +35,8 @@ func (hd *clientHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		// rw.WriteHeader(http.StatusNoContent)
 
-	case "POST": // TODO
-	case "DELETE": // TODO
+	case "POST": // TODO: implement config change
+	case "DELETE": // TODO: implement config change
 
 	case "GET":
 		if val, ok := hd.ds.get(key); ok {

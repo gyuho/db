@@ -10,10 +10,10 @@ import (
 //
 // (etcd raft.Node)
 type Node interface {
-	// GetNodeStatus returns the current status of the Raft state machine.
+	// NodeStatus returns the current status of the Raft state machine.
 	//
 	// (etcd raft.Node.Status)
-	GetNodeStatus() NodeStatus
+	NodeStatus() NodeStatus
 
 	// Tick increments the internal logical clock in the Node, by a single tick.
 	// Election timeouts and heartbeat timeouts are in units of ticks.
@@ -159,7 +159,7 @@ func newNode() node {
 }
 
 // (etcd raft.node.Status)
-func (nd *node) GetNodeStatus() NodeStatus {
+func (nd *node) NodeStatus() NodeStatus {
 	ch := make(chan NodeStatus)
 	nd.nodeStatusChCh <- ch
 	return <-ch
