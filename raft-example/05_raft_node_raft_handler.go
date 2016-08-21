@@ -41,7 +41,9 @@ func (rnd *raftNode) applySnapshot(ap *apply) {
 		return
 	}
 
-	// TODO
+	// TODO: progress, backend
+
+	// if ap.snapshotToSave.Metadata.Index <=
 }
 
 // (etcd etcdserver.EtcdServer.applyEntries,apply)
@@ -95,7 +97,7 @@ type apply struct {
 
 // (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
 func (rnd *raftNode) startRaftHandler() {
-	defer rnd.wal.Close()
+	defer rnd.storage.Close()
 
 	ticker := time.NewTicker(time.Duration(rnd.electionTickN) * time.Millisecond)
 	defer ticker.Stop()
@@ -134,13 +136,15 @@ func (rnd *raftNode) startRaftHandler() {
 			}
 
 			// etcdserver/raft.go: r.storage.Save(rd.HardState, rd.Entries)
-			if err := rnd.wal.Save(rd.HardStateToSave, rd.EntriesToAppend); err != nil {
+			if err := rnd.storage.Save(rd.HardStateToSave, rd.EntriesToAppend); err != nil {
 				panic(err)
 			}
 
 			if !raftpb.IsEmptySnapshot(rd.SnapshotToSave) {
 				// etcdserver/raft.go: r.storage.SaveSnap(rd.Snapshot)
-				// TODO
+				if err := rnd.storage.SaveSnap(rd.SnapshotToSave); err != nil {
+					panic(err)
+				}
 
 				// etcdserver/raft.go: r.raftStorage.ApplySnapshot(rd.Snapshot)
 				rnd.storageMemory.ApplySnapshot(rd.SnapshotToSave)

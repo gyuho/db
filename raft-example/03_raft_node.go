@@ -8,7 +8,7 @@ import (
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft"
 	"github.com/gyuho/db/rafthttp"
-	"github.com/gyuho/db/raftwal"
+	"github.com/gyuho/db/raftsnap"
 )
 
 type config struct {
@@ -40,9 +40,7 @@ type raftNode struct {
 	lastIndex uint64
 
 	storageMemory *raft.StorageStableInMemory
-
-	// TODO: storage interface
-	wal *raftwal.WAL
+	storage       Storage
 
 	node      raft.Node
 	transport *rafthttp.Transport
@@ -77,9 +75,10 @@ func startRaftNode(cfg config) *raftNode {
 		lastIndex: 0,
 
 		storageMemory: raft.NewStorageStableInMemory(),
-		wal:           nil,
-		node:          nil,
-		transport:     nil,
+		storage:       nil,
+
+		node:      nil,
+		transport: nil,
 
 		propc:   make(chan []byte, 100),
 		commitc: make(chan []byte, 100),
@@ -97,7 +96,10 @@ func (rnd *raftNode) start() {
 	logger.Printf("raftNode.start %s at %s", types.ID(rnd.id), rnd.dir)
 
 	walExist := fileutil.DirHasFiles(rnd.walDir)
-	rnd.wal = rnd.replayWAL()
+	rnd.storage = &storage{
+		WAL:         rnd.replayWAL(),
+		Snapshotter: raftsnap.New(rnd.snapDir),
+	}
 
 	cfg := &raft.Config{
 		ID:                      rnd.id,
