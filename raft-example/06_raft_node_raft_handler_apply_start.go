@@ -80,6 +80,15 @@ func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
 
 // (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
 func (rnd *raftNode) startRaftHandler() {
+	snap, err := rnd.storageMemory.Snapshot()
+	if err != nil {
+		panic(err)
+	}
+	pr := &progress{
+		snapshotIndex: snap.Metadata.Index,
+		appliedIndex:  snap.Metadata.Index,
+	}
+
 	defer rnd.storage.Close()
 
 	ticker := time.NewTicker(time.Duration(rnd.electionTickN) * time.Millisecond)
@@ -87,20 +96,19 @@ func (rnd *raftNode) startRaftHandler() {
 
 	go rnd.handleProposal()
 
-	// handle Ready
 	for {
 		select {
 		case <-ticker.C:
 			rnd.node.Tick()
 
-		case rd := <-rnd.node.Ready(): // ready to commit
+		case rd := <-rnd.node.Ready():
 			isLeader := false
 			if rd.SoftState != nil && rd.SoftState.NodeState == raftpb.NODE_STATE_LEADER {
 				isLeader = true
 			}
 
 			readyToSnapshot := make(chan struct{})
-			go rnd.applyAll(nil, &apply{
+			go rnd.applyAll(pr, &apply{
 				entriesToApply:  rd.EntriesToApply,
 				snapshotToSave:  rd.SnapshotToSave,
 				readyToSnapshot: readyToSnapshot,
