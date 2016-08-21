@@ -134,9 +134,11 @@ func (r *raftNode) start(s *EtcdServer) {
         r.applyc <- ap
         r.s.send(rd.Messages) // if leader
         r.storage.Save(rd.HardState, rd.Entries)
+
         if !raft.IsEmptySnap(rd.Snapshot)
             r.storage.SaveSnap(rd.Snapshot)
             r.raftStorage.ApplySnapshot(rd.Snapshot)
+
         r.raftStorage.Append(rd.Entries)
         raftDone <- struct{}{}
         r.Advance()
@@ -176,12 +178,15 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
     r.storage.SaveSnap(snap)
     r.raftStorage.Compact(compacti) // discard all entries before compacti (now only entries "compacti ≤" are left)
 
-(raft/raft.go) (r *raft) sendAppend(to uint64)
+(raft/raft.go)
+func (r *raft) sendAppend(to uint64) {
     term, errt := r.raftLog.term(pr.Next - 1)
     ents, erre := r.raftLog.entries(pr.Next, r.maxMsgSize)
     if errt != nil || erre != nil { // send snapshot if we failed to get term or entries
         m.Type = pb.MsgSnap
         snapshot, err := r.raftLog.snapshot()
+        m.Snapshot = snapshot
+        pr.becomeSnapshot(sindex)
 
 (raft/raft.go)
 func stepCandidate(r *raft, m pb.Message)
@@ -195,6 +200,16 @@ func (r *raft) handleSnapshot(m pb.Message) {
     sindex, sterm := m.Snapshot.Metadata.Index, m.Snapshot.Metadata.Term
     if r.restore(m.Snapshot) {
 
+func (r *raft) restore(s pb.Snapshot) bool {
+    r.raftLog.restore(s)
+
+(raft/log.go)
+func (l *raftLog) restore(s pb.Snapshot) {
+    l.unstable.restore(s)
+
+(raft/log_unstable.go)
+func (u *unstable) restore(s pb.Snapshot) {
+    u.snapshot = &s
 
 =================================================================
 
