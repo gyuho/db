@@ -125,7 +125,7 @@ func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
 }
 
 func (rnd *raftNode) createSnapshot() {
-
+	// TODO
 }
 
 func (rnd *raftNode) triggerSnapshot(pr *progress) {
@@ -155,12 +155,18 @@ func (rnd *raftNode) startRaftHandler() {
 	ticker := time.NewTicker(time.Duration(rnd.electionTickN) * time.Millisecond)
 	defer ticker.Stop()
 
+	tickerSnap := time.NewTicker(rnd.snapshotInterval)
+	defer tickerSnap.Stop()
+
 	go rnd.handleProposal()
 
 	for {
 		select {
 		case <-ticker.C:
 			rnd.node.Tick()
+
+		case <-tickerSnap.C:
+			rnd.triggerSnapshot(pr)
 
 		case rd := <-rnd.node.Ready():
 			isLeader := false
