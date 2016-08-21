@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/gob"
 	"sync"
+
+	"github.com/gyuho/db/pkg/fileutil"
 )
 
 type keyValue struct {
@@ -104,4 +106,36 @@ func (ds *dataStore) readCommit() {
 			return
 		}
 	}
+}
+
+func (ds *dataStore) createSnapshot() ([]byte, error) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(ds.store); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (ds *dataStore) loadSnapshot(fpath string) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	f, err := fileutil.OpenToRead(fpath)
+	if err != nil {
+		ds.errc <- err
+		return
+	}
+	defer f.Close()
+
+	var store map[string]string
+	if err := gob.NewDecoder(f).Decode(&store); err != nil {
+		ds.errc <- err
+		return
+	}
+
+	ds.store = store
 }

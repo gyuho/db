@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gyuho/db/pkg/fileutil"
 )
 
 func Test_dataStore(t *testing.T) {
@@ -30,5 +35,46 @@ func Test_dataStore(t *testing.T) {
 	}
 	if val != "bar" {
 		t.Fatalf("value expected %q, got %q", "bar", val)
+	}
+
+	close(ds.errc)
+	if err := <-ds.errc; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_dataStore_createSnapshot(t *testing.T) {
+	tm := map[string]string{
+		"foo": "bar",
+	}
+	fpath := filepath.Join(os.TempDir(), "testsnapshot")
+	os.RemoveAll(fpath)
+
+	ds := newDataStore(make(chan []byte), make(chan []byte))
+	defer ds.stop()
+
+	ds.store = tm
+
+	bts, err := ds.createSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fileutil.WriteSync(fpath, bts, fileutil.PrivateFileMode); err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(fpath)
+
+	ds.store = nil
+
+	ds.loadSnapshot(fpath)
+
+	if !reflect.DeepEqual(ds.store, tm) {
+		t.Fatalf("store expected %+v, got %+v", tm, ds.store)
+	}
+
+	close(ds.errc)
+	if err := <-ds.errc; err != nil {
+		t.Fatal(err)
 	}
 }

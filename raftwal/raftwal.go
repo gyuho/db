@@ -205,6 +205,8 @@ func OpenWALRead(dir string, snap raftwalpb.Snapshot) (*WAL, error) {
 //
 // For example, if WAL is holding locks 1,2,3,4,5, then ReleaseLocks(4)
 // releases locks for  1,2 (not 3). ReleaseLocks(5) releases 1,2,3.
+//
+// (etcd wal.WAL.ReleaseLockTo)
 func (w *WAL) ReleaseLocks(idx uint64) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

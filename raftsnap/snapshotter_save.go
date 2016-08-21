@@ -34,10 +34,10 @@ func (s *Snapshotter) save(snapshot *raftpb.Snapshot) error {
 	return err
 }
 
-// Save saves raftpb.Snapshot to Snapshotter.
+// SaveSnap saves raftpb.Snapshot to Snapshotter.
 //
 // (etcd snap.Snapshotter.SaveSnap)
-func (s *Snapshotter) Save(snapshot raftpb.Snapshot) error {
+func (s *Snapshotter) SaveSnap(snapshot raftpb.Snapshot) error {
 	if raftpb.IsEmptySnapshot(snapshot) {
 		return nil
 	}

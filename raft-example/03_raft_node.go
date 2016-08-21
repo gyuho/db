@@ -3,12 +3,13 @@ package main
 import (
 	"net/url"
 	"path/filepath"
+	"time"
 
 	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft"
 	"github.com/gyuho/db/rafthttp"
-	"github.com/gyuho/db/raftwal"
+	"github.com/gyuho/db/raftsnap"
 )
 
 type config struct {
@@ -34,15 +35,17 @@ type raftNode struct {
 	walDir  string
 	snapDir string
 
+	periodicSnapshot bool
+	snapshotInterval time.Duration
+	snapCount        uint64
+
 	electionTickN  int
 	heartbeatTickN int
 
 	lastIndex uint64
 
 	storageMemory *raft.StorageStableInMemory
-
-	// TODO: storage interface
-	wal *raftwal.WAL
+	storage       Storage
 
 	node      raft.Node
 	transport *rafthttp.Transport
@@ -56,6 +59,8 @@ type raftNode struct {
 	stopc         chan struct{}
 	stopListenerc chan struct{}
 	donec         chan struct{}
+
+	ds *dataStore
 }
 
 func startRaftNode(cfg config) *raftNode {
@@ -71,33 +76,43 @@ func startRaftNode(cfg config) *raftNode {
 		walDir:  filepath.Join(cfg.dir, "wal"),
 		snapDir: filepath.Join(cfg.dir, "snap"),
 
+		periodicSnapshot: false,
+		snapshotInterval: 5 * time.Second,
+		snapCount:        10000,
+
 		electionTickN:  10,
 		heartbeatTickN: 1,
 
 		lastIndex: 0,
 
 		storageMemory: raft.NewStorageStableInMemory(),
-		wal:           nil,
-		node:          nil,
-		transport:     nil,
+		storage:       nil,
 
+		node:      nil,
+		transport: nil,
+
+		// shared channel with dataStore
 		propc:   make(chan []byte, 100),
 		commitc: make(chan []byte, 100),
+		///////////////////////////////
 
 		errc:          make(chan error),
 		stopc:         make(chan struct{}),
 		stopListenerc: make(chan struct{}),
 		donec:         make(chan struct{}),
 	}
+	rnd.ds = newDataStore(rnd.propc, rnd.commitc)
+
 	go rnd.start()
+
 	return rnd
 }
 
 func (rnd *raftNode) start() {
 	logger.Printf("raftNode.start %s at %s", types.ID(rnd.id), rnd.dir)
 
-	walExist := fileutil.DirHasFiles(rnd.walDir)
-	rnd.wal = rnd.replayWAL()
+	walExist := fileutil.DirHasFiles(rnd.walDir) // MUST BE BEFORE replayWAL
+	rnd.storage = newStorage(rnd.replayWAL(), raftsnap.New(rnd.snapDir))
 
 	cfg := &raft.Config{
 		ID:                      rnd.id,

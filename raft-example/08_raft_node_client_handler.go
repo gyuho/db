@@ -10,11 +10,7 @@ import (
 	"github.com/gyuho/db/pkg/types"
 )
 
-type clientHandler struct {
-	ds *dataStore
-}
-
-func (hd *clientHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (rnd *raftNode) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	key := req.RequestURI
 
 	switch req.Method {
@@ -28,18 +24,18 @@ func (hd *clientHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		kv := keyValue{Key: key, Val: string(val)}
 
 		logger.Printf("proposing %+v", kv)
-		hd.ds.propose(context.TODO(), kv)
+		rnd.ds.propose(context.TODO(), kv)
 
 		// not yet committed, so subsetquent GET may return stale data
 		fmt.Fprintf(rw, "proposing %+v\n", kv)
 
 		// rw.WriteHeader(http.StatusNoContent)
 
-	case "POST": // TODO
-	case "DELETE": // TODO
+	case "POST": // TODO: implement config change
+	case "DELETE": // TODO: implement config change
 
 	case "GET":
-		if val, ok := hd.ds.get(key); ok {
+		if val, ok := rnd.ds.get(key); ok {
 			fmt.Fprintln(rw, val) // rw.Write([]byte(val))
 		} else {
 			fmt.Fprintf(rw, "%q does not exist\n", key)
@@ -55,9 +51,8 @@ func (hd *clientHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (rnd *raftNode) startClientHandler() {
-	ds := newDataStore(rnd.propc, rnd.commitc)
 	go func() {
-		err := <-ds.errc
+		err := <-rnd.ds.errc
 		if err != nil {
 			panic(err)
 		}
@@ -71,7 +66,7 @@ func (rnd *raftNode) startClientHandler() {
 	logger.Printf("startClientHandler %s with %q", types.ID(rnd.id), rnd.clientURL.String())
 	srv := http.Server{
 		Addr:    ":" + port,
-		Handler: &clientHandler{ds: ds},
+		Handler: rnd,
 	}
 	if err := srv.ListenAndServe(); err != nil {
 		panic(err)

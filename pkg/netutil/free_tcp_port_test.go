@@ -10,7 +10,7 @@ func Test_getFreeTCPPort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("Port %s is available for tcp.\n", pt)
+	fmt.Printf("getFreeTCPPort: %d\n", pt)
 }
 
 func Test_GetFreeTCPPorts(t *testing.T) {
@@ -18,5 +18,5 @@ func Test_GetFreeTCPPorts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("GetFreeTCPPorts: %v\n", ps)
+	fmt.Printf("GetFreeTCPPorts: %+v\n", ps)
 }
