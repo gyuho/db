@@ -28,6 +28,8 @@ func (rnd *raftNode) openWAL() *raftwal.WAL {
 
 func (rnd *raftNode) replayWAL() *raftwal.WAL {
 	w := rnd.openWAL()
+
+	// TODO: repair
 	_, hardstate, ents, err := w.ReadAll()
 	if err != nil {
 		panic(err)

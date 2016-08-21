@@ -150,6 +150,8 @@ func (w *WAL) UnsafeEncodeMetadata(meatadata []byte) error {
 }
 
 // UnsafeEncodeSnapshotAndFdatasync encodes raftwalpb.Snapshot to the record.
+//
+// (etcd wal.WAL.SaveSnapshot)
 func (w *WAL) UnsafeEncodeSnapshotAndFdatasync(snap *raftwalpb.Snapshot) error {
 	data, err := snap.Marshal()
 	if err != nil {
@@ -172,6 +174,8 @@ func (w *WAL) UnsafeEncodeSnapshotAndFdatasync(snap *raftwalpb.Snapshot) error {
 }
 
 // UnsafeEncodeEntry encodes raftpb.Entry to the record.
+//
+// (etcd wal.WAL.saveEntry)
 func (w *WAL) UnsafeEncodeEntry(ent *raftpb.Entry) error {
 	data, err := ent.Marshal()
 	if err != nil {
@@ -190,25 +194,24 @@ func (w *WAL) UnsafeEncodeEntry(ent *raftpb.Entry) error {
 }
 
 // UnsafeEncodeHardState encodes raftpb.HardState to the record.
+//
+// (etcd wal.WAL.saveState)
 func (w *WAL) UnsafeEncodeHardState(state *raftpb.HardState) error {
 	if raftpb.IsEmptyHardState(*state) {
 		return nil
 	}
+
+	w.hardState = *state
 
 	data, err := state.Marshal()
 	if err != nil {
 		return err
 	}
 
-	if err := w.enc.encode(&raftwalpb.Record{
+	return w.enc.encode(&raftwalpb.Record{
 		Type: raftwalpb.RECORD_TYPE_HARDSTATE,
 		Data: data,
-	}); err != nil {
-		return err
-	}
-
-	w.hardState = *state
-	return nil
+	})
 }
 
 // UnsafeCutCurrent closes currently written file.
