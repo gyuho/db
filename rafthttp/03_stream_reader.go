@@ -110,7 +110,7 @@ func (sr *streamReader) dial() (io.ReadCloser, error) {
 	case http.StatusNotFound:
 		netutil.GracefulClose(resp)
 		sr.picker.unreachable(targetURL)
-		return nil, fmt.Errorf("%s failed to find peer %s (%s)", sr.transport.Sender, sr.peerID, targetURL.String())
+		return nil, fmt.Errorf("%s failed to reach peer %s (%s)", sr.transport.Sender, sr.peerID, targetURL.String())
 
 	case http.StatusPreconditionFailed:
 		bts, err := ioutil.ReadAll(resp.Body)

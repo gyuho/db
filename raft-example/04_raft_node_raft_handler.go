@@ -35,6 +35,7 @@ func (rnd *raftNode) handleProposal() {
 	}
 }
 
+// (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
 func (rnd *raftNode) handleEntriesToCommit(ents []raftpb.Entry) bool {
 	for i := range ents {
 		switch ents[i].Type {
@@ -65,6 +66,7 @@ func (rnd *raftNode) handleEntriesToCommit(ents []raftpb.Entry) bool {
 	return true
 }
 
+// (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
 func (rnd *raftNode) startRaftHandler() {
 	defer rnd.wal.Close()
 
