@@ -42,10 +42,9 @@ func TestPurgeFile(t *testing.T) {
 	// create 6 more files
 	for i := 4; i < 10; i++ {
 		go func(n int) {
-			var f *os.File
-			f, err = os.Create(filepath.Join(dir, fmt.Sprintf("%d.test", n)))
-			if err != nil {
-				t.Fatal(err)
+			f, berr := os.Create(filepath.Join(dir, fmt.Sprintf("%d.test", n)))
+			if berr != nil {
+				t.Fatal(berr)
 			}
 			f.Close()
 		}(i)

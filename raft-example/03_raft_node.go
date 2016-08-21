@@ -88,18 +88,15 @@ func startRaftNode(cfg config) *raftNode {
 		stopListenerc: make(chan struct{}),
 		donec:         make(chan struct{}),
 	}
+	rnd.storage = newStorage(rnd.replayWAL(), raftsnap.New(rnd.snapDir))
+
 	go rnd.start()
+
 	return rnd
 }
 
 func (rnd *raftNode) start() {
 	logger.Printf("raftNode.start %s at %s", types.ID(rnd.id), rnd.dir)
-
-	walExist := fileutil.DirHasFiles(rnd.walDir)
-	rnd.storage = &storage{
-		WAL:         rnd.replayWAL(),
-		Snapshotter: raftsnap.New(rnd.snapDir),
-	}
 
 	cfg := &raft.Config{
 		ID:                      rnd.id,
@@ -110,7 +107,7 @@ func (rnd *raftNode) start() {
 		MaxInflightMsgNum:       256,
 	}
 
-	if walExist {
+	if fileutil.DirHasFiles(rnd.walDir) {
 		rnd.node = raft.RestartNode(cfg)
 	} else {
 		raftPeers := make([]raft.Peer, len(rnd.peerIDs))
