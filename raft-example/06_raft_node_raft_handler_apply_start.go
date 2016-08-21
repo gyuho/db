@@ -117,31 +117,25 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 	}
 }
 
+// (etcd etcdserver.EtcdServer.applyAll)
+func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
+	rnd.applySnapshot(pr, ap)
+	rnd.applyEntries(pr, ap)
+	close(ap.readyToSnapshot)
+}
+
 func (rnd *raftNode) createSnapshot() {
 
 }
 
-func (rnd *raftNode) triggerSnapshot(force bool, pr *progress) {
-	if pr.appliedIndex-pr.snapshotIndex <= rnd.snapCount && !force {
+func (rnd *raftNode) triggerSnapshot(pr *progress) {
+	if !rnd.forceSnapshot && pr.appliedIndex-pr.snapshotIndex <= rnd.snapCount {
 		return
 	}
 
 	logger.Infof("start snapshot [applied index: %d | last snapshot index: %d]", pr.appliedIndex, pr.snapshotIndex)
 	rnd.createSnapshot() // TODO
 	pr.snapshotIndex = pr.appliedIndex
-}
-
-// (etcd etcdserver.EtcdServer.applyAll)
-func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
-	rnd.applySnapshot(pr, ap)
-	rnd.applyEntries(pr, ap)
-
-	// wait for the raft routine to finish the disk writes before triggering a
-	// snapshot. or applied index might be greater than the last index in raft
-	// storage, since the raft routine might be slower than apply routine.
-	<-ap.readyToSnapshot
-
-	rnd.triggerSnapshot(false, pr)
 }
 
 // (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
@@ -216,7 +210,11 @@ func (rnd *raftNode) startRaftHandler() {
 				rnd.transport.Send(rd.MessagesToSend)
 			}
 
-			close(readyToSnapshot)
+			// wait for the raft routine to finish the disk writes before triggering a
+			// snapshot. or applied index might be greater than the last index in raft
+			// storage, since the raft routine might be slower than apply routine.
+			<-readyToSnapshot
+			rnd.triggerSnapshot(pr)
 
 			// after commit, must call Advance
 			// etcdserver/raft.go: r.Advance()

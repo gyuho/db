@@ -34,7 +34,8 @@ type raftNode struct {
 	walDir  string
 	snapDir string
 
-	snapCount uint64
+	forceSnapshot bool
+	snapCount     uint64
 
 	electionTickN  int
 	heartbeatTickN int
@@ -56,6 +57,8 @@ type raftNode struct {
 	stopc         chan struct{}
 	stopListenerc chan struct{}
 	donec         chan struct{}
+
+	ds *dataStore
 }
 
 func startRaftNode(cfg config) *raftNode {
@@ -71,7 +74,8 @@ func startRaftNode(cfg config) *raftNode {
 		walDir:  filepath.Join(cfg.dir, "wal"),
 		snapDir: filepath.Join(cfg.dir, "snap"),
 
-		snapCount: 10000,
+		forceSnapshot: false,
+		snapCount:     10000,
 
 		electionTickN:  10,
 		heartbeatTickN: 1,
@@ -84,14 +88,17 @@ func startRaftNode(cfg config) *raftNode {
 		node:      nil,
 		transport: nil,
 
+		// shared channel with dataStore
 		propc:   make(chan []byte, 100),
 		commitc: make(chan []byte, 100),
+		///////////////////////////////
 
 		errc:          make(chan error),
 		stopc:         make(chan struct{}),
 		stopListenerc: make(chan struct{}),
 		donec:         make(chan struct{}),
 	}
+	rnd.ds = newDataStore(rnd.propc, rnd.commitc)
 
 	go rnd.start()
 
