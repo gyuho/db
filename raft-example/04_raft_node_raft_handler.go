@@ -102,6 +102,7 @@ func (rnd *raftNode) startRaftHandler() {
 
 		case err := <-rnd.transport.Errc:
 			rnd.errc <- err
+
 			logger.Warningln("stopping %s;", types.ID(rnd.id), err)
 			select {
 			case <-rnd.stopc:

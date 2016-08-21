@@ -26,11 +26,12 @@ func (hd *clientHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 		kv := keyValue{Key: key, Val: string(val)}
+
+		logger.Printf("proposing %+v", kv)
 		hd.ds.propose(context.TODO(), kv)
-		logger.Printf("proposed %+v", kv)
 
 		// not yet committed, so subsetquent GET may return stale data
-		fmt.Fprintf(rw, "proposed %+v\n", kv)
+		fmt.Fprintf(rw, "proposing %+v\n", kv)
 
 		// rw.WriteHeader(http.StatusNoContent)
 

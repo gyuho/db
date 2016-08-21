@@ -91,7 +91,7 @@ func startRaftNode(cfg config) *raftNode {
 }
 
 func (rnd *raftNode) start() {
-	logger.Printf("startRaftNode %s at %s", types.ID(rnd.id), rnd.dir)
+	logger.Printf("raftNode.start %s at %s", types.ID(rnd.id), rnd.dir)
 
 	walExist := fileutil.DirHasFiles(rnd.walDir)
 	rnd.wal = rnd.replayWAL()

@@ -119,12 +119,93 @@ etcdserver.NewServer creates a new etcdserver.EtcdServer.
  8. receive Ready from applyc
  9. EtcdServer applies these Ready
 10. If Ready.Snapshot is not empty, save,apply Snapshot
+11. r.Advance
+
+
+=================================================================
+(etcdserver/raft.go)
+func (r *raftNode) start(s *EtcdServer) {
+    case rd := <-r.Ready():
+        ap := apply{
+            entries:  rd.CommittedEntries,
+            snapshot: rd.Snapshot,
+            raftDone: raftDone,
+        }
+        r.applyc <- ap
+        r.s.send(rd.Messages) // if leader
+        r.storage.Save(rd.HardState, rd.Entries)
+        if !raft.IsEmptySnap(rd.Snapshot)
+            r.storage.SaveSnap(rd.Snapshot)
+            r.raftStorage.ApplySnapshot(rd.Snapshot)
+        r.raftStorage.Append(rd.Entries)
+        raftDone <- struct{}{}
+        r.Advance()
+
+(etcdserver/server.go)
+func (s *EtcdServer) send(ms []raftpb.Message) {
+    if ms[i].Type == raftpb.MsgSnap {
+        s.msgSnapC <- ms[i]:
+
+(etcdserver/server.go)
+func (s *EtcdServer) run() {
+    for {
+        select {
+            case ap := <-s.r.applyc:
+                s.applyAll(&ep, &ap)
+
+(etcdserver/server.go)
+func (s *EtcdServer) applyAll(ep *etcdProgress, apply *apply) {
+    s.applySnapshot(ep, apply)
+    s.applyEntries(ep, apply)
+    <-apply.raftDone
+    s.triggerSnapshot(ep)
+    m := <-s.msgSnapC
+        merged := s.createMergedSnapshotMessage(m, ep.appliedi, ep.confState)
+        s.sendMergedSnap(merged)
+
+(etcdserver/server.go)
+func (s *EtcdServer) triggerSnapshot(ep *etcdProgress) {
+    if ep.appliedi-ep.snapi > s.snapCount
+        s.snapshot(snapi uint64, confState raftpb.ConfState)
+
+(etcdserver/server.go)
+func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
+    d, err := clone.SaveNoCopy()
+    snap, err := s.r.raftStorage.CreateSnapshot(snapi, &confState, d)
+    s.KV().Commit()
+    r.storage.SaveSnap(snap)
+    r.raftStorage.Compact(compacti) // discard all entries before compacti (now only entries "compacti ≤" are left)
+
+(raft/raft.go) (r *raft) sendAppend(to uint64)
+    term, errt := r.raftLog.term(pr.Next - 1)
+    ents, erre := r.raftLog.entries(pr.Next, r.maxMsgSize)
+    if errt != nil || erre != nil { // send snapshot if we failed to get term or entries
+        m.Type = pb.MsgSnap
+        snapshot, err := r.raftLog.snapshot()
+
+(raft/raft.go)
+func stepCandidate(r *raft, m pb.Message)
+func stepFollower(r *raft, m pb.Message) {
+    case pb.MsgSnap:
+        r.electionElapsed = 0
+        r.lead = m.From
+        r.handleSnapshot(m)
+
+func (r *raft) handleSnapshot(m pb.Message) {
+    sindex, sterm := m.Snapshot.Metadata.Index, m.Snapshot.Metadata.Term
+    if r.restore(m.Snapshot) {
+
+
+=================================================================
+
+
+
 11. trigger snapshot in the background
     - after commit
     - <-apply.raftDone
     - s.triggerSnapshot(ep)
     - ep.appliedi-ep.snapi > s.snapCount
-12. r.Advance
+
 
 =================================================================================
 

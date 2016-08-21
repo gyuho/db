@@ -314,9 +314,9 @@ func (ms *StorageStableInMemory) SetHardState(state raftpb.HardState) error {
 	return nil
 }
 
-// Compact discards all log entries "up to" compactIndex.
-// It keeps entries[compactIndex:], and retains entries[compactIndex]
-// in its first entry only for matching purposes.
+// Compact discards all log entries "before" compactIndex.
+// It keeps entries of "compactIndex ≤".
+// It keeps the entry at "compactIndex" as the first entry for matching purposes.
 //
 // The application must ensure that it does not compacts on an index
 // greater than applied index.
