@@ -34,6 +34,8 @@ type raftNode struct {
 	walDir  string
 	snapDir string
 
+	snapCount uint64
+
 	electionTickN  int
 	heartbeatTickN int
 
@@ -68,6 +70,8 @@ func startRaftNode(cfg config) *raftNode {
 		dir:     cfg.dir,
 		walDir:  filepath.Join(cfg.dir, "wal"),
 		snapDir: filepath.Join(cfg.dir, "snap"),
+
+		snapCount: 10000,
 
 		electionTickN:  10,
 		heartbeatTickN: 1,

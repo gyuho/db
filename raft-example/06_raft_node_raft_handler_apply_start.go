@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gyuho/db/pkg/types"
@@ -39,10 +41,17 @@ func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(dbFilePath)
+	fpath := filepath.Join(rnd.snapDir, "db")
+	if err := os.Rename(dbFilePath, fpath); err != nil {
+		panic(err)
+	}
+	fmt.Println(fpath)
 
-	// TODO: progress
 	// TODO: save to backend
+
+	pr.configState = ap.snapshotToSave.Metadata.ConfigState
+	pr.snapshotIndex = ap.snapshotToSave.Metadata.Index
+	pr.appliedIndex = ap.snapshotToSave.Metadata.Index
 }
 
 // (etcd etcdserver.EtcdServer.applyEntries,apply)
@@ -108,8 +117,18 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 	}
 }
 
-func (rnd *raftNode) triggerSnapshot(pr *progress) {
-	// TODO
+func (rnd *raftNode) createSnapshot() {
+
+}
+
+func (rnd *raftNode) triggerSnapshot(force bool, pr *progress) {
+	if pr.appliedIndex-pr.snapshotIndex <= rnd.snapCount && !force {
+		return
+	}
+
+	logger.Infof("start snapshot [applied index: %d | last snapshot index: %d]", pr.appliedIndex, pr.snapshotIndex)
+	rnd.createSnapshot() // TODO
+	pr.snapshotIndex = pr.appliedIndex
 }
 
 // (etcd etcdserver.EtcdServer.applyAll)
@@ -122,7 +141,7 @@ func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
 	// storage, since the raft routine might be slower than apply routine.
 	<-ap.readyToSnapshot
 
-	rnd.triggerSnapshot(pr)
+	rnd.triggerSnapshot(false, pr)
 }
 
 // (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
