@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path"
 	"strings"
 	"testing"
 	"time"
@@ -30,11 +29,11 @@ func Test_basic_single_node(t *testing.T) {
 
 	cfg := config{
 		id:               1,
-		clientURL:        fmt.Sprintf("http://localhost%s", ports[0]),
-		advertisePeerURL: fmt.Sprintf("http://localhost%s", ports[1]),
+		clientURL:        fmt.Sprintf("http://localhost:%d", ports[0]),
+		advertisePeerURL: fmt.Sprintf("http://localhost:%d", ports[1]),
 
 		peerIDs:  []uint64{1},
-		peerURLs: []string{fmt.Sprintf("http://localhost%s", ports[1])},
+		peerURLs: []string{fmt.Sprintf("http://localhost:%d", ports[1])},
 
 		dir: dir,
 	}
@@ -48,7 +47,7 @@ func Test_basic_single_node(t *testing.T) {
 
 		time.Sleep(300 * time.Millisecond)
 		func() {
-			req, err := http.NewRequest("PUT", path.Join(cfg.clientURL, "foo"), strings.NewReader("bar"))
+			req, err := http.NewRequest("PUT", cfg.clientURL+"/foo", strings.NewReader("bar"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -68,7 +67,7 @@ func Test_basic_single_node(t *testing.T) {
 
 		time.Sleep(300 * time.Millisecond)
 		func() {
-			req, err := http.NewRequest("GET", path.Join(cfg.clientURL, "foo"), nil)
+			req, err := http.NewRequest("GET", cfg.clientURL+"/foo", nil)
 			if err != nil {
 				t.Fatal(err)
 			}

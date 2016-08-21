@@ -4,30 +4,29 @@ import (
 	"fmt"
 	"net"
 	"sort"
-	"strconv"
 )
 
-func getFreeTCPPort() (string, error) {
+func getFreeTCPPort() (int, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
 	l, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
 	pd := l.Addr().(*net.TCPAddr).Port
 	l.Close()
 
-	return ":" + strconv.Itoa(pd), nil
+	return pd, nil
 }
 
 // GetFreeTCPPorts returns available ports.
-func GetFreeTCPPorts(num int) ([]string, error) {
+func GetFreeTCPPorts(num int) ([]int, error) {
 	try := 0
-	rm := make(map[string]struct{})
+	rm := make(map[int]struct{})
 	for len(rm) != num {
 		if try > 500 {
 			return nil, fmt.Errorf("too many tries to find free ports")
@@ -42,11 +41,11 @@ func GetFreeTCPPorts(num int) ([]string, error) {
 		try++
 	}
 
-	var rs []string
+	var ns []int
 	for p := range rm {
-		rs = append(rs, p)
+		ns = append(ns, p)
 	}
-	sort.Strings(rs)
+	sort.Ints(ns)
 
-	return rs, nil
+	return ns, nil
 }
