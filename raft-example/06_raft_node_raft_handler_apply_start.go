@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gyuho/db/pkg/types"
@@ -16,6 +17,7 @@ type apply struct {
 
 // (etcd etcdserver.progress)
 type progress struct {
+	configState   raftpb.ConfigState
 	snapshotIndex uint64
 	appliedIndex  uint64
 }
@@ -25,6 +27,19 @@ func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 	if raftpb.IsEmptySnapshot(ap.snapshotToSave) {
 		return
 	}
+
+	logger.Infof("applying snapshot at index %d", pr.snapshotIndex)
+	defer logger.Infof("finished applying snapshot at index %d", pr.snapshotIndex)
+
+	if ap.snapshotToSave.Metadata.Index <= pr.appliedIndex {
+		logger.Panicf("snapshot index [%d] should > progress.appliedIndex [%d] + 1", ap.snapshotToSave.Metadata.Index, pr.appliedIndex)
+	}
+
+	dbFilePath, err := rnd.storage.DBFilePath(ap.snapshotToSave.Metadata.Index)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(dbFilePath)
 
 	// TODO: progress
 	// TODO: save to backend
@@ -36,9 +51,20 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 		return
 	}
 
-	// TODO: handle progress
+	firstIdx := ap.entriesToApply[0].Index
+	if firstIdx > pr.appliedIndex+1 {
+		logger.Panicf("first index of committed entry[%d] should <= progress.appliedIndex[%d] + 1", firstIdx, pr.appliedIndex)
+	}
 
-	for i := range ap.entriesToApply {
+	var ents []raftpb.Entry
+	if pr.appliedIndex-firstIdx+1 < uint64(len(ap.entriesToApply)) {
+		ents = ap.entriesToApply[pr.appliedIndex-firstIdx+1:]
+	}
+	if len(ents) == 0 {
+		return
+	}
+
+	for i := range ents {
 		switch ap.entriesToApply[i].Type {
 		case raftpb.ENTRY_TYPE_NORMAL:
 			if len(ap.entriesToApply[i].Data) == 0 {
@@ -52,8 +78,25 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 			}
 
 		case raftpb.ENTRY_TYPE_CONFIG_CHANGE:
-			// TODO: support config change
+			var cc raftpb.ConfigChange
+			cc.Unmarshal(ap.entriesToApply[i].Data)
+			rnd.node.ApplyConfigChange(cc)
+			switch cc.Type {
+			case raftpb.CONFIG_CHANGE_TYPE_ADD_NODE:
+				if len(cc.Context) > 0 {
+					rnd.transport.AddPeer(types.ID(cc.NodeID), []string{string(cc.Context)})
+				}
+			case raftpb.CONFIG_CHANGE_TYPE_REMOVE_NODE:
+				if cc.NodeID == rnd.id {
+					logger.Warningln("%s had already been removed!", types.ID(rnd.id))
+					return
+				}
+				rnd.transport.RemovePeer(types.ID(cc.NodeID))
+			}
 		}
+
+		// after commit, update appliedIndex
+		pr.appliedIndex = ap.entriesToApply[i].Index
 
 		if ap.entriesToApply[i].Index == rnd.lastIndex { // special nil commit to signal that replay has finished
 			select {
@@ -74,7 +117,11 @@ func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
 	rnd.applySnapshot(pr, ap)
 	rnd.applyEntries(pr, ap)
 
+	// wait for the raft routine to finish the disk writes before triggering a
+	// snapshot. or applied index might be greater than the last index in raft
+	// storage, since the raft routine might be slower than apply routine.
 	<-ap.readyToSnapshot
+
 	rnd.triggerSnapshot(pr)
 }
 
@@ -85,6 +132,7 @@ func (rnd *raftNode) startRaftHandler() {
 		panic(err)
 	}
 	pr := &progress{
+		configState:   snap.Metadata.ConfigState,
 		snapshotIndex: snap.Metadata.Index,
 		appliedIndex:  snap.Metadata.Index,
 	}
