@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gyuho/db/pkg/fileutil"
 )
 
 func Test_dataStore(t *testing.T) {
@@ -41,20 +43,26 @@ func Test_dataStore(t *testing.T) {
 	}
 }
 
-func Test_dataStore_saveSnapshot(t *testing.T) {
+func Test_dataStore_createSnapshot(t *testing.T) {
 	tm := map[string]string{
 		"foo": "bar",
 	}
+	fpath := filepath.Join(os.TempDir(), "testsnapshot")
+	os.RemoveAll(fpath)
 
 	ds := newDataStore(make(chan []byte), make(chan []byte))
 	defer ds.stop()
 
 	ds.store = tm
 
-	fpath := filepath.Join(os.TempDir(), "testsnapshot")
-	os.RemoveAll(fpath)
+	bts, err := ds.createSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	ds.saveSnapshot(fpath)
+	if err := fileutil.WriteSync(fpath, bts, fileutil.PrivateFileMode); err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(fpath)
 
 	ds.store = nil

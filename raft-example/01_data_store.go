@@ -108,20 +108,16 @@ func (ds *dataStore) readCommit() {
 	}
 }
 
-func (ds *dataStore) saveSnapshot(fpath string) {
+func (ds *dataStore) createSnapshot() ([]byte, error) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(ds.store); err != nil {
-		ds.errc <- err
-		return
+		return nil, err
 	}
 
-	if err := fileutil.WriteSync(fpath, buf.Bytes(), fileutil.PrivateFileMode); err != nil {
-		ds.errc <- err
-		return
-	}
+	return buf.Bytes(), nil
 }
 
 func (ds *dataStore) loadSnapshot(fpath string) {

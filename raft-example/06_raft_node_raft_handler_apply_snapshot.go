@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -45,9 +44,9 @@ func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 	if err := os.Rename(dbFilePath, fpath); err != nil {
 		panic(err)
 	}
-	fmt.Println(fpath)
 
-	// TODO: save to backend
+	logger.Infof("loading snapshot at %q", fpath)
+	rnd.ds.loadSnapshot(fpath)
 
 	pr.configState = ap.snapshotToSave.Metadata.ConfigState
 	pr.snapshotIndex = ap.snapshotToSave.Metadata.Index
@@ -124,8 +123,32 @@ func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
 	close(ap.readyToSnapshot)
 }
 
-func (rnd *raftNode) createSnapshot() {
-	// TODO
+const catchUpEntriesN = 10
+
+// (etcd etcdserver.EtcdServer.snapshot)
+func (rnd *raftNode) createSnapshot(pr *progress) {
+	data, err := rnd.ds.createSnapshot()
+	if err != nil {
+		panic(err)
+	}
+
+	snap, err := rnd.storageMemory.CreateSnapshot(pr.snapshotIndex, &pr.configState, data)
+	if err != nil {
+		panic(err)
+	}
+	if err := rnd.storage.SaveSnap(snap); err != nil {
+		panic(err)
+	}
+	logger.Infof("saved snapshot at index %d", snap.Metadata.Index)
+
+	compactIndex := uint64(1)
+	if pr.snapshotIndex > catchUpEntriesN {
+		compactIndex = pr.snapshotIndex - catchUpEntriesN
+	}
+	if err := rnd.storageMemory.Compact(compactIndex); err != nil {
+		panic(err)
+	}
+	logger.Infof("saved snapshot at index %d", compactIndex)
 }
 
 func (rnd *raftNode) triggerSnapshot(pr *progress) {
@@ -134,7 +157,7 @@ func (rnd *raftNode) triggerSnapshot(pr *progress) {
 	}
 
 	logger.Infof("start snapshot [applied index: %d | last snapshot index: %d]", pr.appliedIndex, pr.snapshotIndex)
-	rnd.createSnapshot() // TODO
+	rnd.createSnapshot(pr)
 	pr.snapshotIndex = pr.appliedIndex
 }
 
