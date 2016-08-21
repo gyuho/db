@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gyuho/db/pkg/types"
+	"github.com/gyuho/db/raft"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
@@ -134,6 +135,11 @@ func (rnd *raftNode) createSnapshot(pr *progress) {
 
 	snap, err := rnd.storageMemory.CreateSnapshot(pr.snapshotIndex, &pr.configState, data)
 	if err != nil {
+		// the snapshot was done asynchronously with the progress of raft.
+		// raft might have already got a newer snapshot.
+		if err == raft.ErrSnapOutOfDate {
+			return
+		}
 		panic(err)
 	}
 	if err := rnd.storage.SaveSnap(snap); err != nil {
