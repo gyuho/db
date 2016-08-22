@@ -112,11 +112,10 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	RECEIVED %s
 	which has HIGHER term (sender current term '%d' > node current term '%d')
 	(elapsed election timeout ticks: %d out of %d)
-	(GOT VOTE-REQUEST from CANDIDATE with HIGHER term, so BECOME FOLLOWER with sender term '%d')
+	(GOT %q with HIGHER term, so BECOME FOLLOWER with sender term '%d')
 
-`, rnd.describeLong(), raftpb.DescribeMessageLong(msg),
-			msg.SenderCurrentTerm, rnd.currentTerm,
-			rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum, msg.SenderCurrentTerm)
+`, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.SenderCurrentTerm, rnd.currentTerm,
+			rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum, msg.Type, msg.SenderCurrentTerm)
 
 		rnd.becomeFollower(msg.SenderCurrentTerm, leaderID)
 
