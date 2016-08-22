@@ -3,7 +3,6 @@ package main
 import (
 	"net/url"
 	"path/filepath"
-	"time"
 
 	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/pkg/types"
@@ -35,9 +34,7 @@ type raftNode struct {
 	walDir  string
 	snapDir string
 
-	periodicSnapshot bool
-	snapshotInterval time.Duration
-	snapCount        uint64
+	snapCount uint64
 
 	electionTickN  int
 	heartbeatTickN int
@@ -76,9 +73,7 @@ func startRaftNode(cfg config) *raftNode {
 		walDir:  filepath.Join(cfg.dir, "wal"),
 		snapDir: filepath.Join(cfg.dir, "snap"),
 
-		periodicSnapshot: false,
-		snapshotInterval: 5 * time.Second,
-		snapCount:        10000,
+		snapCount: 10000,
 
 		electionTickN:  10,
 		heartbeatTickN: 1,

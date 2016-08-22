@@ -159,7 +159,7 @@ func (rnd *raftNode) createSnapshot(pr *progress) {
 }
 
 func (rnd *raftNode) triggerSnapshot(pr *progress) {
-	if !rnd.periodicSnapshot && pr.appliedIndex-pr.snapshotIndex <= rnd.snapCount {
+	if pr.appliedIndex-pr.snapshotIndex <= rnd.snapCount {
 		return
 	}
 
