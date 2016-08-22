@@ -53,7 +53,9 @@ func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 		panic(err)
 	}
 	defer f.Close()
-	rnd.ds.loadSnapshot(f)
+	if err := rnd.ds.loadSnapshot(f); err != nil {
+		panic(err)
+	}
 
 	pr.configState = ap.snapshotToSave.Metadata.ConfigState
 	pr.snapshotIndex = ap.snapshotToSave.Metadata.Index

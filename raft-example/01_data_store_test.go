@@ -72,7 +72,9 @@ func Test_dataStore_createSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	ds.loadSnapshot(f)
+	if err := ds.loadSnapshot(f); err != nil {
+		t.Fatal(err)
+	}
 
 	if !reflect.DeepEqual(ds.store, tm) {
 		t.Fatalf("store expected %+v, got %+v", tm, ds.store)

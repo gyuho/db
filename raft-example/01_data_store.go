@@ -119,13 +119,13 @@ func (ds *dataStore) createSnapshot() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (ds *dataStore) loadSnapshot(rd io.Reader) {
+func (ds *dataStore) loadSnapshot(rd io.Reader) error {
 	var store map[string]string
 	if err := gob.NewDecoder(rd).Decode(&store); err != nil {
-		ds.errc <- err
-		return
+		return err
 	}
 	ds.mu.Lock()
 	ds.store = store
 	ds.mu.Unlock()
+	return nil
 }
