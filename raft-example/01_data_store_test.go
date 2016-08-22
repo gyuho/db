@@ -67,7 +67,12 @@ func Test_dataStore_createSnapshot(t *testing.T) {
 
 	ds.store = nil
 
-	ds.loadSnapshot(fpath)
+	f, err := fileutil.OpenToRead(fpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	ds.loadSnapshot(f)
 
 	if !reflect.DeepEqual(ds.store, tm) {
 		t.Fatalf("store expected %+v, got %+v", tm, ds.store)

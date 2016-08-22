@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft"
 	"github.com/gyuho/db/raft/raftpb"
@@ -47,7 +48,12 @@ func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 	}
 
 	logger.Infof("loading snapshot at %q", fpath)
-	rnd.ds.loadSnapshot(fpath)
+	f, err := fileutil.OpenToRead(fpath)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	rnd.ds.loadSnapshot(f)
 
 	pr.configState = ap.snapshotToSave.Metadata.ConfigState
 	pr.snapshotIndex = ap.snapshotToSave.Metadata.Index

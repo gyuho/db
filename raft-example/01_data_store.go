@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"io"
 	"sync"
-
-	"github.com/gyuho/db/pkg/fileutil"
 )
 
 type keyValue struct {
@@ -120,22 +119,13 @@ func (ds *dataStore) createSnapshot() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (ds *dataStore) loadSnapshot(fpath string) {
-	ds.mu.Lock()
-	defer ds.mu.Unlock()
-
-	f, err := fileutil.OpenToRead(fpath)
-	if err != nil {
-		ds.errc <- err
-		return
-	}
-	defer f.Close()
-
+func (ds *dataStore) loadSnapshot(rd io.Reader) {
 	var store map[string]string
-	if err := gob.NewDecoder(f).Decode(&store); err != nil {
+	if err := gob.NewDecoder(rd).Decode(&store); err != nil {
 		ds.errc <- err
 		return
 	}
-
+	ds.mu.Lock()
 	ds.store = store
+	ds.mu.Unlock()
 }
