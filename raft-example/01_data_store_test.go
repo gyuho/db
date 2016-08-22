@@ -19,10 +19,10 @@ func Test_dataStore(t *testing.T) {
 	go func() {
 		defer close(donec)
 
-		bts := <-ds.propc
+		data := <-ds.propc
 		// assume this is agreed by consensus
 
-		ds.commitc <- bts
+		ds.commitc <- data
 	}()
 	ds.propose(context.TODO(), keyValue{"foo", "bar"})
 	<-donec
@@ -53,12 +53,12 @@ func Test_dataStore_createSnapshot(t *testing.T) {
 
 	ds.store = tm
 
-	bts, err := ds.createSnapshot()
+	data, err := ds.createSnapshot()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := fileutil.WriteSync(fpath, bts, fileutil.PrivateFileMode); err != nil {
+	if err := fileutil.WriteSync(fpath, data, fileutil.PrivateFileMode); err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(fpath)
