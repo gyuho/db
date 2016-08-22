@@ -44,9 +44,7 @@ func Test_dataStore(t *testing.T) {
 }
 
 func Test_dataStore_createSnapshot(t *testing.T) {
-	tm := map[string]string{
-		"foo": "bar",
-	}
+	tm := map[string]string{"foo": "bar"}
 	fpath := filepath.Join(os.TempDir(), "testsnapshot")
 	os.RemoveAll(fpath)
 
