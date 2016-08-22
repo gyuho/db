@@ -113,9 +113,9 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 		}
 
 		// after commit, update appliedIndex
-		pr.appliedIndex = ap.entriesToApply[i].Index
+		pr.appliedIndex = ents[i].Index
 
-		if ap.entriesToApply[i].Index == rnd.lastIndex { // special nil commit to signal that replay has finished
+		if ents[i].Index == rnd.lastIndex { // special nil commit to signal that replay has finished
 			select {
 			case rnd.commitc <- nil:
 			case <-rnd.stopc:
