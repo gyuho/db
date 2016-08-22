@@ -13,9 +13,9 @@ import (
 
 // (etcd etcdserver.apply)
 type apply struct {
-	entriesToApply  []raftpb.Entry  // (etcd etcdserver.apply.entries)
-	snapshotToSave  raftpb.Snapshot // (etcd etcdserver.apply.snapshot)
-	readyToSnapshot chan struct{}   // (etcd etcdserver.apply.raftDone)
+	entriesToApply []raftpb.Entry  // (etcd etcdserver.apply.entries)
+	snapshotToSave raftpb.Snapshot // (etcd etcdserver.apply.snapshot)
+	applyDone      chan struct{}   // (etcd etcdserver.apply.raftDone)
 }
 
 // (etcd etcdserver.progress)
@@ -125,13 +125,6 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 	}
 }
 
-// (etcd etcdserver.EtcdServer.applyAll)
-func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
-	rnd.applySnapshot(pr, ap)
-	rnd.applyEntries(pr, ap)
-	close(ap.readyToSnapshot)
-}
-
 const catchUpEntriesN = 10
 
 // (etcd etcdserver.EtcdServer.snapshot)
@@ -175,6 +168,14 @@ func (rnd *raftNode) triggerSnapshot(pr *progress) {
 	pr.snapshotIndex = pr.appliedIndex
 }
 
+// (etcd etcdserver.EtcdServer.applyAll)
+func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
+	rnd.applySnapshot(pr, ap)
+	rnd.applyEntries(pr, ap)
+	close(ap.applyDone)
+	rnd.triggerSnapshot(pr)
+}
+
 // (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
 func (rnd *raftNode) startRaftHandler() {
 	snap, err := rnd.storageMemory.Snapshot()
@@ -192,9 +193,6 @@ func (rnd *raftNode) startRaftHandler() {
 	ticker := time.NewTicker(time.Duration(rnd.electionTickN) * time.Millisecond)
 	defer ticker.Stop()
 
-	tickerSnap := time.NewTicker(rnd.snapshotInterval)
-	defer tickerSnap.Stop()
-
 	go rnd.handleProposal()
 
 	for {
@@ -202,20 +200,17 @@ func (rnd *raftNode) startRaftHandler() {
 		case <-ticker.C:
 			rnd.node.Tick()
 
-		case <-tickerSnap.C:
-			rnd.triggerSnapshot(pr)
-
 		case rd := <-rnd.node.Ready():
 			isLeader := false
 			if rd.SoftState != nil && rd.SoftState.NodeState == raftpb.NODE_STATE_LEADER {
 				isLeader = true
 			}
 
-			readyToSnapshot := make(chan struct{})
+			applyDone := make(chan struct{})
 			go rnd.applyAll(pr, &apply{
-				entriesToApply:  rd.EntriesToApply,
-				snapshotToSave:  rd.SnapshotToSave,
-				readyToSnapshot: readyToSnapshot,
+				entriesToApply: rd.EntriesToApply,
+				snapshotToSave: rd.SnapshotToSave,
+				applyDone:      applyDone,
 			})
 
 			// (Raft §10.2.1 Writing to the leader’s disk in parallel, p.141)
@@ -256,8 +251,7 @@ func (rnd *raftNode) startRaftHandler() {
 			// wait for the raft routine to finish the disk writes before triggering a
 			// snapshot. or applied index might be greater than the last index in raft
 			// storage, since the raft routine might be slower than apply routine.
-			<-readyToSnapshot
-			rnd.triggerSnapshot(pr)
+			<-applyDone
 
 			// after commit, must call Advance
 			// etcdserver/raft.go: r.Advance()
