@@ -93,10 +93,6 @@ mvcc.NewStore creates a new mvcc.store with a new mvcc.treeIndex for mvcc.index.
 mvcc.store struct implements mvcc.KV interface.
 
 =================================================================================
-Package mvcc ...
-
-
-=================================================================================
 Package rsm is a replicated state machine built on top of consensus protocol.
 It is also an applying machine of those replicated commands.
 
@@ -122,7 +118,6 @@ etcdserver.NewServer creates a new etcdserver.EtcdServer.
 11. r.Advance
 
 
-=================================================================
 (etcdserver/raft.go)
 func (r *raftNode) start(s *EtcdServer) {
     case rd := <-r.Ready():
@@ -211,16 +206,6 @@ func (l *raftLog) restore(s pb.Snapshot) {
 func (u *unstable) restore(s pb.Snapshot) {
     u.snapshot = &s
 
-=================================================================
-
-
-
-11. trigger snapshot in the background
-    - after commit
-    - <-apply.raftDone
-    - s.triggerSnapshot(ep)
-    - ep.appliedi-ep.snapi > s.snapCount
-
 
 =================================================================================
 
@@ -246,6 +231,30 @@ background. `etcdserver.raftNode` keeps receiving from `Ready` channel, and stor
 applies them.
 
 Then how do client requests get passed to `raft.Node`?
+
+etcdctl put foo bar
+
+# client side
+-> etcdserverpb.KVClient.Put
+-> etcdserverpb (c *kVClient) Put: key:"foo" value:"bar"
+
+# server side
+etcdserverpb._KV_Put_Handler
+-> etcdserver.api.v3rpc (s *kvServer) Put
+-> etcdserver.EtcdServer.Put(ctx context.Context, r *pb.PutRequest)
+-> etcdserver.EtcdServer.processInternalRaftRequest
+-> etcdserver.EtcdServer.processInternalRaftRequestOnce
+-> data, err := r.Marshal()
+-> etcdserver.EtcdServer.raftNode.Propose(cctx, data)
+-> etcdserver.EtcdServer.raftNode.Ready()               (raft.go)
+-> f := func(context.Context) { s.applyAll(&ep, &ap) }  (server.go)
+
+(s *EtcdServer) applyAll
+s.applyEntries(ep, apply)
+s.apply(ents, &ep.confState)
+s.applyEntryNormal(&e)
+s.applyV3.Apply(&raftReq)
+Put
 
 1. etcdserverpb defines RPC interfaces (e.g. KV service interface with Range, Put methods)
 2. etcdserverpb then generates KVServer, KVClient interfaces that can en/decode Protocol Buffer messages
