@@ -38,6 +38,7 @@ func Test_unsafeEncodeHardState(t *testing.T) {
 	}
 }
 
+// (etcd pkg.wal.TestNew)
 func TestCreate(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -117,6 +118,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+// (etcd pkg.wal.TestNewForInitedDir)
 func TestCreateErrExist(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -133,6 +135,7 @@ func TestCreateErrExist(t *testing.T) {
 	}
 }
 
+// (etcd pkg.wal.TestRestartCreateWal)
 func TestCreateInterrupted(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -175,6 +178,7 @@ func TestCreateInterrupted(t *testing.T) {
 	}
 }
 
+// (etcd pkg.wal.TestRecover)
 func TestSave(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -238,6 +242,7 @@ func TestSave(t *testing.T) {
 	}
 }
 
+// (etcd pkg.wal.TestCut)
 func Test_unsafeCutCurrent(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -264,9 +269,7 @@ func Test_unsafeCutCurrent(t *testing.T) {
 		t.Fatalf("name expected %q, got %q", getWALName(1, 1), fpath)
 	}
 
-	entries := []raftpb.Entry{
-		{Term: 1, Index: 1, Data: []byte{1}},
-	}
+	entries := []raftpb.Entry{{Term: 1, Index: 1, Data: []byte{1}}}
 	if err = w.Save(raftpb.HardState{}, entries); err != nil {
 		t.Fatal(err)
 	}
@@ -303,6 +306,7 @@ func Test_unsafeCutCurrent(t *testing.T) {
 	}
 }
 
+// (etcd pkg.wal.TestRecoverAfterCut)
 func Test_unsafeCutCurrent_Recover(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -321,9 +325,7 @@ func Test_unsafeCutCurrent_Recover(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entries := []raftpb.Entry{
-			{Index: uint64(i)},
-		}
+		entries := []raftpb.Entry{{Index: uint64(i)}}
 		if err = w.Save(raftpb.HardState{}, entries); err != nil {
 			t.Fatal(err)
 		}
@@ -369,6 +371,7 @@ func Test_unsafeCutCurrent_Recover(t *testing.T) {
 	}
 }
 
+// (etcd pkg.wal.TestTailWriteNoSlackSpace)
 func TestTailWritesUnused(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {

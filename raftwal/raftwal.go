@@ -50,9 +50,8 @@ func (w *WAL) Unlock() { w.mu.Unlock() }
 //
 // (etcd wal.WAL.tail)
 func (w *WAL) unsafeLastFile() *fileutil.LockedFile {
-	n := len(w.lockedFiles)
-	if n > 0 {
-		return w.lockedFiles[n-1]
+	if len(w.lockedFiles) > 0 {
+		return w.lockedFiles[len(w.lockedFiles)-1]
 	}
 	return nil
 }

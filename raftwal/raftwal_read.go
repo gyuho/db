@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/gyuho/db/pkg/crcutil"
+	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
@@ -112,6 +113,26 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 			hardstate.Reset()
 			return nil, hardstate, nil, err
 		}
+
+		// decoder.decode returns io.EOF if it detects a zero record
+		// but this zero record may be followed by non-zero records
+		// from a torn write.
+		//
+		// Overwriting some of these non-zero records, but not all,
+		// will cause CRC errors on WAL open.
+		//
+		// Since the records with torn-writes are never fully synced
+		// to disk in the first place, it's safe to zero them out to
+		// avoid any CRC mismatch errors for the new writes.
+		//
+		// seek relative to the origin of the file
+		_, err = w.unsafeLastFile().Seek(w.dec.lastValidOffset, os.SEEK_SET)
+		if err != nil {
+			return nil, hardstate, nil, err
+		}
+		if err = fileutil.ZeroToEnd(w.unsafeLastFile().File); err != nil {
+			return nil, hardstate, nil, err
+		}
 	}
 
 	err = nil
@@ -128,9 +149,6 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 	w.metadata = metadata
 
 	if w.unsafeLastFile() != nil { // write mode
-		// set offset with seek relative to the origin of the file
-		_, err = w.unsafeLastFile().Seek(w.dec.lastValidOffset, os.SEEK_SET)
-
 		// create encoder to enable appends
 		w.enc = newEncoder(w.unsafeLastFile(), w.dec.crc.Sum32())
 	}
