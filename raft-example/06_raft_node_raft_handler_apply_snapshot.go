@@ -134,7 +134,7 @@ func (rnd *raftNode) createSnapshot(pr *progress) {
 		panic(err)
 	}
 
-	snap, err := rnd.storageMemory.CreateSnapshot(pr.snapshotIndex, &pr.configState, data)
+	snap, err := rnd.storageMemory.CreateSnapshot(pr.appliedIndex, &pr.configState, data)
 	if err != nil {
 		// the snapshot was done asynchronously with the progress of raft.
 		// raft might have already got a newer snapshot.

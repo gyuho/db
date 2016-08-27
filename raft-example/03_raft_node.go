@@ -105,6 +105,11 @@ func startRaftNode(cfg config) *raftNode {
 
 func (rnd *raftNode) start() {
 	logger.Printf("raftNode.start %s at %s", types.ID(rnd.id), rnd.dir)
+	if !fileutil.ExistFileOrDir(rnd.snapDir) {
+		if err := fileutil.MkdirAll(rnd.snapDir); err != nil {
+			panic(err)
+		}
+	}
 
 	walExist := fileutil.DirHasFiles(rnd.walDir) // MUST BE BEFORE replayWAL
 	rnd.storage = newStorage(rnd.replayWAL(), raftsnap.New(rnd.snapDir))
