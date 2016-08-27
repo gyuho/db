@@ -31,13 +31,13 @@ func benchmarkWriteEntry(b *testing.B, size, batch int) {
 	b.SetBytes(int64(entry.Size()))
 	for i := 0; i < b.N; i++ {
 		w.Lock()
-		if err := w.UnsafeEncodeEntry(entry); err != nil {
+		if err := w.unsafeEncodeEntry(entry); err != nil {
 			b.Fatal(err)
 		}
 
 		cnt++
 		if cnt > batch {
-			w.UnsafeFdatasync()
+			w.unsafeFdatasync()
 			cnt = 0
 		}
 		w.Unlock()

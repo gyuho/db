@@ -68,12 +68,12 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	}
 
 	// 1. encode CRC
-	if err := w.UnsafeEncodeCRC(prevCRC); err != nil {
+	if err := w.unsafeEncodeCRC(prevCRC); err != nil {
 		return nil, err
 	}
 
 	// 2. encode metadata
-	if err := w.UnsafeEncodeMetadata(metadata); err != nil {
+	if err := w.unsafeEncodeMetadata(metadata); err != nil {
 		return nil, err
 	}
 
@@ -115,8 +115,10 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	return newWAL, nil
 }
 
-// UnsafeFdatasync fsyncs the last file in the lockedFiles to the disk.
-func (w *WAL) UnsafeFdatasync() error {
+// unsafeFdatasync fsyncs the last file in the lockedFiles to the disk.
+//
+// (etcd wal.WAL.sync)
+func (w *WAL) unsafeFdatasync() error {
 	if w.enc != nil {
 		if err := w.enc.flush(); err != nil {
 			return err
@@ -124,7 +126,7 @@ func (w *WAL) UnsafeFdatasync() error {
 	}
 
 	st := time.Now()
-	err := fileutil.Fdatasync(w.UnsafeLastFile().File)
+	err := fileutil.Fdatasync(w.unsafeLastFile().File)
 	took := time.Since(st)
 
 	if took > warnSyncDuration {
@@ -133,16 +135,18 @@ func (w *WAL) UnsafeFdatasync() error {
 	return err
 }
 
-// UnsafeEncodeCRC encodes the CRC record.
-func (w *WAL) UnsafeEncodeCRC(crc uint32) error {
+// unsafeEncodeCRC encodes the CRC record.
+//
+// (etcd wal.WAL.saveCrc)
+func (w *WAL) unsafeEncodeCRC(crc uint32) error {
 	return w.enc.encode(&raftwalpb.Record{
 		Type: raftwalpb.RECORD_TYPE_CRC,
 		CRC:  crc,
 	})
 }
 
-// UnsafeEncodeMetadata encodes metadata to the record.
-func (w *WAL) UnsafeEncodeMetadata(meatadata []byte) error {
+// unsafeEncodeMetadata encodes metadata to the record.
+func (w *WAL) unsafeEncodeMetadata(meatadata []byte) error {
 	return w.enc.encode(&raftwalpb.Record{
 		Type: raftwalpb.RECORD_TYPE_METADATA,
 		Data: meatadata,
@@ -157,7 +161,6 @@ func (w *WAL) UnsafeEncodeSnapshotAndFdatasync(snap *raftwalpb.Snapshot) error {
 	if err != nil {
 		return err
 	}
-
 	if err := w.enc.encode(&raftwalpb.Record{
 		Type: raftwalpb.RECORD_TYPE_SNAPSHOT,
 		Data: data,
@@ -169,14 +172,13 @@ func (w *WAL) UnsafeEncodeSnapshotAndFdatasync(snap *raftwalpb.Snapshot) error {
 		// update only when snapshot is ahead of last index
 		w.lastIndex = snap.Index
 	}
-
-	return w.UnsafeFdatasync()
+	return w.unsafeFdatasync()
 }
 
-// UnsafeEncodeEntry encodes raftpb.Entry to the record.
+// unsafeEncodeEntry encodes raftpb.Entry to the record.
 //
 // (etcd wal.WAL.saveEntry)
-func (w *WAL) UnsafeEncodeEntry(ent *raftpb.Entry) error {
+func (w *WAL) unsafeEncodeEntry(ent *raftpb.Entry) error {
 	data, err := ent.Marshal()
 	if err != nil {
 		return err
@@ -188,15 +190,14 @@ func (w *WAL) UnsafeEncodeEntry(ent *raftpb.Entry) error {
 	}); err != nil {
 		return err
 	}
-
 	w.lastIndex = ent.Index
 	return nil
 }
 
-// UnsafeEncodeHardState encodes raftpb.HardState to the record.
+// unsafeEncodeHardState encodes raftpb.HardState to the record.
 //
 // (etcd wal.WAL.saveState)
-func (w *WAL) UnsafeEncodeHardState(state *raftpb.HardState) error {
+func (w *WAL) unsafeEncodeHardState(state *raftpb.HardState) error {
 	if raftpb.IsEmptyHardState(*state) {
 		return nil
 	}
@@ -214,28 +215,30 @@ func (w *WAL) UnsafeEncodeHardState(state *raftpb.HardState) error {
 	})
 }
 
-// UnsafeCutCurrent closes currently written file.
+// unsafeCutCurrent closes currently written file.
 // It first creates a temporary WAL file to write necessary headers onto.
 // And atomically rename the temporary WAL file to a WAL file.
-func (w *WAL) UnsafeCutCurrent() error {
+//
+// (etcd wal.WAL.cut)
+func (w *WAL) unsafeCutCurrent() error {
 	// set offset to current
-	offset, err := w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		return err
 	}
 
 	// truncate to avoid wasting space with early cut
-	if err = w.UnsafeLastFile().Truncate(offset); err != nil {
+	if err = w.unsafeLastFile().Truncate(offset); err != nil {
 		return err
 	}
 
 	// fsync to the disk
-	if err = w.UnsafeFdatasync(); err != nil {
+	if err = w.unsafeFdatasync(); err != nil {
 		return err
 	}
 
 	// next WAL file with index + 1
-	walPath := filepath.Join(w.dir, getWALName(w.UnsafeLastFileSeq()+1, w.lastIndex+1))
+	walPath := filepath.Join(w.dir, getWALName(w.unsafeLastFileSeq()+1, w.lastIndex+1))
 
 	// open a temporary file to write a new data
 	newLastTmpFile, err := w.filePipeline.Open()
@@ -246,30 +249,30 @@ func (w *WAL) UnsafeCutCurrent() error {
 
 	// update encoder with the newly-appended last file
 	prevCRC := w.enc.crc.Sum32()
-	w.enc = newEncoder(w.UnsafeLastFile(), prevCRC)
+	w.enc = newEncoder(w.unsafeLastFile(), prevCRC)
 
 	// 1. update CRC
-	if err = w.UnsafeEncodeCRC(prevCRC); err != nil {
+	if err = w.unsafeEncodeCRC(prevCRC); err != nil {
 		return err
 	}
 
 	// 2. write metadata
-	if err = w.UnsafeEncodeMetadata(w.metadata); err != nil {
+	if err = w.unsafeEncodeMetadata(w.metadata); err != nil {
 		return err
 	}
 
 	// 3. write hard state
-	if err = w.UnsafeEncodeHardState(&w.hardState); err != nil {
+	if err = w.unsafeEncodeHardState(&w.hardState); err != nil {
 		return err
 	}
 
 	// fsync the last temporary file to the disk
-	if err = w.UnsafeFdatasync(); err != nil {
+	if err = w.unsafeFdatasync(); err != nil {
 		return err
 	}
 
 	// set offset to current, because there were writes
-	offset, err = w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err = w.unsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		return err
 	}
@@ -302,13 +305,15 @@ func (w *WAL) UnsafeCutCurrent() error {
 	prevCRC = w.enc.crc.Sum32()
 
 	// update the encoder with newly-locked file
-	w.enc = newEncoder(w.UnsafeLastFile(), prevCRC)
+	w.enc = newEncoder(w.unsafeLastFile(), prevCRC)
 
 	logger.Infof("created %q", walPath)
 	return nil
 }
 
 // Save stores the raftpb.HardState with entries.
+//
+// (etcd wal.WAL.Save)
 func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -321,28 +326,27 @@ func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
 
 	// write entries
 	for i := range ents {
-		if err := w.UnsafeEncodeEntry(&ents[i]); err != nil {
+		if err := w.unsafeEncodeEntry(&ents[i]); err != nil {
 			return err
 		}
 	}
 
 	// write hard state
-	if err := w.UnsafeEncodeHardState(&st); err != nil {
+	if err := w.unsafeEncodeHardState(&st); err != nil {
 		return err
 	}
 
 	// seek the current location, and get the offset
-	curOffset, err := w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
+	curOffset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		return err
 	}
 
 	if curOffset < segmentSizeBytes { // no need to cut
 		if needFsync {
-			return w.UnsafeFdatasync()
+			return w.unsafeFdatasync()
 		}
 		return nil
 	}
-
-	return w.UnsafeCutCurrent()
+	return w.unsafeCutCurrent()
 }

@@ -25,12 +25,12 @@ func createEmptyEntries(num int) [][]raftpb.Entry {
 	return entries
 }
 
-func TestUnsafeEncodeHardState(t *testing.T) {
+func Test_unsafeEncodeHardState(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	w := &WAL{
 		enc: newEncoder(buf, 0),
 	}
-	if err := w.UnsafeEncodeHardState(&raftpb.HardState{}); err != nil {
+	if err := w.unsafeEncodeHardState(&raftpb.HardState{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(buf.Bytes()) != 0 {
@@ -53,13 +53,13 @@ func TestCreate(t *testing.T) {
 	}
 	defer w.Close()
 
-	fpath := filepath.Base(w.UnsafeLastFile().Name())
+	fpath := filepath.Base(w.unsafeLastFile().Name())
 	if fpath != getWALName(0, 0) {
 		t.Fatalf("expected %q, got %q", getWALName(0, 0), fpath)
 	}
 
 	// WAL is created with preallocation with segment size
-	offset, err := w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestSave(t *testing.T) {
 	}
 }
 
-func TestUnsafeCutCurrent(t *testing.T) {
+func Test_unsafeCutCurrent(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
 		t.Fatal(err)
@@ -256,11 +256,11 @@ func TestUnsafeCutCurrent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = w.UnsafeCutCurrent(); err != nil {
+	if err = w.unsafeCutCurrent(); err != nil {
 		t.Fatal(err)
 	}
 
-	if fpath := filepath.Base(w.UnsafeLastFile().Name()); fpath != getWALName(1, 1) {
+	if fpath := filepath.Base(w.unsafeLastFile().Name()); fpath != getWALName(1, 1) {
 		t.Fatalf("name expected %q, got %q", getWALName(1, 1), fpath)
 	}
 
@@ -271,7 +271,7 @@ func TestUnsafeCutCurrent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = w.UnsafeCutCurrent(); err != nil {
+	if err = w.unsafeCutCurrent(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -280,7 +280,7 @@ func TestUnsafeCutCurrent(t *testing.T) {
 		t.Fatal(err)
 	} // this does fsync
 
-	if fpath := filepath.Base(w.UnsafeLastFile().Name()); fpath != getWALName(2, 2) {
+	if fpath := filepath.Base(w.unsafeLastFile().Name()); fpath != getWALName(2, 2) {
 		t.Fatalf("expected %q, got %q", getWALName(2, 2), fpath)
 	}
 
@@ -303,7 +303,7 @@ func TestUnsafeCutCurrent(t *testing.T) {
 	}
 }
 
-func TestUnsafeCutCurrentRecover(t *testing.T) {
+func Test_unsafeCutCurrent_Recover(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
 		t.Fatal(err)
@@ -327,7 +327,7 @@ func TestUnsafeCutCurrentRecover(t *testing.T) {
 		if err = w.Save(raftpb.HardState{}, entries); err != nil {
 			t.Fatal(err)
 		}
-		if err = w.UnsafeCutCurrent(); err != nil {
+		if err = w.unsafeCutCurrent(); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -393,11 +393,11 @@ func TestTailWritesUnused(t *testing.T) {
 	}
 
 	// remove the unused space (slack space) by truncating
-	offset, err := w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = w.UnsafeLastFile().Truncate(offset); err != nil {
+	if err = w.unsafeLastFile().Truncate(offset); err != nil {
 		t.Fatal(err)
 	}
 	w.Close()

@@ -31,6 +31,8 @@ var (
 // and all the record.
 //
 // After ReadAll, the WAL is ready for appending new records.
+//
+// (etcd wal.WAL.ReadAll)
 func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []raftpb.Entry, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -94,7 +96,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 		}
 	}
 
-	switch w.UnsafeLastFile() {
+	switch w.unsafeLastFile() {
 	case nil:
 		// no need to read out all records in read mode
 		// because the last record might be partially written
@@ -125,12 +127,12 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 	w.readStartSnapshot = raftwalpb.Snapshot{}
 	w.metadata = metadata
 
-	if w.UnsafeLastFile() != nil { // write mode
+	if w.unsafeLastFile() != nil { // write mode
 		// set offset with seek relative to the origin of the file
-		_, err = w.UnsafeLastFile().Seek(w.dec.lastValidOffset, os.SEEK_SET)
+		_, err = w.unsafeLastFile().Seek(w.dec.lastValidOffset, os.SEEK_SET)
 
 		// create encoder to enable appends
-		w.enc = newEncoder(w.UnsafeLastFile(), w.dec.crc.Sum32())
+		w.enc = newEncoder(w.unsafeLastFile(), w.dec.crc.Sum32())
 	}
 
 	// done with reading

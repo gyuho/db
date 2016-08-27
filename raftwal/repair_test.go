@@ -34,7 +34,7 @@ func testRepair(t *testing.T, expectedEntriesN int, entries [][]raftpb.Entry, co
 	}
 
 	// move current position to 0
-	offset, err := w.UnsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
 	if err != nil {
 		t.Fatal(err)
 	}

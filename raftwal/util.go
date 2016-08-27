@@ -12,6 +12,7 @@ func getWALName(seq, index uint64) string {
 	return fmt.Sprintf("%016x-%016x.wal", seq, index)
 }
 
+// (etcd wal.parseWalName)
 func parseWALName(name string) (seq, index uint64, err error) {
 	if filepath.Ext(name) != ".wal" {
 		return 0, 0, fmt.Errorf("bad WAL name")
@@ -20,6 +21,7 @@ func parseWALName(name string) (seq, index uint64, err error) {
 	return
 }
 
+// (etcd wal.checkWalNames)
 func selectWALNames(names []string) []string {
 	var wnames []string
 	for _, name := range names {
@@ -37,6 +39,8 @@ func selectWALNames(names []string) []string {
 
 // readWALNames reads all the WAL files in the directory.
 // And the results must be sorted.
+//
+// (etcd wal.readWALNames)
 func readWALNames(dir string) ([]string, error) {
 	names, err := fileutil.ReadDir(dir) // this reads and sorts
 	if err != nil {
@@ -53,6 +57,8 @@ func readWALNames(dir string) ([]string, error) {
 // areWALNamesSorted returns true if WAL names are correctly sorted.
 // They should have been sorted based on sequence number
 // (sequence number should increase continuously).
+//
+// (etcd wal.isValidSeq)
 func areWALNamesSorted(names []string) bool {
 	var lastSeq uint64
 	for _, name := range names {
@@ -69,6 +75,7 @@ func areWALNamesSorted(names []string) bool {
 	return true
 }
 
+// (etcd wal.closeAll)
 func closeAll(rcs ...io.ReadCloser) error {
 	for _, f := range rcs {
 		if err := f.Close(); err != nil {
@@ -82,6 +89,8 @@ func closeAll(rcs ...io.ReadCloser) error {
 // whose Raft index section is equal to or smaller than the given index.
 // It assumes that the given names are already sorted.
 // It returns -1 if all indexes are greater than the given index.
+//
+// (etcd wal.searchIndex)
 func searchLastWALIndex(ns []string, idx uint64) int {
 	for i := len(ns) - 1; i >= 0; i-- {
 		name := ns[i]

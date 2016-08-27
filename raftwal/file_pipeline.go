@@ -24,6 +24,7 @@ type filePipeline struct {
 	donec        chan struct{}
 }
 
+// (etcd wal.newFilePipeline)
 func newFilePipeline(dir string, size int64) *filePipeline {
 	fp := &filePipeline{
 		dir:          dir,
@@ -37,6 +38,7 @@ func newFilePipeline(dir string, size int64) *filePipeline {
 	return fp
 }
 
+// (etcd wal.filePipeline.alloc)
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	fpath := filepath.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2)) // to make it different than previous one
 	if f, err = fileutil.OpenFileWithLock(fpath, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode); err != nil {
@@ -49,7 +51,6 @@ func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 		f.Close()
 		return nil, err
 	}
-
 	fp.count++
 	return f, nil
 }
@@ -57,6 +58,8 @@ func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 // Open returns a fresh file ready for writes.
 // Rename the file before calling this or duplicate Open
 // will trigger file collisions.
+//
+// (etcd wal.filePipeline.Open)
 func (fp *filePipeline) Open() (f *fileutil.LockedFile, err error) {
 	select {
 	case f = <-fp.lockedFileCh:
@@ -65,6 +68,7 @@ func (fp *filePipeline) Open() (f *fileutil.LockedFile, err error) {
 	return
 }
 
+// (etcd wal.filePipeline.run)
 func (fp *filePipeline) run() {
 	defer close(fp.errc)
 
@@ -85,6 +89,9 @@ func (fp *filePipeline) run() {
 	}
 }
 
+// Close closes filePipeline.
+//
+// (etcd wal.filePipeline.Close)
 func (fp *filePipeline) Close() error {
 	close(fp.donec)
 	return <-fp.errc

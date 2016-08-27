@@ -31,7 +31,7 @@ func TestOpenWALRead(t *testing.T) {
 		if err = w.Save(raftpb.HardState{}, entries); err != nil {
 			t.Fatal(err)
 		}
-		if err = w.UnsafeCutCurrent(); err != nil {
+		if err = w.unsafeCutCurrent(); err != nil {
 			t.Fatal(err)
 		}
 	}
