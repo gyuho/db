@@ -3,6 +3,7 @@ package raftwal
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gyuho/db/pkg/fileutil"
@@ -113,7 +114,7 @@ func Test_ReadAll_torn_write(t *testing.T) {
 		}
 	}
 
-	fn := w.unsafeLastFile().Name()
+	fn := filepath.Join(p, filepath.Base(w.unsafeLastFile().Name()))
 	w.Close()
 
 	// clobber some entry with 0's to simulate a torn write
