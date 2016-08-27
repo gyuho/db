@@ -29,11 +29,11 @@ func TestOpenWAL(t *testing.T) {
 	}
 
 	w.Lock()
-	if name := filepath.Base(w.UnsafeLastFile().Name()); name != getWALName(0, 0) {
+	if name := filepath.Base(w.unsafeLastFile().Name()); name != getWALName(0, 0) {
 		t.Fatalf("expected %v, got %v", getWALName(0, 0), name)
 	}
-	if w.UnsafeLastFileSeq() != 0 {
-		t.Fatalf("expected 0, got %d", w.UnsafeLastFileSeq())
+	if w.unsafeLastFileSeq() != 0 {
+		t.Fatalf("expected 0, got %d", w.unsafeLastFileSeq())
 	}
 	w.Unlock()
 	w.Close()
@@ -71,7 +71,7 @@ func TestReleaseLocks(t *testing.T) {
 		if err = w.Save(raftpb.HardState{}, es); err != nil {
 			t.Fatal(err)
 		}
-		if err = w.UnsafeCutCurrent(); err != nil {
+		if err = w.unsafeCutCurrent(); err != nil {
 			t.Fatal(err)
 		}
 	}

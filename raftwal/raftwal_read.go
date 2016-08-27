@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/gyuho/db/pkg/crcutil"
+	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
@@ -31,6 +32,8 @@ var (
 // and all the record.
 //
 // After ReadAll, the WAL is ready for appending new records.
+//
+// (etcd wal.WAL.ReadAll)
 func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []raftpb.Entry, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -94,7 +97,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 		}
 	}
 
-	switch w.UnsafeLastFile() {
+	switch w.unsafeLastFile() {
 	case nil:
 		// no need to read out all records in read mode
 		// because the last record might be partially written
@@ -108,6 +111,26 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 		// write mode, must read all entries in write mode
 		if err != io.EOF {
 			hardstate.Reset()
+			return nil, hardstate, nil, err
+		}
+
+		// decoder.decode returns io.EOF if it detects a zero record
+		// but this zero record may be followed by non-zero records
+		// from a torn write.
+		//
+		// Overwriting some of these non-zero records, but not all,
+		// will cause CRC errors on WAL open.
+		//
+		// Since the records with torn-writes are never fully synced
+		// to disk in the first place, it's safe to zero them out to
+		// avoid any CRC mismatch errors for the new writes.
+		//
+		// seek relative to the origin of the file
+		_, err = w.unsafeLastFile().Seek(w.dec.lastValidOffset, os.SEEK_SET)
+		if err != nil {
+			return nil, hardstate, nil, err
+		}
+		if err = fileutil.ZeroToEnd(w.unsafeLastFile().File); err != nil {
 			return nil, hardstate, nil, err
 		}
 	}
@@ -125,12 +148,9 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 	w.readStartSnapshot = raftwalpb.Snapshot{}
 	w.metadata = metadata
 
-	if w.UnsafeLastFile() != nil { // write mode
-		// set offset with seek relative to the origin of the file
-		_, err = w.UnsafeLastFile().Seek(w.dec.lastValidOffset, os.SEEK_SET)
-
+	if w.unsafeLastFile() != nil { // write mode
 		// create encoder to enable appends
-		w.enc = newEncoder(w.UnsafeLastFile(), w.dec.crc.Sum32())
+		w.enc = newEncoder(w.unsafeLastFile(), w.dec.crc.Sum32())
 	}
 
 	// done with reading

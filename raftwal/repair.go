@@ -9,8 +9,9 @@ import (
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
-// Repair repairs the last WAL file by truncating
-// for the error io.ErrUnexpectedEOF.
+// Repair repairs the last WAL file by truncating for the error io.ErrUnexpectedEOF.
+//
+// (etcd wal.Repair)
 func Repair(dir string) bool {
 	f, err := openLastWALFile(dir)
 	if err != nil {
@@ -35,7 +36,6 @@ func Repair(dir string) bool {
 				if cv != 0 && rec.Validate(cv) != nil {
 					return false
 				}
-
 				// update the CRC of the decoder when needed
 				dec.crc = crcutil.New(rec.CRC, crcTable)
 			}

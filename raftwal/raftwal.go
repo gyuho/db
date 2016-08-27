@@ -46,19 +46,22 @@ func (w *WAL) Lock() { w.mu.Lock() }
 // Unlock unlocks the WAL.
 func (w *WAL) Unlock() { w.mu.Unlock() }
 
-// UnsafeLastFile returns the last file in the lockedFiles.
-func (w *WAL) UnsafeLastFile() *fileutil.LockedFile {
-	n := len(w.lockedFiles)
-	if n > 0 {
-		return w.lockedFiles[n-1]
+// unsafeLastFile returns the last file in the lockedFiles.
+//
+// (etcd wal.WAL.tail)
+func (w *WAL) unsafeLastFile() *fileutil.LockedFile {
+	if len(w.lockedFiles) > 0 {
+		return w.lockedFiles[len(w.lockedFiles)-1]
 	}
 	return nil
 }
 
-// UnsafeLastFileSeq returns the sequence number of the
+// unsafeLastFileSeq returns the sequence number of the
 // last file in the lockedFiles.
-func (w *WAL) UnsafeLastFileSeq() uint64 {
-	f := w.UnsafeLastFile()
+//
+// (etcd wal.WAL.seq)
+func (w *WAL) unsafeLastFileSeq() uint64 {
+	f := w.unsafeLastFile()
 	if f == nil {
 		return 0
 	}
@@ -81,8 +84,8 @@ func (w *WAL) Close() error {
 	}
 
 	// fsync
-	if w.UnsafeLastFile() != nil {
-		if err := w.UnsafeFdatasync(); err != nil {
+	if w.unsafeLastFile() != nil {
+		if err := w.unsafeFdatasync(); err != nil {
 			return err
 		}
 	}
@@ -100,12 +103,13 @@ func (w *WAL) Close() error {
 }
 
 // openLastWALFile opens the last WAL file for read and write.
+//
+// (etcd wal.openLast)
 func openLastWALFile(dir string) (*fileutil.LockedFile, error) {
 	wnames, err := readWALNames(dir)
 	if err != nil {
 		return nil, err
 	}
-
 	fpath := filepath.Join(dir, wnames[len(wnames)-1])
 	return fileutil.OpenFileWithLock(fpath, os.O_RDWR, fileutil.PrivateFileMode)
 }
@@ -172,7 +176,7 @@ func openWAL(dir string, snap raftwalpb.Snapshot, write bool) (*WAL, error) {
 		// Write reuses the file descriptors from read.
 		// Don't close, so that WAL can append without releasing flocks.
 		w.decoderReaderCloser = nil
-		if _, _, err := parseWALName(filepath.Base(w.UnsafeLastFile().Name())); err != nil {
+		if _, _, err := parseWALName(filepath.Base(w.unsafeLastFile().Name())); err != nil {
 			closeFunc()
 			return nil, err
 		}
