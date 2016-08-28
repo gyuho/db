@@ -85,8 +85,8 @@ func (tr *Transport) Send(msgs []raftpb.Message) {
 }
 
 func (tr *Transport) SendSnapshot(msg raftsnap.Message) {
-	tr.mu.RLock()
-	defer tr.mu.RUnlock()
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 
 	to := tr.peers[types.ID(msg.To)]
 	if to == nil {
@@ -170,8 +170,8 @@ func (tr *Transport) UpdatePeer(peerID types.ID, urls []string) {
 }
 
 func (tr *Transport) ActiveSince(peerID types.ID) time.Time {
-	tr.mu.RLock()
-	defer tr.mu.RUnlock()
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 
 	if p, ok := tr.peers[peerID]; ok {
 		return p.activeSince()
