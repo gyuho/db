@@ -18,24 +18,17 @@ type apply struct {
 	applyDone      chan struct{}   // (etcd etcdserver.apply.raftDone)
 }
 
-// (etcd etcdserver.progress)
-type progress struct {
-	configState   raftpb.ConfigState
-	snapshotIndex uint64
-	appliedIndex  uint64
-}
-
 // (etcd etcdserver.EtcdServer.applySnapshot)
-func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
+func (rnd *raftNode) applySnapshot(ap *apply) {
 	if raftpb.IsEmptySnapshot(ap.snapshotToSave) {
 		return
 	}
 
-	logger.Infof("applying snapshot at index %d", pr.snapshotIndex)
-	defer logger.Infof("finished applying snapshot at index %d", pr.snapshotIndex)
+	logger.Infof("applying snapshot at index %d", rnd.snapshotIndex)
+	defer logger.Infof("finished applying snapshot at index %d", rnd.snapshotIndex)
 
-	if ap.snapshotToSave.Metadata.Index <= pr.appliedIndex {
-		logger.Panicf("snapshot index [%d] should > progress.appliedIndex [%d] + 1", ap.snapshotToSave.Metadata.Index, pr.appliedIndex)
+	if ap.snapshotToSave.Metadata.Index <= rnd.appliedIndex {
+		logger.Panicf("snapshot index [%d] should > progress.appliedIndex [%d] + 1", ap.snapshotToSave.Metadata.Index, rnd.appliedIndex)
 	}
 
 	dbFilePath, err := rnd.storage.DBFilePath(ap.snapshotToSave.Metadata.Index)
@@ -43,7 +36,7 @@ func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 		panic(err)
 	}
 	fpath := filepath.Join(rnd.snapDir, "db")
-	if err := os.Rename(dbFilePath, fpath); err != nil {
+	if err = os.Rename(dbFilePath, fpath); err != nil {
 		panic(err)
 	}
 
@@ -57,25 +50,25 @@ func (rnd *raftNode) applySnapshot(pr *progress, ap *apply) {
 		panic(err)
 	}
 
-	pr.configState = ap.snapshotToSave.Metadata.ConfigState
-	pr.snapshotIndex = ap.snapshotToSave.Metadata.Index
-	pr.appliedIndex = ap.snapshotToSave.Metadata.Index
+	rnd.configState = ap.snapshotToSave.Metadata.ConfigState
+	rnd.snapshotIndex = ap.snapshotToSave.Metadata.Index
+	rnd.appliedIndex = ap.snapshotToSave.Metadata.Index
 }
 
 // (etcd etcdserver.EtcdServer.applyEntries,apply)
-func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
+func (rnd *raftNode) applyEntries(ap *apply) {
 	if len(ap.entriesToApply) == 0 {
 		return
 	}
 
 	firstIdx := ap.entriesToApply[0].Index
-	if firstIdx > pr.appliedIndex+1 {
-		logger.Panicf("first index of committed entry[%d] should <= progress.appliedIndex[%d] + 1", firstIdx, pr.appliedIndex)
+	if firstIdx > rnd.appliedIndex+1 {
+		logger.Panicf("first index of committed entry[%d] should <= progress.appliedIndex[%d] + 1", firstIdx, rnd.appliedIndex)
 	}
 
 	var ents []raftpb.Entry
-	if pr.appliedIndex-firstIdx+1 < uint64(len(ap.entriesToApply)) {
-		ents = ap.entriesToApply[pr.appliedIndex-firstIdx+1:]
+	if rnd.appliedIndex-firstIdx+1 < uint64(len(ap.entriesToApply)) {
+		ents = ap.entriesToApply[rnd.appliedIndex-firstIdx+1:]
 	}
 	if len(ents) == 0 {
 		return
@@ -113,7 +106,9 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 		}
 
 		// after commit, update appliedIndex
-		pr.appliedIndex = ents[i].Index
+		rnd.mu.Lock()
+		rnd.appliedIndex = ents[i].Index
+		rnd.mu.Unlock()
 
 		if ents[i].Index == rnd.lastIndex { // special nil commit to signal that replay has finished
 			select {
@@ -128,13 +123,13 @@ func (rnd *raftNode) applyEntries(pr *progress, ap *apply) {
 const catchUpEntriesN = 10
 
 // (etcd etcdserver.EtcdServer.snapshot)
-func (rnd *raftNode) createSnapshot(pr *progress) {
+func (rnd *raftNode) createSnapshot() {
 	data, err := rnd.ds.createSnapshot()
 	if err != nil {
 		panic(err)
 	}
 
-	snap, err := rnd.storageMemory.CreateSnapshot(pr.appliedIndex, &pr.configState, data)
+	snap, err := rnd.storageMemory.CreateSnapshot(rnd.appliedIndex, &rnd.configState, data)
 	if err != nil {
 		// the snapshot was done asynchronously with the progress of raft.
 		// raft might have already got a newer snapshot.
@@ -148,32 +143,40 @@ func (rnd *raftNode) createSnapshot(pr *progress) {
 	}
 	logger.Infof("saved snapshot at index %d", snap.Metadata.Index)
 
+	rnd.mu.Lock()
 	compactIndex := uint64(1)
-	if pr.snapshotIndex > catchUpEntriesN {
-		compactIndex = pr.snapshotIndex - catchUpEntriesN
+	if rnd.snapshotIndex > catchUpEntriesN {
+		compactIndex = rnd.snapshotIndex - catchUpEntriesN
 	}
+	rnd.mu.Unlock()
+
 	if err := rnd.storageMemory.Compact(compactIndex); err != nil {
 		panic(err)
 	}
 	logger.Infof("saved snapshot at index %d", compactIndex)
 }
 
-func (rnd *raftNode) triggerSnapshot(pr *progress) {
-	if pr.appliedIndex-pr.snapshotIndex <= rnd.snapCount {
+func (rnd *raftNode) triggerSnapshot() {
+	rnd.mu.Lock()
+	if rnd.appliedIndex-rnd.snapshotIndex <= rnd.snapCount {
+		rnd.mu.Unlock()
 		return
 	}
+	rnd.mu.Unlock()
 
-	logger.Infof("start snapshot [applied index: %d | last snapshot index: %d]", pr.appliedIndex, pr.snapshotIndex)
-	rnd.createSnapshot(pr)
-	pr.snapshotIndex = pr.appliedIndex
+	logger.Infof("start snapshot [applied index: %d | last snapshot index: %d]", rnd.appliedIndex, rnd.snapshotIndex)
+	rnd.createSnapshot()
+	rnd.mu.Lock()
+	rnd.snapshotIndex = rnd.appliedIndex
+	rnd.mu.Unlock()
 }
 
 // (etcd etcdserver.EtcdServer.applyAll)
-func (rnd *raftNode) applyAll(pr *progress, ap *apply) {
-	rnd.applySnapshot(pr, ap)
-	rnd.applyEntries(pr, ap)
+func (rnd *raftNode) applyAll(ap *apply) {
+	rnd.applySnapshot(ap)
+	rnd.applyEntries(ap)
 	close(ap.applyDone)
-	rnd.triggerSnapshot(pr)
+	rnd.triggerSnapshot()
 }
 
 // (etcd etcdserver.raftNode.start, contrib.raftexample.raftNode.serveChannels)
@@ -182,11 +185,9 @@ func (rnd *raftNode) startRaftHandler() {
 	if err != nil {
 		panic(err)
 	}
-	pr := &progress{
-		configState:   snap.Metadata.ConfigState,
-		snapshotIndex: snap.Metadata.Index,
-		appliedIndex:  snap.Metadata.Index,
-	}
+	rnd.configState = snap.Metadata.ConfigState
+	rnd.snapshotIndex = snap.Metadata.Index
+	rnd.appliedIndex = snap.Metadata.Index
 
 	defer rnd.storage.Close()
 
@@ -207,7 +208,7 @@ func (rnd *raftNode) startRaftHandler() {
 			}
 
 			applyDone := make(chan struct{})
-			go rnd.applyAll(pr, &apply{
+			go rnd.applyAll(&apply{
 				entriesToApply: rd.EntriesToApply,
 				snapshotToSave: rd.SnapshotToSave,
 				applyDone:      applyDone,

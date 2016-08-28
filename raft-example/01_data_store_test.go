@@ -58,14 +58,15 @@ func Test_dataStore_createSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := fileutil.WriteSync(fpath, data, fileutil.PrivateFileMode); err != nil {
+	if err = fileutil.WriteSync(fpath, data, fileutil.PrivateFileMode); err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(fpath)
 
 	ds.store = nil
 
-	f, err := fileutil.OpenToRead(fpath)
+	var f *os.File
+	f, err = fileutil.OpenToRead(fpath)
 	if err != nil {
 		t.Fatal(err)
 	}

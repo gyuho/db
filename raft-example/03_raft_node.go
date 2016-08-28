@@ -3,10 +3,12 @@ package main
 import (
 	"net/url"
 	"path/filepath"
+	"sync"
 
 	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft"
+	"github.com/gyuho/db/raft/raftpb"
 	"github.com/gyuho/db/rafthttp"
 	"github.com/gyuho/db/raftsnap"
 )
@@ -58,6 +60,11 @@ type raftNode struct {
 	donec         chan struct{}
 
 	ds *dataStore
+
+	mu            sync.Mutex
+	configState   raftpb.ConfigState
+	snapshotIndex uint64
+	appliedIndex  uint64
 }
 
 func startRaftNode(cfg config) *raftNode {

@@ -40,12 +40,12 @@ func ZeroToEnd(f *os.File) error {
 		return err
 	}
 
-	if err := f.Truncate(curOffset); err != nil {
+	if err = f.Truncate(curOffset); err != nil {
 		return err
 	}
 
 	// make sure blocks remain allocated
-	if err := Preallocate(f, endOffset, true); err != nil {
+	if err = Preallocate(f, endOffset, true); err != nil {
 		return err
 	}
 
