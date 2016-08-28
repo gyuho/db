@@ -10,13 +10,8 @@ import (
 
 // filePipeline pipelines disk space allocation.
 type filePipeline struct {
-	// dir is the directory to put files.
-	dir string
-
-	// size of files to make in bytes.
-	size int64
-
-	// count is the number of files generated.
+	dir   string
+	size  int64 // in bytes.
 	count int
 
 	lockedFileCh chan *fileutil.LockedFile
@@ -38,6 +33,8 @@ func newFilePipeline(dir string, size int64) *filePipeline {
 	return fp
 }
 
+const extendFile = true
+
 // (etcd wal.filePipeline.alloc)
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	fpath := filepath.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2)) // to make it different than previous one
@@ -45,7 +42,6 @@ func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 		return nil, err
 	}
 
-	extendFile := true
 	if err = fileutil.Preallocate(f.File, fp.size, extendFile); err != nil {
 		logger.Errorf("failed to allocate space when creating %q (%v)", fpath, err)
 		f.Close()

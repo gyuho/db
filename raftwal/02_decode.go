@@ -11,14 +11,9 @@ import (
 )
 
 type decoder struct {
-	mu sync.Mutex
-
-	crc hash.Hash32
-
-	bufioReaders []*bufio.Reader
-
-	// lastValidOffset is the file offset
-	// following the last valid decoded record
+	mu              sync.Mutex
+	crc             hash.Hash32
+	bufioReaders    []*bufio.Reader
 	lastValidOffset int64
 }
 
@@ -33,14 +28,11 @@ func newDecoder(r ...io.Reader) *decoder {
 	}
 }
 
-// decode decodes data in decoder and save in rec.
 func (d *decoder) decode(rec *raftwalpb.Record) error {
 	rec.Reset()
-
 	d.mu.Lock()
 	err := d.decodeRecord(rec)
 	d.mu.Unlock()
-
 	return err
 }
 
@@ -49,30 +41,22 @@ func (d *decoder) decodeRecord(rec *raftwalpb.Record) error {
 		return io.EOF
 	}
 
-	lengthFieldN, err := readLengthFieldN(d.bufioReaders[0])
-
+	headerN, err := readHeaderN(d.bufioReaders[0])
 	switch {
-	case err == io.EOF || (err == nil && lengthFieldN == 0):
+	case err == io.EOF || (err == nil && headerN == 0):
 		// end of file, or end of preallocated space
 		d.bufioReaders = d.bufioReaders[1:]
 		if len(d.bufioReaders) == 0 {
 			return io.EOF
 		}
 		d.lastValidOffset = 0
-
-		// decode next reader
-		// if err == io.EOF && len(d.bufioReaders) > 0
-		// OR
-		// if err == nil && lengthFieldN == 0 && len(d.bufioReaders) > 0
 		return d.decodeRecord(rec)
 
 	case err != nil:
 		return err
 	}
 
-	// continue if err == nil && lengthFieldN > 0
-
-	dataN, padBytesN := decodeLengthFieldN(lengthFieldN)
+	dataN, padBytesN := decodeLen(headerN)
 	data := make([]byte, dataN+padBytesN)
 	if _, err = io.ReadFull(d.bufioReaders[0], data); err != nil {
 		// ReadFull returns io.EOF only when no bytes were read.
@@ -83,7 +67,6 @@ func (d *decoder) decodeRecord(rec *raftwalpb.Record) error {
 		return err
 	}
 
-	// unsharshal, and check torn entry if error
 	if err = rec.Unmarshal(data[:dataN:dataN]); err != nil {
 		if d.isTornEntry(data) {
 			return io.ErrUnexpectedEOF
@@ -91,10 +74,9 @@ func (d *decoder) decodeRecord(rec *raftwalpb.Record) error {
 		return err
 	}
 
-	// skip CRC checking if the record is raftwalpb.RECORD_TYPE_CRC
 	if rec.Type != raftwalpb.RECORD_TYPE_CRC {
 		d.crc.Write(rec.Data)
-		if err = rec.Validate(d.crc.Sum32()); err != nil { // double-check CRC
+		if err = rec.Validate(d.crc.Sum32()); err != nil {
 			if d.isTornEntry(data) {
 				return io.ErrUnexpectedEOF
 			}
@@ -105,7 +87,6 @@ func (d *decoder) decodeRecord(rec *raftwalpb.Record) error {
 	// record is considered valid
 	// update the last valid offset to the end of record
 	d.lastValidOffset += dataN + padBytesN + byteBitN
-
 	return nil
 }
 
@@ -154,6 +135,5 @@ func (d *decoder) isTornEntry(data []byte) bool {
 			return true
 		}
 	}
-
 	return false
 }

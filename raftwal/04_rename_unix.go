@@ -12,7 +12,7 @@ func (w *WAL) renameWAL(tmpDir string) (*WAL, error) {
 	// but there is a window between the fork and the exec where another
 	// process holds the lock.
 	// (https://github.com/coreos/etcd/pull/6269)
-
+	//
 	if err := os.RemoveAll(w.dir); err != nil {
 		return nil, err
 	}
