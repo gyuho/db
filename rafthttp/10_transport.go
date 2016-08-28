@@ -85,15 +85,14 @@ func (tr *Transport) Send(msgs []raftpb.Message) {
 }
 
 func (tr *Transport) SendSnapshot(msg raftsnap.Message) {
-	tr.mu.Lock()
-	defer tr.mu.Unlock()
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
 
 	to := tr.peers[types.ID(msg.To)]
 	if to == nil {
 		msg.CloseWithError(ErrMemberNotFound)
 		return
 	}
-
 	to.sendSnapshotToPeer(msg)
 }
 
@@ -181,8 +180,8 @@ func (tr *Transport) ActiveSince(peerID types.ID) time.Time {
 }
 
 func (tr *Transport) AddPeerRemote(peerID types.ID, urls []string) {
-	tr.mu.RLock()
-	defer tr.mu.RUnlock()
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 
 	if tr.peerRemotes == nil {
 		// there's no clean way to shutdown the golang http server
