@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math"
 
+	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
@@ -87,36 +88,12 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			ignoreHigherTermVoteRequest := notLeaderTransfer && notCandidate && lastQuorumChecked
 
 			if ignoreHigherTermVoteRequest {
-				raftLogger.Infof(`
-
-	%s
-	IGNORES %s
-	which has HIGHER term (sender current term '%d' > node current term '%d')
-	(elapsed election timeout ticks: %d out of %d)
-	(IGNORES VOTE-REQUEST from CANDIDATE with "HIGHER" term!)
-
-`, rnd.describeLong(), raftpb.DescribeMessageLong(msg),
-					msg.SenderCurrentTerm, rnd.currentTerm,
-					rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum)
-
+				raftLogger.Infof("%s ignores vote-request from %s with higher term %d", rnd.describe(), types.ID(msg.From), msg.SenderCurrentTerm)
 				return nil
 			}
-
-			// leader should revert back to follower
-			leaderID = NoNodeID
+			leaderID = NoNodeID // leader should revert back to follower
 		}
-
-		raftLogger.Infof(`
-
-	%s
-	RECEIVED %s
-	which has HIGHER term (sender current term '%d' > node current term '%d')
-	(elapsed election timeout ticks: %d out of %d)
-	(GOT %q with HIGHER term, so BECOME FOLLOWER with sender term '%d')
-
-`, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.SenderCurrentTerm, rnd.currentTerm,
-			rnd.electionTimeoutElapsedTickNum, rnd.electionTimeoutTickNum, msg.Type, msg.SenderCurrentTerm)
-
+		raftLogger.Infof("%s received vote-request from %s with higher term %d", rnd.describe(), types.ID(msg.From), msg.SenderCurrentTerm)
 		rnd.becomeFollower(msg.SenderCurrentTerm, leaderID)
 
 	case msg.SenderCurrentTerm < rnd.currentTerm: // message with lower term
@@ -140,16 +117,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			// this will update msg.SenderCurrentTerm with rnd.currentTerm
 
 		} else {
-
-			raftLogger.Infof(`
-				
-	%s
-	IGNORES %s
-	whic has LOWER term (sender current term '%d' < node current term '%d')
-	(IGNORES message with LOWER term!)
-
-`, rnd.describeLong(), raftpb.DescribeMessageLong(msg), msg.SenderCurrentTerm, rnd.currentTerm)
-
+			raftLogger.Infof("%s ignores vote-request from %s with lower term %d", rnd.describe(), types.ID(msg.From), msg.SenderCurrentTerm)
 		}
 		return nil
 	}

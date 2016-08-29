@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.WARN))
+	raftLogger.SetLogger(xlog.NewLogger("raft", xlog.INFO))
 }
 
 // Logger defines logging interface for Raft.

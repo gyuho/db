@@ -114,22 +114,21 @@ type Node interface {
 
 // node implements Node interface.
 type node struct {
-	tickc chan struct{} // tickc chan struct{}
+	tickc chan struct{}
 
-	propc chan raftpb.Message // propc chan pb.Message
-	recvc chan raftpb.Message // recvc chan pb.Message
+	propc chan raftpb.Message
+	recvc chan raftpb.Message
 
-	configChangeCh chan raftpb.ConfigChange // confc chan pb.ConfChange
-	configStateCh  chan raftpb.ConfigState  // confstatec chan pb.ConfState
+	confc        chan raftpb.ConfigChange
+	configStatec chan raftpb.ConfigState
 
-	readyc   chan Ready    // readyc chan Ready
-	advancec chan struct{} // advancec chan struct{}
+	readyc   chan Ready
+	advancec chan struct{}
 
-	stopc chan struct{} // stop chan struct{}
-	donec chan struct{} // done  chan struct{}
-	// <-nd.stopc ➝ close(donec)
+	stopc chan struct{}
+	donec chan struct{}
 
-	nodeStatusChCh chan chan NodeStatus // status chan chan Status
+	nodeStatuscc chan chan NodeStatus
 }
 
 // tickcBufferSize buffers node.tickc, so Raft node can buffer some ticks
@@ -145,8 +144,8 @@ func newNode() node {
 		propc: make(chan raftpb.Message),
 		recvc: make(chan raftpb.Message),
 
-		configChangeCh: make(chan raftpb.ConfigChange),
-		configStateCh:  make(chan raftpb.ConfigState),
+		confc:        make(chan raftpb.ConfigChange),
+		configStatec: make(chan raftpb.ConfigState),
 
 		readyc:   make(chan Ready),
 		advancec: make(chan struct{}),
@@ -154,14 +153,14 @@ func newNode() node {
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),
 
-		nodeStatusChCh: make(chan chan NodeStatus),
+		nodeStatuscc: make(chan chan NodeStatus),
 	}
 }
 
 // (etcd raft.node.Status)
 func (nd *node) NodeStatus() NodeStatus {
 	ch := make(chan NodeStatus)
-	nd.nodeStatusChCh <- ch
+	nd.nodeStatuscc <- ch
 	return <-ch
 }
 
@@ -169,9 +168,7 @@ func (nd *node) NodeStatus() NodeStatus {
 func (nd *node) Tick() {
 	select {
 	case nd.tickc <- struct{}{}:
-
 	case <-nd.donec:
-
 	default:
 		raftLogger.Warningln("Tick missed to fire, since Node was blocking too long!")
 	}
@@ -179,13 +176,13 @@ func (nd *node) Tick() {
 
 // (etcd raft.node.step)
 func (nd *node) step(ctx context.Context, msg raftpb.Message) error {
-	chToReceive := nd.recvc
+	ch := nd.recvc
 	if msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
-		chToReceive = nd.propc
+		ch = nd.propc
 	}
 
 	select {
-	case chToReceive <- msg:
+	case ch <- msg:
 		return nil
 
 	case <-ctx.Done():
@@ -236,13 +233,13 @@ func (nd *node) ProposeConfigChange(ctx context.Context, cc raftpb.ConfigChange)
 // (etcd raft.node.ApplyConfChange)
 func (nd *node) ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState {
 	select {
-	case nd.configChangeCh <- cc:
+	case nd.confc <- cc:
 	case <-nd.donec:
 	}
 
 	var configState raftpb.ConfigState
 	select {
-	case configState = <-nd.configStateCh:
+	case configState = <-nd.configStatec:
 	case <-nd.donec:
 	}
 
@@ -252,21 +249,16 @@ func (nd *node) ApplyConfigChange(cc raftpb.ConfigChange) *raftpb.ConfigState {
 // (etcd raft.node.Stop)
 func (nd *node) Stop() {
 	select {
-	case nd.stopc <- struct{}{}:
-		// not stopped yet, so trigger stop
-
+	case nd.stopc <- struct{}{}: // not stopped yet, so trigger stop
 	case <-nd.donec: // node has already been stopped, no need to do anything
 		return
 	}
-
 	// wait until Stop has been acknowledged by node.run()
 	<-nd.donec
 }
 
 // (etcd raft.node.Ready)
-func (nd *node) Ready() <-chan Ready {
-	return nd.readyc
-}
+func (nd *node) Ready() <-chan Ready { return nd.readyc }
 
 // (etcd raft.node.Advance)
 func (nd *node) Advance() {
@@ -468,18 +460,18 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 			rnd.storageRaftLog.persistedSnapshotAt(prevSnapshotIndex)
 			advancec = nil // reset, waits for next ready
 
-		case nodeStatusCh := <-nd.nodeStatusChCh: // case c := <-n.status:
+		case nodeStatusCh := <-nd.nodeStatuscc: // case c := <-n.status:
 			nodeStatusCh <- getNodeStatus(rnd)
 
 		case <-nd.stopc: // case <-n.stop:
 			close(nd.donec)
 			return
 
-		case configChange := <-nd.configChangeCh: // case cc := <-n.confc:
+		case configChange := <-nd.confc: // case cc := <-n.confc:
 			if configChange.NodeID == NoNodeID {
 				rnd.resetPendingConfigExist()
 				select {
-				case nd.configStateCh <- raftpb.ConfigState{IDs: rnd.allNodeIDs()}:
+				case nd.configStatec <- raftpb.ConfigState{IDs: rnd.allNodeIDs()}:
 				case <-nd.donec:
 				}
 				break
@@ -504,7 +496,7 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 			}
 
 			select {
-			case nd.configStateCh <- raftpb.ConfigState{IDs: rnd.allNodeIDs()}:
+			case nd.configStatec <- raftpb.ConfigState{IDs: rnd.allNodeIDs()}:
 			case <-nd.donec:
 			}
 		}

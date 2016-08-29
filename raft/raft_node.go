@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"sort"
 
+	"github.com/gyuho/db/pkg/types"
 	"github.com/gyuho/db/raft/raftpb"
 )
 
@@ -171,12 +172,7 @@ func newRaftNode(c *Config) *raftNode {
 		nodeSlice = append(nodeSlice, fmt.Sprintf("%x", id))
 	}
 
-	raftLogger.Infof(`
-
-	NEW NODE %s
-
-`, rnd.describeLong())
-
+	raftLogger.Infof("NEW NODE %s", rnd.describe())
 	return rnd
 }
 
@@ -313,7 +309,7 @@ func (rnd *raftNode) allNodeIDs() []uint64 {
 // (etcd raft.raft.addNode)
 func (rnd *raftNode) addNode(id uint64) {
 	if _, ok := rnd.allProgresses[id]; ok {
-		raftLogger.Infof("%s ignores redundant 'addNode' call to %x (can happen when initial boostrapping entries are applied twice)", rnd.describe(), id)
+		raftLogger.Infof("%s ignores redundant 'addNode' call to %s (can happen when initial boostrapping entries are applied twice)", rnd.describe(), types.ID(id))
 		return
 	}
 
@@ -329,7 +325,7 @@ func (rnd *raftNode) deleteNode(id uint64) {
 	rnd.pendingConfigExist = false
 
 	if len(rnd.allProgresses) == 0 {
-		raftLogger.Infof("%s has no progresses when raftNode.deleteNode(%x)... returning...", rnd.describe(), id)
+		raftLogger.Infof("%s has no progresses when raftNode.deleteNode(%s); returning", rnd.describe(), types.ID(id))
 		return
 	}
 
@@ -339,15 +335,7 @@ func (rnd *raftNode) deleteNode(id uint64) {
 }
 
 func (rnd *raftNode) describe() string {
-	return fmt.Sprintf("%q %x [term=%d | leader id=%x]", rnd.state, rnd.id, rnd.currentTerm, rnd.leaderID)
-}
-
-func (rnd *raftNode) describeLong() string {
-	return fmt.Sprintf(`%q %x [node current term=%d | voted for %x | leader id=%x]
-	[first log index=%d | committed index=%d | applied index=%d | last log index=%d | last log term=%d]`,
-		rnd.state, rnd.id, rnd.currentTerm, rnd.votedFor, rnd.leaderID,
-		rnd.storageRaftLog.firstIndex(), rnd.storageRaftLog.committedIndex, rnd.storageRaftLog.appliedIndex,
-		rnd.storageRaftLog.lastIndex(), rnd.storageRaftLog.lastTerm())
+	return fmt.Sprintf("%q %s [term=%d | leader=%s]", rnd.state, types.ID(rnd.id), rnd.currentTerm, types.ID(rnd.leaderID))
 }
 
 func (rnd *raftNode) assertNodeState(expected raftpb.NODE_STATE) {
