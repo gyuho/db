@@ -61,17 +61,17 @@ func NewJSONFormatter(w io.Writer) Formatter {
 }
 
 type jsonFormat struct {
-	Pkg   string    `json:"pkg"`
-	Level string    `json:"level"`
-	Time  time.Time `json:"time"`
-	Log   string    `json:"log"`
+	Pkg   string `json:"pkg"`
+	Level string `json:"level"`
+	Time  string `json:"time"`
+	Log   string `json:"log"`
 }
 
 func (ft *jsonFormatter) WriteFlush(pkg string, lvl LogLevel, txt string) {
 	l := jsonFormat{
 		Pkg:   pkg,
 		Level: lvl.String(),
-		Time:  time.Now(),
+		Time:  time.Now().String()[:26],
 		Log:   txt,
 	}
 	json.NewEncoder(ft.w).Encode(l)
