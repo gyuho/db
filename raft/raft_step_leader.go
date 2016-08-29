@@ -443,7 +443,6 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		if rnd.readOnly.option != ReadOnlySafe || len(msg.Context) == 0 {
 			return
 		}
-
 		ackCount := rnd.readOnly.recvAck(msg)
 		if ackCount < rnd.quorum() {
 			return
