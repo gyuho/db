@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"io"
 	"os"
 	"syscall"
 )
@@ -69,19 +70,19 @@ func preallocExtendTrunc(f *os.File, sizeInBytes int64) error {
 	// interpreted according to whence:
 	//
 	// move current offset to the beginning (0)
-	curOff, err := f.Seek(0, os.SEEK_CUR) // 1, os.SEEK_CUR: seek relative to the current offset
+	curOff, err := f.Seek(0, io.SeekCurrent) // 1, io.SeekCurrent: seek relative to the current offset
 	if err != nil {
 		return err
 	}
 
 	// move(set) end of the file with sizeInBytes
-	sizeOff, err := f.Seek(sizeInBytes, os.SEEK_END) // 2, os.SEEK_END: seek relative to the end
+	sizeOff, err := f.Seek(sizeInBytes, io.SeekEnd) // 2, io.SeekEnd: seek relative to the end
 	if err != nil {
 		return err
 	}
 
-	// move(set) beginning of the file(os.SEEK_SET) to curOff(beginning)
-	if _, err = f.Seek(curOff, os.SEEK_SET); err != nil { // 0, os.SEEK_SET: seek relative to the origin(beginning) of the file
+	// move(set) beginning of the file(io.SeekStart) to curOff(beginning)
+	if _, err = f.Seek(curOff, io.SeekStart); err != nil { // 0, io.SeekStart: seek relative to the origin(beginning) of the file
 		return err
 	}
 

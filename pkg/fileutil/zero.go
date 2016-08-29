@@ -1,6 +1,9 @@
 package fileutil
 
-import "os"
+import (
+	"io"
+	"os"
+)
 
 /*
 https://golang.org/pkg/os/#File.Seek
@@ -24,18 +27,18 @@ const (
 )
 */
 
-// ZeroToEnd zeros a file from os.SEEK_CUR to its os.SEEK_END.
+// ZeroToEnd zeros a file from io.SeekCurrent to its io.SeekEnd.
 // May temporarily shorten the length of the file.
 //
 // (etcd pkg.fileutil.ZeroToEnd)
 func ZeroToEnd(f *os.File) error {
 	// TODO: support FALLOC_FL_ZERO_RANGE
-	curOffset, err := f.Seek(0, os.SEEK_CUR)
+	curOffset, err := f.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
 
-	endOffset, err := f.Seek(0, os.SEEK_END)
+	endOffset, err := f.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
 	}
@@ -49,6 +52,6 @@ func ZeroToEnd(f *os.File) error {
 		return err
 	}
 
-	_, err = f.Seek(curOffset, os.SEEK_SET)
+	_, err = f.Seek(curOffset, io.SeekStart)
 	return err
 }

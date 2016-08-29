@@ -53,8 +53,8 @@ func Repair(dir string) bool {
 			}
 			defer bf.Close()
 
-			// move(set) beginning of the file(os.SEEK_SET) to offset 0
-			if _, err = f.Seek(0, os.SEEK_SET); err != nil {
+			// move(set) beginning of the file(io.SeekStart) to offset 0
+			if _, err = f.Seek(0, io.SeekStart); err != nil {
 				logger.Errorf("failed to read backup file %q for WAL (%v)", f.Name(), err)
 				return false
 			}

@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -22,13 +23,13 @@ func Test_ZeroToEnd(t *testing.T) {
 	if _, err = f.Write(b); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.Seek(512, os.SEEK_SET); err != nil {
+	if _, err = f.Seek(512, io.SeekStart); err != nil {
 		t.Fatal(err)
 	}
 	if err = ZeroToEnd(f); err != nil {
 		t.Fatal(err)
 	}
-	off, serr := f.Seek(0, os.SEEK_CUR)
+	off, serr := f.Seek(0, io.SeekCurrent)
 	if serr != nil {
 		t.Fatal(serr)
 	}
@@ -36,7 +37,7 @@ func Test_ZeroToEnd(t *testing.T) {
 		t.Fatalf("expected offset 512, got %d", off)
 	}
 
-	// reading the next 512 bytes from os.SEEK_CUR
+	// reading the next 512 bytes from io.SeekCurrent
 	b = make([]byte, 512)
 	if _, err = f.Read(b); err != nil {
 		t.Fatal(err)

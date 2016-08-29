@@ -1,6 +1,7 @@
 package raftwal
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -109,7 +110,7 @@ func Test_ReadAll_torn_write(t *testing.T) {
 		if err = w.Save(raftpb.HardState{}, []raftpb.Entry{{Index: uint64(i)}}); err != nil {
 			t.Fatal(err)
 		}
-		if offsets[i], err = w.unsafeLastFile().Seek(0, os.SEEK_CUR); err != nil {
+		if offsets[i], err = w.unsafeLastFile().Seek(0, io.SeekCurrent); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -124,7 +125,7 @@ func Test_ReadAll_torn_write(t *testing.T) {
 	}
 	defer f.Close()
 
-	_, err = f.Seek(offsets[clobberIdx], os.SEEK_SET)
+	_, err = f.Seek(offsets[clobberIdx], io.SeekStart)
 	if err != nil {
 		t.Fatal(err)
 	}

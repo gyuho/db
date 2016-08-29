@@ -2,6 +2,7 @@ package fileutil
 
 import (
 	"errors"
+	"io"
 	"os"
 	"syscall"
 )
@@ -29,7 +30,7 @@ var (
 
 	writeLock = syscall.Flock_t{
 		Type:   syscall.F_WRLCK,
-		Whence: int16(os.SEEK_SET), // beginning of the file
+		Whence: int16(io.SeekStart), // beginning of the file
 		Start:  0,
 		Len:    0,
 	}

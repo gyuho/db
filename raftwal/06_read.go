@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/gyuho/db/pkg/crcutil"
 	"github.com/gyuho/db/pkg/fileutil"
@@ -126,7 +125,7 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 		// avoid any CRC mismatch errors for the new writes.
 		//
 		// seek relative to the origin of the file
-		_, err = w.unsafeLastFile().Seek(w.dec.lastValidOffset, os.SEEK_SET)
+		_, err = w.unsafeLastFile().Seek(w.dec.lastValidOffset, io.SeekStart)
 		if err != nil {
 			return nil, hardstate, nil, err
 		}

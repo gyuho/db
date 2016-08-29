@@ -2,6 +2,7 @@ package rotate
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -121,7 +122,7 @@ func (ft *formatter) WriteFlush(pkg string, lvl xlog.LogLevel, txt string) {
 	ft.w.Flush()
 
 	// seek the current location, and get the offset
-	curOffset, err := ft.file.Seek(0, os.SEEK_CUR)
+	curOffset, err := ft.file.Seek(0, io.SeekCurrent)
 	if err != nil {
 		panic(err)
 	}

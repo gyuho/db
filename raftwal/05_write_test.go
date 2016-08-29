@@ -162,7 +162,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	// WAL is created with preallocation with segment size
-	offset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err := w.unsafeLastFile().Seek(0, io.SeekCurrent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +498,7 @@ func TestTailWritesUnused(t *testing.T) {
 	}
 
 	// remove the unused space (slack space) by truncating
-	offset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err := w.unsafeLastFile().Seek(0, io.SeekCurrent)
 	if err != nil {
 		t.Fatal(err)
 	}

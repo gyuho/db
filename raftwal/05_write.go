@@ -291,7 +291,7 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	}
 
 	// set offset to the end of file with 0 for pre-allocation
-	if _, err := f.Seek(0, os.SEEK_END); err != nil {
+	if _, err := f.Seek(0, io.SeekEnd); err != nil {
 		return nil, err
 	}
 	if err := fileutil.Preallocate(f.File, segmentSizeBytes, preallocWithExtendFile); err != nil {
@@ -429,7 +429,7 @@ func (w *WAL) unsafeEncodeHardState(state *raftpb.HardState) error {
 // (etcd wal.WAL.cut)
 func (w *WAL) unsafeCutCurrent() error {
 	// set offset to current
-	offset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err := w.unsafeLastFile().Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
@@ -479,7 +479,7 @@ func (w *WAL) unsafeCutCurrent() error {
 	}
 
 	// set offset to current, because there were writes
-	offset, err = w.unsafeLastFile().Seek(0, os.SEEK_CUR)
+	offset, err = w.unsafeLastFile().Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
@@ -500,8 +500,8 @@ func (w *WAL) unsafeCutCurrent() error {
 		return err
 	}
 
-	// move(set) beginning of the file(os.SEEK_SET) to offset, because there were writes
-	if _, err = newLastTmpFile.Seek(offset, os.SEEK_SET); err != nil { // 0, os.SEEK_SET: seek relative to the origin(beginning) of the file
+	// move(set) beginning of the file(io.SeekStart) to offset, because there were writes
+	if _, err = newLastTmpFile.Seek(offset, io.SeekStart); err != nil { // 0, io.SeekStart: seek relative to the origin(beginning) of the file
 		return err
 	}
 
@@ -544,7 +544,7 @@ func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
 	}
 
 	// seek the current location, and get the offset
-	curOffset, err := w.unsafeLastFile().Seek(0, os.SEEK_CUR)
+	curOffset, err := w.unsafeLastFile().Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
