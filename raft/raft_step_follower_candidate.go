@@ -55,8 +55,9 @@ func (rnd *raftNode) candidateReceivedVoteFrom(fromID uint64, voted bool) int {
 func (rnd *raftNode) followerHandleLeaderHeartbeat(msg raftpb.Message) {
 	rnd.storageRaftLog.commitTo(msg.SenderCurrentCommittedIndex)
 	rnd.sendToMailbox(raftpb.Message{
-		Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT,
-		To:   msg.From,
+		Type:    raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT,
+		To:      msg.From,
+		Context: msg.Context,
 	})
 }
 

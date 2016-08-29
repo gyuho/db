@@ -440,7 +440,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			rnd.leaderSendAppendOrSnapshot(msg.From)
 		}
 
-		if rnd.readOnly.option != ReadOnlySafe || len(msg.Context) == 0 { // ???
+		if rnd.readOnly.option != ReadOnlySafe || len(msg.Context) == 0 {
 			return
 		}
 
