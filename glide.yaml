@@ -1,8 +1,12 @@
 package: github.com/gyuho/db
 import:
 - package: github.com/gogo/protobuf
+  version: 966a6f4b3274f2692aa2f30df2ea5c7172c832ca
   subpackages:
   - gogoproto
+  - proto
+  - protoc-gen-gogo/descriptor
 - package: github.com/golang/protobuf
+  version: f592bd283e9ef86337a432eb50e592278c3d534d
   subpackages:
   - proto

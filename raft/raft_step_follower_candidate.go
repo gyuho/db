@@ -19,7 +19,7 @@ func (rnd *raftNode) promotableToLeader() bool {
 // (etcd raft.raft.tickElection)
 func (rnd *raftNode) tickFuncFollowerElectionTimeout() {
 	if rnd.id == rnd.leaderID {
-		raftLogger.Panicf("MUST NOT BE called by leader(%s)", rnd.leaderID, rnd.state, types.ID(rnd.id))
+		raftLogger.Panicf("MUST NOT BE called by leader(%s)", types.ID(rnd.id))
 	}
 
 	rnd.electionTimeoutElapsedTickNum++
