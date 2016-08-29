@@ -1,0 +1,29 @@
+{
+	"ImportPath": "github.com/gyuho/db",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v74",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/gogo/protobuf/gogoproto",
+			"Comment": "v0.3-11-g966a6f4",
+			"Rev": "966a6f4b3274f2692aa2f30df2ea5c7172c832ca"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/proto",
+			"Comment": "v0.3-11-g966a6f4",
+			"Rev": "966a6f4b3274f2692aa2f30df2ea5c7172c832ca"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"Comment": "v0.3-11-g966a6f4",
+			"Rev": "966a6f4b3274f2692aa2f30df2ea5c7172c832ca"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "f592bd283e9ef86337a432eb50e592278c3d534d"
+		}
+	]
+}

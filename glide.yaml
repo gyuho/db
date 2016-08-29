@@ -1,8 +1,0 @@
-package: github.com/gyuho/db
-import:
-- package: github.com/gogo/protobuf
-  subpackages:
-  - gogoproto
-- package: github.com/golang/protobuf
-  subpackages:
-  - proto
