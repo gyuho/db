@@ -40,7 +40,6 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	case msg.SenderCurrentTerm == 0: // local message (e.g. msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER)
 
 	case msg.SenderCurrentTerm > rnd.currentTerm: // message with higher term
-
 		leaderID := msg.From
 		if msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
 			// if the vote was requested for leadership transfer,
@@ -97,7 +96,6 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 		rnd.becomeFollower(msg.SenderCurrentTerm, leaderID)
 
 	case msg.SenderCurrentTerm < rnd.currentTerm: // message with lower term
-
 		// checkQuorum is true, and message from leader with lower term
 		if rnd.checkQuorum &&
 			(msg.Type == raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT ||
@@ -123,6 +121,5 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 	}
 
 	rnd.stepFunc(rnd, msg)
-
 	return nil
 }

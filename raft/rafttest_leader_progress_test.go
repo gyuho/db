@@ -266,7 +266,7 @@ func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
 		for j := 0; j < rnd.heartbeatTimeoutTickNum; j++ {
 			rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT, From: 1, To: 1})
 		}
-		// rnd.leaderReplicateHeartbeatRequests() // resume all progresses
+		// rnd.leaderSendHeartbeats() // resume all progresses
 
 		if rnd.allProgresses[2].isPaused() {
 			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected false, got %v", i, rnd.allProgresses[2].isPaused())

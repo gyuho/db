@@ -206,7 +206,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 	// it assumes that there is no viable leader and starts an election.
 
 	switch msg.Type {
-	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
+	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER:
 		if rnd.leaderID == NoNodeID {
 			raftLogger.Infof("%s has no leader; dropping %q", rnd.describe(), rnd.leaderID, msg.Type)
 			return
@@ -214,22 +214,22 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		msg.To = rnd.leaderID
 		rnd.sendToMailbox(msg)
 
-	case raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT: // pb.MsgHeartbeat
+	case raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT:
 		rnd.electionTimeoutElapsedTickNum = 0
 		rnd.leaderID = msg.From
 		rnd.followerHandleLeaderHeartbeat(msg)
 
-	case raftpb.MESSAGE_TYPE_LEADER_APPEND: // pb.MsgApp
+	case raftpb.MESSAGE_TYPE_LEADER_APPEND:
 		rnd.electionTimeoutElapsedTickNum = 0
 		rnd.leaderID = msg.From
 		rnd.followerHandleLeaderAppend(msg)
 
-	case raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT: // pb.MsgSnap
+	case raftpb.MESSAGE_TYPE_LEADER_SNAPSHOT:
 		rnd.electionTimeoutElapsedTickNum = 0
 		rnd.leaderID = msg.From
 		rnd.followerHandleLeaderSnapshot(msg)
 
-	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
+	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
 		// isUpToDate returns true if the given (index, term) log is more up-to-date
 		// than the last entry in the existing logs. It returns true, first if the
 		// term is greater than the last term. Second if the index is greater than
@@ -252,11 +252,11 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 
 		}
 
-	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT: // pb.MsgTimeoutNow
+	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT:
 		raftLogger.Infof("%s received %q; start campaign", rnd.describe(), msg.Type)
 		rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
 
-	case raftpb.MESSAGE_TYPE_TRANSFER_LEADER: // pb.MsgTransferLeader
+	case raftpb.MESSAGE_TYPE_TRANSFER_LEADER:
 		if rnd.leaderID == NoNodeID {
 			raftLogger.Infof("%s has no leader (dropping %q)", rnd.describe(), msg.Type)
 			return
@@ -264,7 +264,7 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		msg.To = rnd.leaderID
 		rnd.sendToMailbox(msg)
 
-	case raftpb.MESSAGE_TYPE_READ_INDEX: // pb.MsgReadIndex
+	case raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX:
 		if rnd.leaderID == NoNodeID {
 			raftLogger.Infof("%s has no leader (dropping %q)", rnd.describe(), msg.Type)
 			return
@@ -272,14 +272,15 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		msg.To = rnd.leaderID
 		rnd.sendToMailbox(msg)
 
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_INDEX: // pb.MsgReadIndexResp
+	case raftpb.MESSAGE_TYPE_READ_INDEX_DATA:
 		if len(msg.Entries) != 1 {
-			raftLogger.Errorf("%s received invalid ReadIndex response from %s (entries count %d)", rnd.describe(), types.ID(msg.From), len(msg.Entries))
+			raftLogger.Errorf("%s got invalid read-index data from %s (entries count %d)", rnd.describe(), types.ID(msg.From), len(msg.Entries))
 			return
 		}
-
-		rnd.readState.Index = msg.LogIndex
-		rnd.readState.RequestCtx = msg.Entries[0].Data
+		rnd.readStates = append(rnd.readStates, ReadState{
+			Index:      msg.LogIndex,
+			RequestCtx: msg.Entries[0].Data,
+		})
 
 	default:
 		raftLogger.Infof("%s ignores %q from %s", rnd.describe(), msg.Type, types.ID(msg.From))

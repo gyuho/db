@@ -50,11 +50,11 @@ type Ready struct {
 	// ReportSnapshot.
 	MessagesToSend []raftpb.Message
 
-	// ReadState is updated when Raft receives raftpb.MESSAGE_TYPE_READ_INDEX,
+	// ReadStates are updated when Raft receives raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX,
 	// only valid for the requested read-request.
 	// ReadState is used to serve linearized read-only quorum-get requests without going
 	// through Raft log appends, when the Node's applied index is greater than the index in ReadState.
-	ReadState ReadState
+	ReadStates []ReadState
 }
 
 // ContainsUpdates returns true if Ready contains any updates.
@@ -67,7 +67,7 @@ func (rd Ready) ContainsUpdates() bool {
 		len(rd.EntriesToAppend) > 0 ||
 		len(rd.EntriesToApply) > 0 ||
 		len(rd.MessagesToSend) > 0 ||
-		rd.ReadState.Index != 0
+		len(rd.ReadStates) > 0
 }
 
 // (etcd raft.newReady)
@@ -90,13 +90,8 @@ func newReady(rnd *raftNode, prevSoftState *raftpb.SoftState, prevHardState raft
 		rd.SnapshotToSave = *rnd.storageRaftLog.storageUnstable.snapshot
 	}
 
-	if rnd.readState.Index != uint64(0) {
-		copied := make([]byte, len(rnd.readState.RequestCtx))
-		copy(copied, rnd.readState.RequestCtx)
-
-		rd.ReadState.Index = rnd.readState.Index
-		rd.ReadState.RequestCtx = copied
+	if len(rnd.readStates) != 0 {
+		rd.ReadStates = rnd.readStates
 	}
-
 	return rd
 }
