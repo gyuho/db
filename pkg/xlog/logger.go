@@ -3,6 +3,7 @@ package xlog
 import (
 	"fmt"
 	"os"
+	"sync"
 )
 
 // LogLevel is the set of all log levels.
@@ -49,23 +50,7 @@ type Logger struct {
 	maxLvl LogLevel
 }
 
-// NewLogger returns a Logger with pkg prefix.
-func NewLogger(pkg string, maxLvl LogLevel) *Logger {
-	lg := &Logger{pkg: pkg, maxLvl: maxLvl}
-
-	xlogger.mu.Lock() // overwrite
-	xlogger.loggers[pkg] = lg
-	xlogger.mu.Unlock()
-
-	return lg
-}
-
-// SetMaxLogLevel updates logger's LogLevel.
-func (l *Logger) SetMaxLogLevel(lvl LogLevel) {
-	xlogger.mu.Lock()
-	l.maxLvl = lvl
-	xlogger.mu.Unlock()
-}
+//////////////////////////////////////////////////////
 
 func (l *Logger) log(lvl LogLevel, txt string) {
 	if lvl < CRITICAL || lvl > DEBUG {
@@ -190,4 +175,51 @@ func (l *Logger) Debugln(args ...interface{}) {
 func (l *Logger) Debugf(format string, args ...interface{}) {
 	txt := fmt.Sprintf(format, args...)
 	l.log(DEBUG, txt)
+}
+
+//////////////////////////////////////////////////////
+
+type globalLogger struct {
+	mu        sync.Mutex
+	loggers   map[string]*Logger
+	formatter Formatter
+}
+
+var xlogger = &globalLogger{
+	loggers: make(map[string]*Logger),
+}
+
+// SetMaxLogLevel updates logger's LogLevel.
+func (l *Logger) SetMaxLogLevel(lvl LogLevel) {
+	xlogger.mu.Lock()
+	l.maxLvl = lvl
+	xlogger.mu.Unlock()
+}
+
+// SetGlobalMaxLogLevel sets max log levels of all loggers.
+func SetGlobalMaxLogLevel(lvl LogLevel) {
+	xlogger.mu.Lock()
+	for _, lg := range xlogger.loggers {
+		lg.maxLvl = lvl
+	}
+	xlogger.mu.Unlock()
+}
+
+// GetLogger returns the pkg logger, so that external packages can update the log level.
+func GetLogger(name string) (*Logger, bool) {
+	xlogger.mu.Lock()
+	lg, ok := xlogger.loggers[name]
+	xlogger.mu.Unlock()
+	return lg, ok
+}
+
+// NewLogger returns a Logger with pkg prefix.
+func NewLogger(pkg string, maxLvl LogLevel) *Logger {
+	lg := &Logger{pkg: pkg, maxLvl: maxLvl}
+
+	xlogger.mu.Lock() // overwrite
+	xlogger.loggers[pkg] = lg
+	xlogger.mu.Unlock()
+
+	return lg
 }

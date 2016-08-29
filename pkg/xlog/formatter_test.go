@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestDefaultFormatterLogger(t *testing.T) {
+func Test_NewDefaultFormatter_Logger_(t *testing.T) {
 	buf := new(bytes.Buffer)
 	SetFormatter(NewDefaultFormatter(buf))
 
@@ -27,7 +27,28 @@ func TestDefaultFormatterLogger(t *testing.T) {
 	fmt.Println(txt)
 }
 
-func TestDefaultFormatterLoggerGlobal(t *testing.T) {
+func Test_NewJSONFormatter_Logger(t *testing.T) {
+	buf := new(bytes.Buffer)
+	SetFormatter(NewJSONFormatter(buf))
+
+	logger := NewLogger("test", INFO)
+	logger.Print("Hello World!")
+	logger.Print("Hello World!")
+	logger.Print("Hello World!")
+
+	logger.Debugln("DO NOT PRINT THIS")
+
+	txt := buf.String()
+	if !strings.Contains(txt, "Hello World!") {
+		t.Fatalf("unexpected log %q", txt)
+	}
+	if strings.Contains(txt, "DO NOT PRINT THIS") {
+		t.Fatalf("unexpected log %q", txt)
+	}
+	fmt.Println(txt)
+}
+
+func Test_NewDefaultFormatter_Logger_global(t *testing.T) {
 	buf := new(bytes.Buffer)
 	SetFormatter(NewDefaultFormatter(buf))
 
@@ -47,7 +68,7 @@ func TestDefaultFormatterLoggerGlobal(t *testing.T) {
 	fmt.Println(txt)
 }
 
-func TestDefaultFormatterLoggerFile(t *testing.T) {
+func Test_NewDefaultFormatter_Logger_file(t *testing.T) {
 	fpath := "test.log"
 	defer os.RemoveAll(fpath)
 
@@ -60,6 +81,39 @@ func TestDefaultFormatterLoggerFile(t *testing.T) {
 	logger := NewLogger("test", DEBUG)
 	logger.Println("Hello World!")
 	logger.Debugln("TEST")
+
+	if err = f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := ioutil.ReadFile(fpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txt := string(b)
+
+	if !strings.Contains(txt, "Hello World!") {
+		t.Fatalf("unexpected log %q", txt)
+	}
+	if !strings.Contains(txt, "TEST") {
+		t.Fatalf("unexpected log %q", txt)
+	}
+	fmt.Println(txt)
+}
+
+func Test_NewJSONFormatter_Logger_file(t *testing.T) {
+	fpath := "test.log"
+	defer os.RemoveAll(fpath)
+
+	f, err := openToAppendOnly(fpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	SetFormatter(NewJSONFormatter(f))
+
+	logger := NewLogger("test", DEBUG)
+	logger.Print("Hello World!")
+	logger.Debug("TEST")
 
 	if err = f.Close(); err != nil {
 		t.Fatal(err)
