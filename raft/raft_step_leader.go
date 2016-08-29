@@ -78,7 +78,7 @@ func (rnd *raftNode) tickFuncLeaderHeartbeatTimeout() {
 // leaderSendHeartbeatTo sends an empty append RPC as a heartbeat to its followers.
 //
 // (etcd raft.raft.sendHeartbeat)
-func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
+func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64, ctx []byte) {
 	var (
 		matched         = rnd.allProgresses[targetID].MatchIndex
 		commitInStorage = rnd.storageRaftLog.committedIndex
@@ -88,18 +88,23 @@ func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64) {
 		Type: raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT,
 		To:   targetID,
 		SenderCurrentCommittedIndex: committedIndex,
+
+		Context: ctx, // for read-index
 	})
 }
 
-// leaderReplicateHeartbeatRequests replicates heartbeats to its followers.
-//
 // (etcd raft.raft.bcastHeartbeat)
-func (rnd *raftNode) leaderReplicateHeartbeatRequests() {
+func (rnd *raftNode) leaderSendHeartbeats() {
+	rnd.leaderSendHeartbeatsCtx(nil)
+}
+
+// (etcd raft.raft.bcastHeartbeatWithCtx)
+func (rnd *raftNode) leaderSendHeartbeatsCtx(ctx []byte) {
 	for id := range rnd.allProgresses {
 		if id == rnd.id { // OR rnd.leaderID
 			continue
 		}
-		rnd.leaderSendHeartbeatTo(id)
+		rnd.leaderSendHeartbeatTo(id, ctx)
 		rnd.allProgresses[id].resume() // pr.Paused = false
 	}
 }
@@ -158,7 +163,7 @@ func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 			case raftpb.PROGRESS_STATE_PROBE:
 				followerProgress.pause()
 				//
-				// 'leaderReplicateHeartbeatRequests' will resume again
+				// 'leaderSendHeartbeats' will resume again
 				// rnd.allProgresses[id].resume()
 
 			case raftpb.PROGRESS_STATE_REPLICATE:
@@ -324,18 +329,18 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 
 	// leader to take action, or receive response
 	switch msg.Type {
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT: // pb.MsgBeat
-		rnd.leaderReplicateHeartbeatRequests() // resume all progresses
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT:
+		rnd.leaderSendHeartbeats() // resume all progresses
 		return
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM: // pb.MsgCheckQuorum
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CHECK_QUORUM:
 		if !rnd.checkQuorumActive() {
 			raftLogger.Warningf("%s becomes %q; quorum is not active", rnd.describe(), raftpb.NODE_STATE_FOLLOWER)
-			rnd.becomeFollower(rnd.currentTerm, NoNodeID) // becomeFollower(term, leader)
+			rnd.becomeFollower(rnd.currentTerm, NoNodeID)
 		}
 		return
 
-	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER: // pb.MsgProp
+	case raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER:
 		if len(msg.Entries) == 0 {
 			raftLogger.Panicf("%s got empty proposal", rnd.describe())
 		}
@@ -363,7 +368,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		rnd.leaderReplicateAppendRequests()
 		return
 
-	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE: // pb.MsgVote
+	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
 		// (Raft §3.4 Leader election, p.17)
 		//
 		// Raft randomizes election timeouts to minimize split votes or two candidates.
@@ -379,17 +384,38 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		})
 		return
 
-	case raftpb.MESSAGE_TYPE_READ_INDEX: // pb.MsgReadIndex
-		logIndex := uint64(0)
-		if rnd.checkQuorum {
-			logIndex = rnd.storageRaftLog.committedIndex
+	case raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX: // manually called from node
+		if rnd.quorum() > 1 {
+			switch rnd.readOnly.option {
+			case ReadOnlySafe:
+				rnd.readOnly.addRequest(msg, rnd.storageRaftLog.committedIndex)
+				rnd.leaderSendHeartbeatsCtx(msg.Entries[0].Data)
+
+			case ReadOnlyLeaseBased:
+				logIndex := uint64(0)
+				if rnd.checkQuorum {
+					logIndex = rnd.storageRaftLog.committedIndex
+				}
+				if msg.From == uint64(0) || msg.From == rnd.id { // from local member(leader)
+					rnd.readStates = append(rnd.readStates, ReadState{
+						Index:      rnd.storageRaftLog.committedIndex,
+						RequestCtx: msg.Entries[0].Data,
+					})
+				} else { // from follower
+					rnd.sendToMailbox(raftpb.Message{
+						Type:     raftpb.MESSAGE_TYPE_READ_INDEX_DATA,
+						To:       msg.From,
+						LogIndex: logIndex,
+						Entries:  msg.Entries,
+					})
+				}
+			}
+		} else { // from local member(leader)
+			rnd.readStates = append(rnd.readStates, ReadState{
+				Index:      rnd.storageRaftLog.committedIndex,
+				RequestCtx: msg.Entries[0].Data,
+			})
 		}
-		rnd.sendToMailbox(raftpb.Message{
-			Type:     raftpb.MESSAGE_TYPE_RESPONSE_TO_READ_INDEX,
-			To:       msg.From,
-			LogIndex: logIndex,
-			Entries:  msg.Entries,
-		})
 		return
 	}
 
@@ -400,7 +426,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 	}
 
 	switch msg.Type {
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT: // pb.MsgHeartbeatResp
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT:
 		followerProgress.RecentActive = true
 
 		if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE && followerProgress.inflights.full() {
@@ -414,7 +440,33 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			rnd.leaderSendAppendOrSnapshot(msg.From)
 		}
 
-	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND: // pb.MsgAppResp
+		if rnd.readOnly.option != ReadOnlySafe || len(msg.Context) == 0 {
+			return
+		}
+		ackCount := rnd.readOnly.recvAck(msg)
+		if ackCount < rnd.quorum() {
+			return
+		}
+
+		rss := rnd.readOnly.advance(msg)
+		for _, rs := range rss {
+			req := rs.req
+			if req.From == uint64(0) || req.From == rnd.id { // from local member(leader)
+				rnd.readStates = append(rnd.readStates, ReadState{
+					Index:      rs.index,
+					RequestCtx: req.Entries[0].Data,
+				})
+			} else { // from follower
+				rnd.sendToMailbox(raftpb.Message{
+					Type:     raftpb.MESSAGE_TYPE_READ_INDEX_DATA,
+					To:       req.From,
+					LogIndex: rs.index,
+					Entries:  req.Entries,
+				})
+			}
+		}
+
+	case raftpb.MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND:
 		followerProgress.RecentActive = true
 
 		switch msg.Reject {
@@ -461,7 +513,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			}
 		}
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT: // pb.MsgSnapStatus
+	case raftpb.MESSAGE_TYPE_INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT:
 		if followerProgress.State != raftpb.PROGRESS_STATE_SNAPSHOT {
 			return
 		}
@@ -472,7 +524,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			followerProgress.pause()
 			raftLogger.Infof("%s got snapshot-response approved from %s", rnd.describe(), types.ID(msg.From))
 			//
-			// 'leaderReplicateHeartbeatRequests' will resume again
+			// 'leaderSendHeartbeats' will resume again
 			// rnd.allProgresses[id].resume()
 
 		case true:
@@ -481,11 +533,11 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			followerProgress.pause()
 			raftLogger.Infof("%s got snapshot-response rejected from %s", rnd.describe(), types.ID(msg.From))
 			//
-			// 'leaderReplicateHeartbeatRequests' will resume again
+			// 'leaderSendHeartbeats' will resume again
 			// rnd.allProgresses[id].resume()
 		}
 
-	case raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER: // pb.MsgUnreachable
+	case raftpb.MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER:
 		raftLogger.Warningf("%s cannot connect to %s", rnd.describe(), types.ID(msg.From))
 		if followerProgress.State == raftpb.PROGRESS_STATE_REPLICATE {
 			followerProgress.becomeProbe()
@@ -499,7 +551,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		//
 		// followerProgress.pause()
 
-	case raftpb.MESSAGE_TYPE_TRANSFER_LEADER: // pb.MsgTransferLeader
+	case raftpb.MESSAGE_TYPE_TRANSFER_LEADER:
 		lastLeaderTransfereeID := rnd.leaderTransfereeID
 		leaderTransfereeID := msg.From
 

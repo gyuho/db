@@ -336,7 +336,7 @@ func Test_Progress_resume(t *testing.T) {
 }
 
 // (etcd raft.TestProgressResumeByHeartbeat)
-func Test_Progress_becomeLeader_resume_by_leaderReplicateHeartbeatRequests(t *testing.T) {
+func Test_Progress_becomeLeader_resume_by_leaderSendHeartbeats(t *testing.T) {
 	rnd := newTestRaftNode(1, []uint64{1, 2}, 10, 1, NewStorageStableInMemory())
 	rnd.becomeCandidate()
 	rnd.becomeLeader()
@@ -346,7 +346,7 @@ func Test_Progress_becomeLeader_resume_by_leaderReplicateHeartbeatRequests(t *te
 	// this should resume follower 2
 	//
 	// stepLeader
-	// case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT: rnd.leaderReplicateHeartbeatRequests()
+	// case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT: rnd.leaderSendHeartbeats()
 	rnd.Step(raftpb.Message{
 		Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT,
 		From: 1,
