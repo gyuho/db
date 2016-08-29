@@ -68,13 +68,12 @@ type jsonFormat struct {
 }
 
 func (ft *jsonFormatter) WriteFlush(pkg string, lvl LogLevel, txt string) {
-	l := jsonFormat{
+	json.NewEncoder(ft.w).Encode(jsonFormat{
 		Pkg:   pkg,
 		Level: lvl.String(),
 		Time:  time.Now().String()[:26],
 		Log:   txt,
-	}
-	json.NewEncoder(ft.w).Encode(l)
+	})
 	ft.w.Flush()
 }
 
