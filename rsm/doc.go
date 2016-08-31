@@ -240,8 +240,8 @@ etcdctl put foo bar
 
 # server side
 etcdserverpb._KV_Put_Handler
--> etcdserver.api.v3rpc (s *kvServer) Put
--> etcdserver.EtcdServer.Put(ctx context.Context, r *pb.PutRequest)
+-> etcdserver.api.v3rpc (s *kvServer) Put   (key.go)
+-> etcdserver.EtcdServer.Put(ctx context.Context, r *pb.PutRequest)   (v3_server.go)
 -> etcdserver.EtcdServer.processInternalRaftRequest
 -> etcdserver.EtcdServer.processInternalRaftRequestOnce
 -> data, err := r.Marshal()
