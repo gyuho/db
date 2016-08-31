@@ -254,7 +254,9 @@ s.applyEntries(ep, apply)
 s.apply(ents, &ep.confState)
 s.applyEntryNormal(&e)
 s.applyV3.Apply(&raftReq)
-Put
+
+func (a *applierV3backend) Put(txnID int64, p *pb.PutRequest) (*pb.PutResponse, error) {
+
 
 1. etcdserverpb defines RPC interfaces (e.g. KV service interface with Range, Put methods)
 2. etcdserverpb then generates KVServer, KVClient interfaces that can en/decode Protocol Buffer messages
