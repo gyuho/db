@@ -4,46 +4,60 @@ import "io"
 
 // PageWriter implements io.Writer interface
 // where writes are in page chunks when flushing.
-// It only writes by chunks of 'pageBytesN'.
+// It only writes by chunks of 'pageChunkN'.
 // That is, (*PageWriter).Write(p []byte) only writes
-// where len(p) % pageBytesN == 0.
+// where len(p) % pageChunkN == 0.
 //
 // (etcd pkg.ioutil.PageWriter)
 type PageWriter struct {
 	w io.Writer
 
-	// pageBytesN is the number of bytes per page.
-	// Then PageWriter splits bytes by the chunks of pageBytesN.
-	pageBytesN int
+	// pageChunkN is the number of bytes per page.
+	// PageWriter splits bytes by the chunks of pageChunkN.
+	//
+	// (etcd pkg.ioutil.pageBytes)
+	pageChunkN int
+
 	// pageOffset tracks the page offset of the base of the buffer.
+	//
+	// (etcd pkg.ioutil.pageOffset)
 	pageOffset int
 
 	// buffered holds write buffer.
+	//
+	// (etcd pkg.ioutil.buf)
 	buffered []byte
+
 	// bufferedN counts the number of bytes pending
 	// for writing in the buffer.
+	//
+	// (etcd pkg.ioutil.bufferedBytes)
 	bufferedN int
-	// bufferedWatermark is the number of bytes that the buffer
+
+	// bufferedWatermarkN is the number of bytes that the buffer
 	// can hold before it needs to be flushed. It is less than len(buf)
 	// so there is spacefor slack writes to bring the writer to page
 	// alignment.
-	bufferedWatermark int
+	//
+	// (etcd pkg.ioutil.bufWatermarkBytes)
+	bufferedWatermarkN int
 }
 
-var defaultBufferBytesN = 128 * 1024
+var defaultWatermarkN = 128 * 1024
 
 // NewPageWriter creates a new PageWriter with specified number
 // of bytes per page.
-func NewPageWriter(w io.Writer, pageBytesN int) *PageWriter {
+func NewPageWriter(w io.Writer, pageChunkN int) *PageWriter {
 	return &PageWriter{
 		w: w,
 
-		pageBytesN: pageBytesN,
+		pageChunkN: pageChunkN,
 		pageOffset: 0,
 
-		buffered:          make([]byte, defaultBufferBytesN+pageBytesN), // ???
-		bufferedN:         0,
-		bufferedWatermark: defaultBufferBytesN,
+		// ???
+		buffered:           make([]byte, defaultWatermarkN+pageChunkN),
+		bufferedN:          0,
+		bufferedWatermarkN: defaultWatermarkN,
 	}
 }
 
@@ -52,14 +66,14 @@ func (pw *PageWriter) Flush() error {
 		return nil
 	}
 	_, err := pw.w.Write(pw.buffered[:pw.bufferedN])
-	pw.pageOffset = (pw.pageOffset + pw.bufferedN) % pw.pageBytesN
+	pw.pageOffset = (pw.pageOffset + pw.bufferedN) % pw.pageChunkN
 	pw.bufferedN = 0
 	return err
 }
 
-// Write only writes where len(p) % pageBytesN == 0.
+// Write only writes where len(p) % pageChunkN == 0.
 func (pw *PageWriter) Write(p []byte) (n int, err error) {
-	if pw.bufferedN+len(p) <= pw.bufferedWatermark {
+	if pw.bufferedN+len(p) <= pw.bufferedWatermarkN {
 		// still have enough space in buffer
 		// just put them in buffer
 		copy(pw.buffered[pw.bufferedN:], p)
@@ -67,39 +81,30 @@ func (pw *PageWriter) Write(p []byte) (n int, err error) {
 		return len(p), nil
 	}
 
-	slackN := pw.pageBytesN - ((pw.pageOffset + pw.bufferedN) % pw.pageBytesN)
-	// ???
-	// len(p) % pw.pageBytesN == 0
-
-	// buffers are not page-aligned
-	if slackN != pw.pageBytesN {
-		// complete slack page in the buffer
-		partial := slackN > len(p)
-		if partial { // ???
-			slackN = len(p)
+	offset := (pw.pageOffset + pw.bufferedN) % pw.pageChunkN
+	if offset != 0 { // buffers are NOT page-aligned
+		leftN := pw.pageChunkN - offset
+		overflow := leftN > len(p)
+		if overflow {
+			leftN = len(p)
 		}
-		// slackN >= len(p)
-
-		copy(pw.buffered[pw.bufferedN:], p[:slackN])
-		pw.bufferedN += slackN
-		n = slackN
-		p = p[slackN:]
-
-		if partial {
-			// avoid forcing an unaligned flush
+		copy(pw.buffered[pw.bufferedN:], p[:leftN])
+		pw.bufferedN += leftN
+		n = leftN
+		p = p[leftN:]
+		if overflow { // avoid forcing an unaligned flush
 			return n, nil
 		}
 	}
-
-	// buffers are page-aligned
+	// buffers are page-aligned; clear out buffer
 	if err = pw.Flush(); err != nil {
 		return
 	}
 
 	// directly write all complete pages without copying
-	if len(p) > pw.pageBytesN {
-		pagesN := len(p) / pw.pageBytesN
-		boundary := pagesN * pw.pageBytesN
+	if len(p) > pw.pageChunkN {
+		pagesN := len(p) / pw.pageChunkN
+		boundary := pagesN * pw.pageChunkN
 		c, werr := pw.w.Write(p[:boundary])
 		n += c
 		if werr != nil {
