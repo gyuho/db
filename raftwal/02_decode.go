@@ -90,8 +90,6 @@ func (d *decoder) decodeRecord(rec *raftwalpb.Record) error {
 	return nil
 }
 
-const minSectorSize = 512
-
 // isTornEntry returns true when the last entry of the WAL
 // was partially written and corrupted because of a torn write.
 func (d *decoder) isTornEntry(data []byte) bool {
@@ -99,8 +97,6 @@ func (d *decoder) isTornEntry(data []byte) bool {
 		return false
 	}
 
-	// split data on sector boundaries
-	const minSectorSize = 512
 	var (
 		dataN  = len(data)
 		fIdx   = d.lastValidOffset + byteBitN

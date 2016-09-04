@@ -1,7 +1,6 @@
 package raftwal
 
 import (
-	"bufio"
 	"encoding/binary"
 	"hash"
 	"hash/crc32"
@@ -9,8 +8,21 @@ import (
 	"sync"
 
 	"github.com/gyuho/db/pkg/crcutil"
+	"github.com/gyuho/db/pkg/ioutil"
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
+
+// split data on sector boundaries
+//
+// (etcd wal.minSectorSize)
+const minSectorSize = 512
+
+// walPageBytes is the alignment for flushing records to the backing Writer.
+// It should be a multiple of the minimum sector size so that WAL repair can
+// safely between torn writes and ordinary data corruption.
+//
+// (etcd wal.walPageBytes)
+const walPageBytes = 8 * minSectorSize
 
 const (
 	systemBitN = 64 // 64-bit system
@@ -107,11 +119,13 @@ func readHeaderN(r io.Reader) (headerN int64, err error) {
 }
 
 type encoder struct {
-	mu          sync.Mutex
-	crc         hash.Hash32
-	recordBuf   []byte
-	wordBuf     []byte
-	bufioWriter *bufio.Writer
+	mu        sync.Mutex
+	crc       hash.Hash32
+	recordBuf []byte
+	wordBuf   []byte
+
+	// bw *bufio.Writer
+	bw *ioutil.PageWriter
 }
 
 var crcTable = crc32.MakeTable(crc32.Castagnoli)
@@ -123,7 +137,8 @@ func newEncoder(w io.Writer, prevCRC uint32) *encoder {
 		recordBuf: make([]byte, 1024*1024), // 1MB buffer
 		wordBuf:   make([]byte, byteBitN),
 
-		bufioWriter: bufio.NewWriter(w),
+		// bw: bufio.NewWriter(w),
+		bw: ioutil.NewPageWriter(w, walPageBytes),
 	}
 }
 
@@ -157,7 +172,7 @@ func (e *encoder) encode(rec *raftwalpb.Record) error {
 
 	padBytesN := getPadBytesN(dataN)
 	headerN := encodeLen(dataN, padBytesN)
-	if err = writeHeaderN(e.bufioWriter, e.wordBuf, headerN); err != nil {
+	if err = writeHeaderN(e.bw, e.wordBuf, headerN); err != nil {
 		return err
 	}
 
@@ -165,13 +180,13 @@ func (e *encoder) encode(rec *raftwalpb.Record) error {
 	if padBytesN != 0 {
 		data = append(data, make([]byte, padBytesN)...)
 	}
-	_, err = e.bufioWriter.Write(data)
+	_, err = e.bw.Write(data)
 	return err
 }
 
 func (e *encoder) flush() error {
 	e.mu.Lock()
-	err := e.bufioWriter.Flush()
+	err := e.bw.Flush()
 	e.mu.Unlock()
 	return err
 }
