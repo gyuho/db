@@ -49,7 +49,6 @@ type peer struct {
 	streamReader   *streamReader
 	snapshotSender *snapshotSender
 
-	sendc chan raftpb.Message
 	recvc chan raftpb.Message
 	propc chan raftpb.Message
 	stopc chan struct{}
@@ -99,7 +98,6 @@ func startPeer(transport *Transport, peerID types.ID, peerURLs types.URLs) *peer
 
 		snapshotSender: newSnapshotSender(transport, peerID, status, picker),
 
-		sendc: make(chan raftpb.Message),
 		recvc: make(chan raftpb.Message, receiveBufferN),
 		propc: make(chan raftpb.Message, maxPendingProposalN),
 		stopc: make(chan struct{}),
