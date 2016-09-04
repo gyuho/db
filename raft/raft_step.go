@@ -60,8 +60,13 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			// it SHOULD IGNORE the vote-request
 			// iff checkQuorum is true and election timeout hasn't passed,
 			// because it has been in contact with leader for the last election timeout
-			//
-			notCandidate := rnd.state != raftpb.NODE_STATE_CANDIDATE
+
+			// Previously, the checkQuorum flag required an election timeout to
+			// expire before a node could cast its first vote. This change permits
+			// the node to cast a vote at any time when the leader is not known,
+			// including immediately after startup.
+			// https://github.com/coreos/etcd/commit/a7a867c1e6f1bac339d8118c508818492acd316d
+			leaderExist := rnd.leaderID != NoNodeID
 
 			// (Raft §4.2.3 Disruptive servers, p.42)
 			//
@@ -84,7 +89,7 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			// So it's ok to to reject vote-request.
 			lastQuorumChecked := rnd.checkQuorum && rnd.electionTimeoutTickNum > rnd.electionTimeoutElapsedTickNum
 
-			ignoreHigherTermVoteRequest := notLeaderTransfer && notCandidate && lastQuorumChecked
+			ignoreHigherTermVoteRequest := notLeaderTransfer && leaderExist && lastQuorumChecked
 
 			if ignoreHigherTermVoteRequest {
 				raftLogger.Infof("%s ignores vote-request from %s with higher term %d", rnd.describe(), types.ID(msg.From), msg.SenderCurrentTerm)

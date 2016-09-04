@@ -204,8 +204,8 @@ func Test_raft_leader_election_checkQuorum_candidate(t *testing.T) {
 
 	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 
-	if rnd1.state != raftpb.NODE_STATE_CANDIDATE {
-		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_CANDIDATE, rnd1.state)
+	if rnd1.state != raftpb.NODE_STATE_LEADER {
+		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd1.state)
 	}
 }
 
@@ -229,9 +229,12 @@ func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	// time out rnd2, so that rnd2 now does not ignore the vote request
 	// and rnd2 becomes the follower. And rnd1 will start campaign, and rnd2
 	// will be able to vote for rnd1 to be a leader
-	for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
-		rnd2.tickFunc()
-	}
+	// for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
+	// 	rnd2.tickFunc()
+	// }
+
+	// Immediately after creation, votes are cast regardless of the
+	// election timeout.
 
 	// rnd1 will start campaign and become the leader
 	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
@@ -335,9 +338,9 @@ func Test_raft_leader_election_checkQuorum_candidate_with_higher_term(t *testing
 	// time out rnd2, so that rnd2 now does not ignore the vote request
 	// and rnd2 becomes the follower. And rnd1 will start campaign, and rnd2
 	// will be able to vote for rnd1 to be a leader
-	for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
-		rnd2.tickFunc()
-	}
+	// for i := 0; i < rnd2.electionTimeoutTickNum; i++ {
+	// 	rnd2.tickFunc()
+	// }
 
 	// rnd1 will start campaign and become the leader
 	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
