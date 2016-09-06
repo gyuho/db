@@ -3,7 +3,6 @@ package raft
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"sort"
 
 	"github.com/gyuho/db/pkg/types"
@@ -132,8 +131,6 @@ type raftNode struct {
 	// (etcd raft.raft.raftLog)
 	storageRaftLog *storageRaftLog
 
-	rand *rand.Rand
-
 	// electionTimeoutTickNum is the number of ticks for election to time out.
 	//
 	// (etcd raft.raft.electionTimeout)
@@ -230,8 +227,6 @@ func newRaftNode(c *Config) *raftNode {
 
 		storageRaftLog: newStorageRaftLog(c.StorageStable),
 
-		rand: rand.New(rand.NewSource(int64(c.ID))),
-
 		electionTimeoutTickNum:  c.ElectionTickNum,
 		heartbeatTimeoutTickNum: c.HeartbeatTimeoutTickNum,
 
@@ -309,7 +304,7 @@ func (rnd *raftNode) quorum() int {
 // (etcd raft.raft.resetRandomizedElectionTimeout)
 func (rnd *raftNode) randomizeElectionTickTimeout() {
 	// [electiontimeout, 2 * electiontimeout)
-	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + rnd.rand.Intn(rnd.electionTimeoutTickNum)
+	rnd.randomizedElectionTimeoutTickNum = rnd.electionTimeoutTickNum + globalRand.Intn(rnd.electionTimeoutTickNum)
 }
 
 // (etcd raft.raft.pastElectionTimeout)
