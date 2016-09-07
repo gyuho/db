@@ -151,10 +151,10 @@ func Test_inflights_freeTo(t *testing.T) {
 	ins.freeTo(1400)
 
 	want5 := &inflights{
-		//                                             ↓
+		//                 ↓
 		buffer: []uint64{1000, 1100, 1200, 1300, 1400, 500, 600, 700, 800, 900},
 
-		bufferStart: 5, // after freeto
+		bufferStart: 0, // after freeto
 		bufferCount: 0,
 	}
 	if !reflect.DeepEqual(ins, want5) {

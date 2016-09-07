@@ -59,6 +59,24 @@ func (ins *inflights) full() bool {
 	return ins.bufferCount == len(ins.buffer)
 }
 
+// grow the inflight buffer by doubling up to inflights.size.
+// We grow on demand instead of preallocating, to handle systems
+// which have thousands of Raft groups per process.
+//
+// (etcd raft.inflights.growBuf)
+func (ins *inflights) growBuffer() {
+	oldSize := len(ins.buffer)
+	newSize := oldSize * 2
+	if newSize == 0 {
+		newSize = 1
+	} else if newSize > oldSize {
+		newSize = oldSize
+	}
+	newBuffer := make([]uint64, newSize)
+	copy(newBuffer, ins.buffer)
+	ins.buffer = newBuffer
+}
+
 // inflight must be incremental.
 //
 // (etcd raft.inflights.add)
@@ -107,6 +125,12 @@ func (ins *inflights) freeTo(to uint64) {
 	// free 'cnt' inflights and set new start index
 	ins.bufferCount -= cnt
 	ins.bufferStart = start
+
+	if ins.bufferCount == 0 {
+		// inflights is empty, reset the start index so that we don't grow the
+		// buffer unnecessarily.
+		ins.bufferStart = 0
+	}
 }
 
 // (etcd raft.inflights.freeFirstOne)
