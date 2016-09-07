@@ -16,7 +16,8 @@ func Test_inflights_add_no_rotating(t *testing.T) {
 
 	want1 := &inflights{
 		//               ↓------------
-		buffer: []uint64{0, 1, 2, 3, 4, 0, 0, 0, 0, 0},
+		buffer:     []uint64{0, 1, 2, 3, 4, 0, 0, 0, 0, 0},
+		bufferSize: 10,
 
 		bufferStart: 0,
 		bufferCount: 5,
@@ -32,7 +33,8 @@ func Test_inflights_add_no_rotating(t *testing.T) {
 
 	want2 := &inflights{
 		//               ↓---------------------------
-		buffer: []uint64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+		buffer:     []uint64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+		bufferSize: 10,
 
 		bufferStart: 0,
 		bufferCount: 10,
@@ -54,7 +56,8 @@ func Test_inflights_add_rotating(t *testing.T) {
 
 	want1 := &inflights{
 		//                              ↓--------------------
-		buffer: []uint64{0, 0, 0, 0, 0, 0, 100, 200, 300, 400},
+		buffer:     []uint64{0, 0, 0, 0, 0, 0, 100, 200, 300, 400},
+		bufferSize: 10,
 
 		bufferStart: 5,
 		bufferCount: 5,
@@ -70,7 +73,8 @@ func Test_inflights_add_rotating(t *testing.T) {
 
 	want2 := &inflights{
 		//               ↓----------------------  ↓--------------------
-		buffer: []uint64{500, 600, 700, 800, 900, 0, 100, 200, 300, 400},
+		buffer:     []uint64{500, 600, 700, 800, 900, 0, 100, 200, 300, 400},
+		bufferSize: 10,
 
 		bufferStart: 5,
 		bufferCount: 10,
@@ -92,7 +96,8 @@ func Test_inflights_freeTo(t *testing.T) {
 
 	want1 := &inflights{
 		//                                       ↓---------------------
-		buffer: []uint64{0, 100, 200, 300, 400, 500, 600, 700, 800, 900},
+		buffer:     []uint64{0, 100, 200, 300, 400, 500, 600, 700, 800, 900},
+		bufferSize: 10,
 
 		bufferStart: 5, // after freeTo 400
 		bufferCount: 5,
@@ -106,7 +111,8 @@ func Test_inflights_freeTo(t *testing.T) {
 
 	want2 := &inflights{
 		//                                                           ↓
-		buffer: []uint64{0, 100, 200, 300, 400, 500, 600, 700, 800, 900},
+		buffer:     []uint64{0, 100, 200, 300, 400, 500, 600, 700, 800, 900},
+		bufferSize: 10,
 
 		bufferStart: 9, // after freeTo 800
 		bufferCount: 1,
@@ -121,7 +127,8 @@ func Test_inflights_freeTo(t *testing.T) {
 	}
 	want3 := &inflights{
 		//               ----------------------------                      ↓
-		buffer: []uint64{1000, 1100, 1200, 1300, 1400, 500, 600, 700, 800, 900},
+		buffer:     []uint64{1000, 1100, 1200, 1300, 1400, 500, 600, 700, 800, 900},
+		bufferSize: 10,
 
 		bufferStart: 9,
 		bufferCount: 6,
@@ -135,7 +142,8 @@ func Test_inflights_freeTo(t *testing.T) {
 
 	want4 := &inflights{
 		//                                 ↓--------
-		buffer: []uint64{1000, 1100, 1200, 1300, 1400, 500, 600, 700, 800, 900},
+		buffer:     []uint64{1000, 1100, 1200, 1300, 1400, 500, 600, 700, 800, 900},
+		bufferSize: 10,
 
 		bufferStart: 3, // after freeto
 		bufferCount: 2,
@@ -152,7 +160,8 @@ func Test_inflights_freeTo(t *testing.T) {
 
 	want5 := &inflights{
 		//                 ↓
-		buffer: []uint64{1000, 1100, 1200, 1300, 1400, 500, 600, 700, 800, 900},
+		buffer:     []uint64{1000, 1100, 1200, 1300, 1400, 500, 600, 700, 800, 900},
+		bufferSize: 10,
 
 		bufferStart: 0, // after freeto
 		bufferCount: 0,
@@ -171,7 +180,8 @@ func Test_inflights_freeFirstOne(t *testing.T) {
 
 	want1 := &inflights{
 		//               ↓----------------------------------------------
-		buffer: []uint64{100, 101, 102, 103, 104, 105, 106, 107, 108, 109},
+		buffer:     []uint64{100, 101, 102, 103, 104, 105, 106, 107, 108, 109},
+		bufferSize: 10,
 
 		bufferStart: 0,
 		bufferCount: 10,
@@ -184,7 +194,8 @@ func Test_inflights_freeFirstOne(t *testing.T) {
 
 	want2 := &inflights{
 		//                    ↓------------------------------------------
-		buffer: []uint64{100, 101, 102, 103, 104, 105, 106, 107, 108, 109},
+		buffer:     []uint64{100, 101, 102, 103, 104, 105, 106, 107, 108, 109},
+		bufferSize: 10,
 
 		bufferStart: 1,
 		bufferCount: 9,

@@ -30,12 +30,17 @@ type inflights struct {
 	// (etcd raft.inflights.buffer)
 	buffer []uint64
 
-	// starting index in the buffer
+	// bufferSize is the size of the buffer.
+	//
+	// (etcd raft.inflights.size)
+	bufferSize int
+
+	// bufferStart is the starting index in the buffer.
 	//
 	// (etcd raft.inflights.start)
 	bufferStart int
 
-	// number of inflights in the buffer
+	// bufferCount is the number of inflights in the buffer.
 	//
 	// (etcd raft.inflights.count)
 	bufferCount int
@@ -44,19 +49,18 @@ type inflights struct {
 // (etcd raft.inflights.newInflights)
 func newInflights(size int) *inflights {
 	return &inflights{
-		buffer:      make([]uint64, size),
+		// to avoid preallocation
+		// buffer: make([]uint64, size),
+
+		bufferSize:  size,
 		bufferStart: 0,
 		bufferCount: 0,
 	}
 }
 
-func (ins *inflights) size() int {
-	return len(ins.buffer)
-}
-
 // (etcd raft.inflights.full)
 func (ins *inflights) full() bool {
-	return ins.bufferCount == len(ins.buffer)
+	return ins.bufferCount == ins.bufferSize
 }
 
 // grow the inflight buffer by doubling up to inflights.size.
@@ -65,12 +69,11 @@ func (ins *inflights) full() bool {
 //
 // (etcd raft.inflights.growBuf)
 func (ins *inflights) growBuffer() {
-	oldSize := len(ins.buffer)
-	newSize := oldSize * 2
+	newSize := ins.bufferSize * 2
 	if newSize == 0 {
 		newSize = 1
-	} else if newSize > oldSize {
-		newSize = oldSize
+	} else if newSize > ins.bufferSize {
+		newSize = ins.bufferSize
 	}
 	newBuffer := make([]uint64, newSize)
 	copy(newBuffer, ins.buffer)
@@ -86,7 +89,10 @@ func (ins *inflights) add(inflight uint64) {
 	}
 
 	next := ins.bufferStart + ins.bufferCount
-	next = next % ins.size() // rotate
+	next = next % ins.bufferSize // rotate
+	if next >= len(ins.buffer) {
+		ins.growBuffer()
+	}
 
 	ins.buffer[next] = inflight
 	ins.bufferCount++
@@ -119,7 +125,7 @@ func (ins *inflights) freeTo(to uint64) {
 		}
 
 		start++
-		start = start % ins.size()
+		start = start % ins.bufferSize
 	}
 
 	// free 'cnt' inflights and set new start index
