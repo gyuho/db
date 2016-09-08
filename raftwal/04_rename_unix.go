@@ -20,5 +20,12 @@ func (w *WAL) renameWAL(tmpDir string) (*WAL, error) {
 		return nil, err
 	}
 	w.filePipeline = newFilePipeline(w.dir, segmentSizeBytes)
+
+	df, derr := os.Open(w.dir)
+	if derr != nil {
+		return nil, derr
+	}
+	w.dirFile = df
+
 	return w, nil
 }

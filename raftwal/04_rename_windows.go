@@ -3,6 +3,7 @@ package raftwal
 import (
 	"os"
 
+	"github.com/gyuho/db/pkg/fileutil"
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
@@ -29,5 +30,13 @@ func (w *WAL) renameWAL(tmpDir string) (*WAL, error) {
 		newWAL.Close()
 		return nil, err
 	}
+
+	// windows expects a writeable file for fsync
+	df, derr := os.OpenFile(w.dir, os.O_WRONLY, fileutil.PrivateFileMode)
+	if derr != nil {
+		return nil, derr
+	}
+	w.dirFile = df
+
 	return newWAL, nil
 }

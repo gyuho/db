@@ -21,7 +21,11 @@ type WAL struct {
 	mu sync.Mutex
 
 	// dir is the location of all underlying WAL files.
-	dir          string
+	dir string
+
+	// dirFile is a fd for the wal directory for syncing on Rename
+	dirFile *os.File
+
 	filePipeline *filePipeline
 	lockedFiles  []*fileutil.LockedFile
 
@@ -100,7 +104,7 @@ func (w *WAL) Close() error {
 		}
 	}
 
-	return nil
+	return w.dirFile.Close()
 }
 
 // openLastWALFile opens the last WAL file for read and write.
@@ -486,6 +490,9 @@ func (w *WAL) unsafeCutCurrent() error {
 
 	// rename the file to WAL name atomically
 	if err = os.Rename(newLastTmpFile.Name(), walPath); err != nil {
+		return err
+	}
+	if err = fileutil.Fsync(w.dirFile); err != nil {
 		return err
 	}
 
