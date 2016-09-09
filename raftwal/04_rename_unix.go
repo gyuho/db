@@ -26,6 +26,5 @@ func (w *WAL) renameWAL(tmpDir string) (*WAL, error) {
 		return nil, derr
 	}
 	w.dirFile = df
-
 	return w, nil
 }

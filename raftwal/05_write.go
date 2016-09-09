@@ -3,6 +3,7 @@ package raftwal
 import (
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -196,7 +197,14 @@ func openWAL(dir string, snap raftwalpb.Snapshot, write bool) (*WAL, error) {
 //
 // (etcd wal.Open)
 func OpenWALWrite(dir string, snap raftwalpb.Snapshot) (*WAL, error) {
-	return openWAL(dir, snap, true)
+	w, err := openWAL(dir, snap, true)
+	if err != nil {
+		return nil, err
+	}
+	if w.dirFile, err = fileutil.OpenDir(w.dir); err != nil {
+		return nil, err
+	}
+	return w, nil
 }
 
 // OpenWALRead opens the WAL file for reads.
@@ -295,10 +303,10 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	}
 
 	// set offset to the end of file with 0 for pre-allocation
-	if _, err := f.Seek(0, io.SeekEnd); err != nil {
+	if _, err = f.Seek(0, io.SeekEnd); err != nil {
 		return nil, err
 	}
-	if err := fileutil.Preallocate(f.File, segmentSizeBytes, preallocWithExtendFile); err != nil {
+	if err = fileutil.Preallocate(f.File, segmentSizeBytes, preallocWithExtendFile); err != nil {
 		return nil, err
 	}
 
@@ -311,20 +319,36 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 	}
 
 	// 1. encode CRC
-	if err := w.unsafeEncodeCRC(prevCRC); err != nil {
+	if err = w.unsafeEncodeCRC(prevCRC); err != nil {
 		return nil, err
 	}
 
 	// 2. encode metadata
-	if err := w.unsafeEncodeMetadata(metadata); err != nil {
+	if err = w.unsafeEncodeMetadata(metadata); err != nil {
 		return nil, err
 	}
 
 	// 3. encode snapshot
-	if err := w.UnsafeEncodeSnapshotAndFdatasync(&raftwalpb.Snapshot{Term: 0, Index: 0}); err != nil {
+	if err = w.UnsafeEncodeSnapshotAndFdatasync(&raftwalpb.Snapshot{Term: 0, Index: 0}); err != nil {
 		return nil, err
 	}
-	return w.renameWAL(tmpDir)
+
+	if w, err = w.renameWAL(tmpDir); err != nil {
+		return nil, err
+	}
+
+	// directory was renamed; sync parent dir to persist rename
+	pdir, perr := fileutil.OpenDir(path.Dir(w.dir))
+	if perr != nil {
+		return nil, perr
+	}
+	if perr = fileutil.Fsync(pdir); perr != nil {
+		return nil, perr
+	}
+	if perr = pdir.Close(); err != nil {
+		return nil, perr
+	}
+	return w, nil
 }
 
 // unsafeFdatasync fsyncs the last file in the lockedFiles to the disk.
