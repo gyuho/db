@@ -12,5 +12,6 @@ popd
 
 rm -rf vendor
 
-glide --verbose update --delete --strip-vendor --strip-vcs --update-vendored --skip-test
+glide update --delete --strip-vendor --strip-vcs --update-vendored --skip-test
 glide vc --only-code --no-tests
+
