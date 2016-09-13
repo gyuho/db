@@ -95,7 +95,12 @@ func (rnd *raftNode) leaderSendHeartbeatTo(targetID uint64, ctx []byte) {
 
 // (etcd raft.raft.bcastHeartbeat)
 func (rnd *raftNode) leaderSendHeartbeats() {
-	rnd.leaderSendHeartbeatsCtx(nil)
+	lastCtx := rnd.readOnly.lastPendingRequestCtx()
+	if len(lastCtx) == 0 {
+		rnd.leaderSendHeartbeatsCtx(nil)
+		return
+	}
+	rnd.leaderSendHeartbeatsCtx([]byte(lastCtx))
 }
 
 // (etcd raft.raft.bcastHeartbeatWithCtx)

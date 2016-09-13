@@ -70,9 +70,9 @@ const (
 
 // (etcd raft.readIndexStatus)
 type readIndexStatus struct {
-	req      raftpb.Message
-	index    uint64
-	ackCount int
+	req   raftpb.Message
+	index uint64
+	acks  map[uint64]struct{}
 }
 
 // (etcd raft.readOnly)
@@ -90,31 +90,49 @@ func newReadOnly(option ReadOnlyOption) *readOnly {
 	}
 }
 
+// addRequest adds a read only reuqest into readonly struct.
+// `index` is the commit index of the raft state machine when it received
+// the read only request.
+// `msg` is the original read only request message from the local or remote node.
+//
 // (etcd raft.readOnly.addRequest)
 func (ro *readOnly) addRequest(msg raftpb.Message, index uint64) {
 	ctx := string(msg.Entries[0].Data)
 	if _, ok := ro.pendingReadIndex[ctx]; ok {
 		return
 	}
-	ro.pendingReadIndex[ctx] = &readIndexStatus{req: msg, index: index, ackCount: 1}
+	ro.pendingReadIndex[ctx] = &readIndexStatus{req: msg, index: index, acks: make(map[uint64]struct{})}
 	ro.readIndexQueue = append(ro.readIndexQueue, ctx)
 }
 
+// recvAck notifies the readonly struct that the raft state machine received
+// an acknowledgment of the heartbeat that attached with the read only request
+// context.
+//
 // (etcd raft.readOnly.recvAck)
 func (ro *readOnly) recvAck(msg raftpb.Message) int {
 	rs, ok := ro.pendingReadIndex[string(msg.Context)]
 	if !ok {
 		return 0
 	}
-	rs.ackCount++
-	return rs.ackCount
+
+	rs.acks[msg.From] = struct{}{}
+	return len(rs.acks) + 1 // including an ack from local node
 }
 
+// advance advances the read only request queue kept by the readonly struct.
+// It dequeues the requests until it finds the read only request that has
+// the same context as the given `msg`.
+//
 // (etcd raft.readOnly.advance)
 func (ro *readOnly) advance(msg raftpb.Message) []*readIndexStatus {
-	var rss []*readIndexStatus
-	var i int
+	var (
+		i     int
+		found bool
+	)
+
 	ctx := string(msg.Context)
+	var rss []*readIndexStatus
 
 	for _, okctx := range ro.readIndexQueue {
 		i++
@@ -123,11 +141,30 @@ func (ro *readOnly) advance(msg raftpb.Message) []*readIndexStatus {
 			panic("cannot find corresponding read state from pending map")
 		}
 		rss = append(rss, rs)
-		delete(ro.pendingReadIndex, okctx)
 		if okctx == ctx {
+			found = true
 			break
 		}
 	}
+
+	if !found {
+		return nil
+	}
+
 	ro.readIndexQueue = ro.readIndexQueue[i:]
+	for _, rs := range rss {
+		delete(ro.pendingReadIndex, string(rs.req.Context))
+	}
 	return rss
+}
+
+// lastPendingRequestCtx returns the context of the last pending read only
+// request in readonly struct.
+//
+// (etcd raft.readOnly.lastPendingRequestCtx)
+func (ro *readOnly) lastPendingRequestCtx() string {
+	if len(ro.readIndexQueue) == 0 {
+		return ""
+	}
+	return ro.readIndexQueue[len(ro.readIndexQueue)-1]
 }
