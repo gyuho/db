@@ -91,10 +91,10 @@ func (ti TLSInfo) ServerConfig() (*tls.Config, error) {
 			return nil, err
 		}
 		cfg.ClientCAs = cp
-
-		// enable HTTP/2 for Go's HTTP server
-		cfg.NextProtos = []string{"h2"}
 	}
+
+	// enable HTTP/2 for Go's HTTP server
+	cfg.NextProtos = []string{"h2"}
 	return cfg, nil
 }
 
