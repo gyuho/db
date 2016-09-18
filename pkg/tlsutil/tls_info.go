@@ -79,21 +79,22 @@ func (ti TLSInfo) ServerConfig() (*tls.Config, error) {
 		return nil, err
 	}
 
-	cs := ti.CAFiles()
-	if len(cs) > 0 {
-		cp, err := NewCertPool(cs)
+	cfg.ClientAuth = tls.NoClientCert
+	if ti.TrustedCAFile != "" || ti.ClientCertAuth {
+		cfg.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
+	caFiles := ti.CAFiles()
+	if len(caFiles) > 0 {
+		cp, err := NewCertPool(caFiles)
 		if err != nil {
 			return nil, err
 		}
 		cfg.ClientCAs = cp
-	}
 
-	cfg.ClientAuth = tls.NoClientCert
-	// if ti.TrustedCAFile != "" || ti.ClientCertAuth {
-	if len(cs) > 0 || ti.ClientCertAuth { // ???
-		cfg.ClientAuth = tls.RequireAndVerifyClientCert
+		// enable HTTP/2 for Go's HTTP server
+		cfg.NextProtos = []string{"h2"}
 	}
-
 	return cfg, nil
 }
 
