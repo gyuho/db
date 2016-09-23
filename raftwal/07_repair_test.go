@@ -13,6 +13,7 @@ import (
 
 type corruptFunc func(string, int64) error
 
+// (etcd wal.testRepair)
 func testRepair(t *testing.T, expectedEntriesN int, entries [][]raftpb.Entry, corrupt corruptFunc) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -99,6 +100,7 @@ func testRepair(t *testing.T, expectedEntriesN int, entries [][]raftpb.Entry, co
 	}
 }
 
+// (etcd wal.TestRepairTruncate)
 func TestRepair_TruncatedWAL(t *testing.T) {
 	entriesN := 10
 	entries := createEmptyEntries(entriesN)
@@ -119,6 +121,7 @@ func TestRepair_TruncatedWAL(t *testing.T) {
 	testRepair(t, expectedEntriesN, entries, corruptByTruncate)
 }
 
+// (etcd wal.TestRepairWriteTearLast)
 func TestRepair_TearLastRecord(t *testing.T) {
 	entriesN := 50
 	entries := createEmptyEntries(entriesN)
@@ -153,6 +156,7 @@ func TestRepair_TearLastRecord(t *testing.T) {
 	testRepair(t, expectedEntriesN, entries, corruptTornLast)
 }
 
+// (etcd wal.TestRepairWriteTearMiddle)
 func TestRepair_TearMiddleRecord(t *testing.T) {
 	// 4096-byte, easy to corrupt middle sector
 	data := make([]byte, 4096)

@@ -12,6 +12,7 @@ import (
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
+// (etcd wal.TestOpenForRead)
 func TestOpenWALRead(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -58,6 +59,7 @@ func TestOpenWALRead(t *testing.T) {
 	}
 }
 
+// (etcd wal.TestOpenAtUncommittedIndex)
 func TestReadAllEmpty(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -73,6 +75,9 @@ func TestReadAllEmpty(t *testing.T) {
 	if err = w.UnsafeEncodeSnapshotAndFdatasync(&raftwalpb.Snapshot{}); err != nil {
 		t.Fatal(err)
 	}
+	if err = w.Save(raftpb.HardState{}, []raftpb.Entry{{Index: 0}}); err != nil {
+		t.Fatal(err)
+	}
 	w.Close()
 
 	w, err = OpenWALRead(dir, raftwalpb.Snapshot{})
@@ -86,7 +91,7 @@ func TestReadAllEmpty(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestOpenOnTornWrite)
+// (etcd wal.TestOpenOnTornWrite)
 func Test_ReadAll_torn_write(t *testing.T) {
 	maxEntries := 40
 	clobberIdx := 20

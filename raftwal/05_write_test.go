@@ -14,6 +14,7 @@ import (
 	"github.com/gyuho/db/raftwal/raftwalpb"
 )
 
+// (etcd wal.TestOpenAtIndex)
 func TestOpenWAL(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -26,18 +27,35 @@ func TestOpenWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.Close()
-
 	w, err := openWAL(dir, raftwalpb.Snapshot{}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	w.Lock()
 	if name := filepath.Base(w.unsafeLastFile().Name()); name != getWALName(0, 0) {
 		t.Fatalf("expected %v, got %v", getWALName(0, 0), name)
 	}
 	if w.unsafeLastFileSeq() != 0 {
 		t.Fatalf("expected 0, got %d", w.unsafeLastFileSeq())
+	}
+	w.Unlock()
+	w.Close()
+
+	f, err = os.Create(filepath.Join(dir, getWALName(2, 10)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	w, err = openWAL(dir, raftwalpb.Snapshot{Index: 5}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Lock()
+	if name := filepath.Base(w.unsafeLastFile().Name()); name != getWALName(2, 10) {
+		t.Fatalf("expected %v, got %v", getWALName(2, 10), name)
+	}
+	if w.unsafeLastFileSeq() != 2 {
+		t.Fatalf("expected 2, got %d", w.unsafeLastFileSeq())
 	}
 	w.Unlock()
 	w.Close()
@@ -53,6 +71,7 @@ func TestOpenWAL(t *testing.T) {
 	}
 }
 
+// (etcd wal.TestReleaseLockTo)
 func TestReleaseLocks(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -127,6 +146,7 @@ func createEmptyEntries(num int) [][]raftpb.Entry {
 	return entries
 }
 
+// (etcd wal.TestSaveEmpty)
 func Test_unsafeEncodeHardState(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	w := &WAL{
@@ -140,7 +160,7 @@ func Test_unsafeEncodeHardState(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestNew)
+// (etcd wal.TestNew)
 func TestCreate(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -220,7 +240,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestNewForInitedDir)
+// (etcd wal.TestNewForInitedDir)
 func TestCreateErrExist(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -237,7 +257,7 @@ func TestCreateErrExist(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestRestartCreateWal)
+// (etcd wal.TestRestartCreateWal)
 func TestCreateInterrupted(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -280,7 +300,7 @@ func TestCreateInterrupted(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestRecover)
+// (etcd wal.TestRecover)
 func TestSave(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -344,7 +364,7 @@ func TestSave(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestCut)
+// (etcd wal.TestCut)
 func Test_unsafeCutCurrent(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -408,7 +428,7 @@ func Test_unsafeCutCurrent(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestRecoverAfterCut)
+// (etcd wal.TestRecoverAfterCut)
 func Test_unsafeCutCurrent_Recover(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
@@ -473,7 +493,7 @@ func Test_unsafeCutCurrent_Recover(t *testing.T) {
 	}
 }
 
-// (etcd pkg.wal.TestTailWriteNoSlackSpace)
+// (etcd wal.TestTailWriteNoSlackSpace)
 func TestTailWritesUnused(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
