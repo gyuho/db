@@ -16,6 +16,6 @@ import "raft/raftpb/node_state.proto";
 //
 // (etcd raftpb.SoftState)
 message SoftState {
-	NODE_STATE NodeState = 1;
-	uint64     LeaderID  = 2;
+	uint64     LeaderID  = 1; // must use atomic operations to access; keep 64-bit aligned.
+	NODE_STATE NodeState = 2;
 }
