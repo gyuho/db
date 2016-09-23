@@ -428,6 +428,72 @@ func Test_unsafeCutCurrent(t *testing.T) {
 	}
 }
 
+// (etcd wal.TestSaveWithCut)
+func Test_unsafeCutCurrent_Save(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "waltest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	w, err := Create(dir, []byte("metadata"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hs := raftpb.HardState{Term: 1}
+	if err = w.Save(hs, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	data := make([]byte, 500)
+	sData := "Hello World!"
+	copy(data, sData)
+
+	originalSeg := segmentSizeBytes
+	defer func() { segmentSizeBytes = originalSeg }()
+
+	entryN := 500
+	segmentSizeBytes = 2 * 1024
+
+	var index uint64
+	for total := 0; total < int(segmentSizeBytes); total += entryN {
+		ents := []raftpb.Entry{{Index: index, Term: 1, Data: data}}
+		if err = w.Save(hs, ents); err != nil {
+			t.Fatal(err)
+		}
+		index++
+	}
+	w.Close()
+
+	nw, err := OpenWALWrite(dir, raftwalpb.Snapshot{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nw.Close()
+
+	wname := getWALName(1, index)
+	if g := filepath.Base(nw.unsafeLastFile().Name()); g != wname {
+		t.Fatalf("name expected %q, got %q", wname, g)
+	}
+
+	_, nhs, entries, err := nw.ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(nhs, hs) {
+		t.Fatalf("hardstate expected %+v, got %+v", hs, nhs)
+	}
+	if len(entries) != int(segmentSizeBytes/int64(entryN)) {
+		t.Fatalf("len(entries) expected %d, got %d", int(segmentSizeBytes/int64(entryN)), len(entries))
+	}
+	for _, et := range entries {
+		if !bytes.Equal(et.Data, data) {
+			t.Fatalf("the saved data does not match at Index %d : found: %s , want :%s", et.Index, et.Data, data)
+		}
+	}
+}
+
 // (etcd wal.TestRecoverAfterCut)
 func Test_unsafeCutCurrent_Recover(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "waltest")

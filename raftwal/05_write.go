@@ -261,14 +261,14 @@ func (w *WAL) ReleaseLocks(idx uint64) error {
 	return nil
 }
 
-const (
+var (
 	// If preallocWithExtendFile is true, it calls fallocate without FALLOC_FL_KEEP_SIZE mode,
 	// which means the file size will be changed depending on the offset.
 	preallocWithExtendFile = true
 
 	// expected size of each segmented wal file
 	// (actual size might be bigger than this)
-	segmentSizeBytes = 64 * 1024 * 1024 // 64 MB
+	segmentSizeBytes int64 = 64 * 1024 * 1024 // 64 MB
 
 	// warnSyncDuration is the amount of time allotted to an fsync before
 	// logging a warning
