@@ -1,6 +1,7 @@
 package raftwal
 
 import (
+	"bufio"
 	"encoding/binary"
 	"hash"
 	"hash/crc32"
@@ -18,7 +19,7 @@ import (
 const minSectorSize = 512
 
 // walPageBytes is the alignment for flushing records to the backing Writer.
-// It should be a multiple of the minimum sector size so that WAL repair can
+// It should be a multiple of the minimum sector size so that WAL can be repaired
 // safely between torn writes and ordinary data corruption.
 //
 // (etcd wal.walPageBytes)
@@ -26,34 +27,31 @@ const walPageBytes = 8 * minSectorSize
 
 const (
 	systemBitN = 64 // 64-bit system
-	byteBitN   = 8  // 1-byte is 8-bit
-
-	// wordBitN is the size of a word chunk. Computer reads from or
-	// writes to a memory address in word-sized chunks or larger.
-	wordBitN = systemBitN / byteBitN
+	byteBitN   = 8  // 8-bit == 1-byte
 
 	// alignedBitN is the number of bits to align into the data.
 	//
-	// 64-bit aligned data structure is called 64/8 byte(8-byte) aligned.
+	// 64-bit processor has 64 bits word size.
+	// Word is the smallest piece of data that the processor can fetch from memory.
+	//
 	//
 	// Computer reads from or writes to a memory address in word-sized chunks
 	// or larger. Data alignment is to put this data to a memory address with
-	// the size of multiple word-sized chunks. This increases the sytem
-	// performance because that's how CPU handles the memory. To align the
-	// data this way, it needs to insert some meaningless bytes between
+	// the size of "multiple" word-sized chunks. This increases the sytem
+	// performance because that's how CPU handles the memory.
+	//
+	// To align the data this way, it needs to insert some meaningless bytes between
 	// multiple data, which is data structure padding.
 	//
 	// etcd uses padding to prevent torn writes.
 	// Each record is 8-byte aligned, so that the length field is never torn.
-	alignedBitN = wordBitN
+	//
+	// 64-bit aligned data structure is called 64/8 byte(8-byte) aligned.
+	// https://en.wikipedia.org/wiki/Data_structure_alignment
+	alignedBitN = systemBitN / byteBitN
 
 	lowerBitN = systemBitN - alignedBitN // lower 56-bit
 )
-
-// https://en.wikipedia.org/wiki/Data_structure_alignment
-func getPadBytesN(dataN int) int {
-	return (alignedBitN - (dataN % alignedBitN)) % alignedBitN
-}
 
 /*
 & (AND)
@@ -73,6 +71,11 @@ Let f be ∨
 	2. f(a, a) = a
 	3. f(a, b) ≥ max(a, b)
 */
+
+// https://en.wikipedia.org/wiki/Data_structure_alignment
+func getPadBytesN(dataN int) int {
+	return (alignedBitN - (dataN % alignedBitN)) % alignedBitN
+}
 
 func encodeLen(dataN, padBytesN int) (headerN uint64) {
 	headerN = uint64(dataN)
@@ -189,4 +192,127 @@ func (e *encoder) flush() error {
 	err := e.bw.Flush()
 	e.mu.Unlock()
 	return err
+}
+
+type decoder struct {
+	mu              sync.Mutex
+	crc             hash.Hash32
+	bufioReaders    []*bufio.Reader
+	lastValidOffset int64
+}
+
+func newDecoder(r ...io.Reader) *decoder {
+	readers := make([]*bufio.Reader, len(r))
+	for i := range r {
+		readers[i] = bufio.NewReader(r[i])
+	}
+	return &decoder{
+		crc:          crcutil.New(0, crcTable),
+		bufioReaders: readers,
+	}
+}
+
+func (d *decoder) decode(rec *raftwalpb.Record) error {
+	rec.Reset()
+	d.mu.Lock()
+	err := d.decodeRecord(rec)
+	d.mu.Unlock()
+	return err
+}
+
+func (d *decoder) decodeRecord(rec *raftwalpb.Record) error {
+	if len(d.bufioReaders) == 0 {
+		return io.EOF
+	}
+
+	headerN, err := readHeaderN(d.bufioReaders[0])
+	switch {
+	case err == io.EOF || (err == nil && headerN == 0):
+		// end of file, or end of preallocated space
+		d.bufioReaders = d.bufioReaders[1:]
+		if len(d.bufioReaders) == 0 {
+			return io.EOF
+		}
+		d.lastValidOffset = 0
+		return d.decodeRecord(rec)
+
+	case err != nil:
+		return err
+	}
+
+	dataN, padBytesN := decodeLen(headerN)
+	data := make([]byte, dataN+padBytesN)
+	if _, err = io.ReadFull(d.bufioReaders[0], data); err != nil {
+		// ReadFull returns io.EOF only when no bytes were read.
+		// decoder should treat this as io.ErrUnexpectedEOF
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+		return err
+	}
+
+	if err = rec.Unmarshal(data[:dataN:dataN]); err != nil {
+		if d.isTornEntry(data) {
+			return io.ErrUnexpectedEOF
+		}
+		return err
+	}
+
+	if rec.Type != raftwalpb.RECORD_TYPE_CRC {
+		d.crc.Write(rec.Data)
+		if err = rec.Validate(d.crc.Sum32()); err != nil {
+			if d.isTornEntry(data) {
+				return io.ErrUnexpectedEOF
+			}
+			return err
+		}
+	}
+
+	// record is considered valid
+	// update the last valid offset to the end of record
+	d.lastValidOffset += dataN + padBytesN + byteBitN
+	return nil
+}
+
+// isTornEntry returns true when the last entry of the WAL
+// was partially written and corrupted because of a torn write.
+func (d *decoder) isTornEntry(data []byte) bool {
+	if len(d.bufioReaders) != 1 { // not the last leader
+		return false
+	}
+
+	var (
+		fileOff = d.lastValidOffset + byteBitN
+		curOff  int
+
+		chunks [][]byte
+	)
+	for curOff < len(data) {
+		chunkN := int(minSectorSize - (fileOff % minSectorSize))
+		if chunkN > len(data)-curOff { // to prevent index out of bound
+			chunkN = len(data) - curOff
+		}
+
+		endIdx := curOff + chunkN
+		chunks = append(chunks, data[curOff:endIdx])
+
+		fileOff += int64(chunkN)
+		curOff += chunkN
+	}
+
+	// if any data in the sector chunk is ALL 0,
+	// it's a torn write
+	for _, sector := range chunks {
+		allZero := true
+		for _, b := range sector {
+			if b != 0 {
+				allZero = false
+				break
+			}
+		}
+		if allZero { // torn-write!
+			return true
+		}
+	}
+	return false
 }
