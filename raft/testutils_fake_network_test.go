@@ -35,11 +35,11 @@ type connection struct {
 //
 // (etcd raft.network)
 type fakeNetwork struct {
-	allStateMachines         map[uint64]stateMachine
-	allStableStorageInMemory map[uint64]*StorageStableInMemory
+	allStateMachines         map[uint64]stateMachine           // (etcd network.peers)
+	allStableStorageInMemory map[uint64]*StorageStableInMemory // (etcd network.storage)
 
-	allDroppedConnections  map[connection]float64
-	allIgnoredMessageTypes map[raftpb.MESSAGE_TYPE]bool
+	allDroppedConnections  map[connection]float64       // (etcd network.dropm)
+	allIgnoredMessageTypes map[raftpb.MESSAGE_TYPE]bool // (etcd network.ignorem)
 }
 
 // (etcd raft.newNetwork)

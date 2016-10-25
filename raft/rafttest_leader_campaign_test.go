@@ -326,7 +326,34 @@ func Test_raft_node_state_transition(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderCycle)
-// TODO:
+// TestLeaderCycle verifies that each node in a cluster can campaign
+// and be elected in turn. This ensures that elections (including
+// pre-vote) work when not starting from a clean slate (as they do in
+// TestLeaderElection)
+func Test_raft_leader_cycle(t *testing.T) {
+	for _, preVote := range []bool{false, true} {
+		var cfg func(*Config)
+		if preVote {
+			cfg = preVoteConfig
+		}
+		n := newFakeNetworkWithConfig(cfg, nil, nil, nil)
+		for campaignerID := uint64(1); campaignerID <= 3; campaignerID++ {
+			n.stepFirstMessage(raftpb.Message{From: campaignerID, To: campaignerID, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+
+			for _, peer := range n.allStateMachines {
+				sm := peer.(*raftNode)
+				if sm.id == campaignerID && sm.state != raftpb.NODE_STATE_LEADER {
+					t.Fatalf("preVote=%v: campaigning node %d state = %v, want raftpb.NODE_STATE_LEADER",
+						preVote, sm.id, sm.state)
+				} else if sm.id != campaignerID && sm.state != raftpb.NODE_STATE_FOLLOWER {
+					t.Fatalf("preVote=%v: after campaign of node %d, "+
+						"node %d had state = %v, want raftpb.NODE_STATE_FOLLOWER",
+						preVote, campaignerID, sm.id, sm.state)
+				}
+			}
+		}
+	}
+}
 
 // (etcd raft.TestVoteFromAnyState)
 // TODO:
