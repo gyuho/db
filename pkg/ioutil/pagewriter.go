@@ -2,11 +2,9 @@ package ioutil
 
 import "io"
 
-// PageWriter implements io.Writer interface
-// where writes are in page chunks when flushing.
+// PageWriter implements io.Writer interface where writes are in page chunks when flushing.
 // It only writes by chunks of 'pageChunkN'.
-// That is, (*PageWriter).Write(p []byte) only writes
-// where len(p) % pageChunkN == 0.
+// That is, (*PageWriter).Write(p []byte) only writes where len(p) % pageChunkN == 0.
 //
 // (etcd pkg.ioutil.PageWriter)
 type PageWriter struct {
@@ -45,14 +43,15 @@ type PageWriter struct {
 
 var defaultWatermarkN = 128 * 1024
 
-// NewPageWriter creates a new PageWriter with specified number
-// of bytes per page.
-func NewPageWriter(w io.Writer, pageChunkN int) *PageWriter {
+// NewPageWriter creates a new PageWriter.
+// pageChunkN is the number of bytes to write per page.
+// pageOffset is the starting offset of io.Writer.
+func NewPageWriter(w io.Writer, pageChunkN, pageOffset int) *PageWriter {
 	return &PageWriter{
 		w: w,
 
 		pageChunkN: pageChunkN,
-		pageOffset: 0,
+		pageOffset: pageOffset,
 
 		// ???
 		buffered:           make([]byte, defaultWatermarkN+pageChunkN),

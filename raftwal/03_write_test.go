@@ -150,7 +150,7 @@ func createEmptyEntries(num int) [][]raftpb.Entry {
 func Test_unsafeEncodeHardState(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	w := &WAL{
-		enc: newEncoder(buf, 0),
+		enc: newEncoder(buf, 0, 0),
 	}
 	if err := w.unsafeEncodeHardState(&raftpb.HardState{}); err != nil {
 		t.Fatal(err)
@@ -203,7 +203,7 @@ func TestCreate(t *testing.T) {
 
 	// encode empty record to compare with the bytes
 	emptyBuf := new(bytes.Buffer)
-	enc := newEncoder(emptyBuf, 0)
+	enc := newEncoder(emptyBuf, 0, 0)
 
 	// 1. encode CRC
 	if err = enc.encode(&raftwalpb.Record{
