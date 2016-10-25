@@ -356,7 +356,80 @@ func Test_raft_leader_cycle(t *testing.T) {
 }
 
 // (etcd raft.TestVoteFromAnyState)
-// TODO:
+func Test_raft_vote_from_any_node_state(t *testing.T) {
+	for _, vt := range []raftpb.MESSAGE_TYPE{raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE, raftpb.MESSAGE_TYPE_PRE_CANDIDATE_REQUEST_VOTE} {
+		for st := raftpb.NODE_STATE(0); st < raftpb.NODE_STATE_NUM_NODE_STATE; st++ {
+			r := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+			r.currentTerm = 1
+
+			switch st {
+			case raftpb.NODE_STATE_FOLLOWER:
+				r.becomeFollower(r.currentTerm, 3)
+			case raftpb.NODE_STATE_PRE_CANDIDATE:
+				r.becomePreCandidate()
+			case raftpb.NODE_STATE_CANDIDATE:
+				r.becomeCandidate()
+			case raftpb.NODE_STATE_LEADER:
+				r.becomeCandidate()
+				r.becomeLeader()
+			}
+
+			// Note that setting our state above may have advanced r.currentTerm
+			// past its initial value.
+			origTerm := r.currentTerm
+			newTerm := r.currentTerm + 1
+
+			msg := raftpb.Message{
+				From:              2,
+				To:                1,
+				Type:              vt,
+				SenderCurrentTerm: newTerm,
+				LogTerm:           newTerm,
+				LogIndex:          42,
+			}
+			if err := r.Step(msg); err != nil {
+				t.Fatalf("%s,%s: Step failed: %s", vt, st, err)
+			}
+			if len(r.mailbox) != 1 {
+				t.Fatalf("%s,%s: %d response messages, want 1: %+v", vt, st, len(r.mailbox), r.mailbox)
+			} else {
+				resp := r.mailbox[0]
+				if resp.Type != raftpb.VoteResponseType(vt) {
+					t.Fatalf("%s,%s: response message is %s, want %s", vt, st, resp.Type, raftpb.VoteResponseType(vt))
+				}
+				if resp.Reject {
+					t.Fatalf("%s,%s: unexpected rejection", vt, st)
+				}
+			}
+
+			// If this was a real vote, we reset our state and term.
+			if vt == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
+				if r.state != raftpb.NODE_STATE_FOLLOWER {
+					t.Fatalf("%s,%s: state %s, want %s", vt, raftpb.NODE_STATE_FOLLOWER, r.state, st)
+				}
+				if r.currentTerm != newTerm {
+					t.Fatalf("%s,%s: term %d, want %d", vt, st, r.currentTerm, newTerm)
+				}
+				if r.votedFor != 2 {
+					t.Fatalf("%s,%s: votedFor %d, want 2", vt, st, r.votedFor)
+				}
+			} else {
+				// In a prevote, nothing changes.
+				if r.state != st {
+					t.Fatalf("%s,%s: state %s, want %s", vt, st, r.state, st)
+				}
+				if r.currentTerm != origTerm {
+					t.Fatalf("%s,%s: term %d, want %d", vt, st, r.currentTerm, origTerm)
+				}
+				// if st == raftpb.NODE_STATE_FOLLOWER  or StatePreCandidate, r hasn't voted yet.
+				// In StateCandidate or StateLeader, it's voted for itself.
+				if r.votedFor != NoNodeID && r.votedFor != 1 {
+					t.Fatalf("%s,%s: votedFor %d, want %d or 1", vt, st, r.votedFor, NoNodeID)
+				}
+			}
+		}
+	}
+}
 
 // (etcd raft.TestSingleNodeCandidate)
 func Test_raft_leader_election_single_node(t *testing.T) {

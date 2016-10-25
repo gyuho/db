@@ -11,8 +11,9 @@ option (gogoproto.goproto_getters_all) = false;
 
 // (etcd raft.StateType)
 enum NODE_STATE {
-	FOLLOWER      = 0;
-	PRE_CANDIDATE = 1;
-	CANDIDATE     = 2;
-	LEADER        = 3;
+	FOLLOWER       = 0;
+	PRE_CANDIDATE  = 1;
+	CANDIDATE      = 2;
+	LEADER         = 3;
+	NUM_NODE_STATE = 4;
 }
