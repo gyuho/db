@@ -373,22 +373,6 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		rnd.leaderReplicateAppendRequests()
 		return
 
-	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
-		// (Raft §3.4 Leader election, p.17)
-		//
-		// Raft randomizes election timeouts to minimize split votes or two candidates.
-		// And each server votes for candidate on first-come base.
-		// This randomized retry approach elects a leader rapidly, more obvious and understandable.
-		//
-		// leader or candidate rejects vote-requests from another server.
-		raftLogger.Infof("%s received vote-request, rejects %s", rnd.describe(), types.ID(msg.From))
-		rnd.sendToMailbox(raftpb.Message{
-			Type:   raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
-			To:     msg.From,
-			Reject: true,
-		})
-		return
-
 	case raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX: // manually called from node
 		if rnd.quorum() > 1 {
 			switch rnd.readOnly.option {

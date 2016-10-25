@@ -56,7 +56,7 @@ func Test_raft_log_replication(t *testing.T) {
 			}
 
 			var appliedEntries []raftpb.Entry
-			for _, ent := range persistALlUnstableAndApplyNextEntries(rnd, tt.fakeNetwork.allStableStorageInMemory[id]) {
+			for _, ent := range persistAllUnstableAndApplyNextEntries(rnd, tt.fakeNetwork.allStableStorageInMemory[id]) {
 				if ent.Data != nil {
 					appliedEntries = append(appliedEntries, ent)
 				}

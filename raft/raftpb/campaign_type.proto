@@ -11,6 +11,7 @@ option (gogoproto.goproto_getters_all) = false;
 
 // (etcd raft.CampaignType)
 enum CAMPAIGN_TYPE {
-	LEADER_ELECTION = 0;
-	LEADER_TRANSFER = 1;
+	PRE_LEADER_ELECTION = 0;
+	LEADER_ELECTION     = 1;
+	LEADER_TRANSFER     = 2;
 }

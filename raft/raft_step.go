@@ -13,35 +13,22 @@ import (
 //
 // (etcd raft.raft.Step)
 func (rnd *raftNode) Step(msg raftpb.Message) error {
-	if msg.Type == raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN { // m.Type == pb.MsgHup
-		if rnd.state == raftpb.NODE_STATE_LEADER {
-			raftLogger.Infof("%s is already leader, so ignores %q from %x", rnd.describe(), msg.Type, msg.From)
-			return nil
-		}
-
-		idx1 := rnd.storageRaftLog.appliedIndex + 1
-		idx2 := rnd.storageRaftLog.committedIndex + 1
-		ents, err := rnd.storageRaftLog.slice(idx1, idx2, math.MaxUint64)
-		if err != nil {
-			raftLogger.Panicf("unexpected error getting uncommitted entries (%v)", err)
-		}
-		if nconf := countPendingConfigChange(ents); nconf > 0 &&
-			rnd.storageRaftLog.committedIndex > rnd.storageRaftLog.appliedIndex {
-			raftLogger.Warningf("%s cannot campaign since there are still %d pending config changes", rnd.describe(), nconf)
-			return nil
-		}
-
-		raftLogger.Infof("%s starts a new election", rnd.describe())
-		rnd.becomeCandidateAndCampaign(raftpb.CAMPAIGN_TYPE_LEADER_ELECTION)
-		return nil
-	}
-
+	// Handle the message term, which may result in our stepping down to a follower.
 	switch {
-	case msg.SenderCurrentTerm == 0: // local message (e.g. msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER)
+	case msg.SenderCurrentTerm == 0:
+		// local message (e.g. msg.Type == raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER)
 
 	case msg.SenderCurrentTerm > rnd.currentTerm: // message with higher term
+		// (Raft §3.4 Leader election, p.17)
+		//
+		// Raft randomizes election timeouts to minimize split votes or two candidates.
+		// And each server votes for candidate on first-come base.
+		// This randomized retry approach elects a leader rapidly, more obvious and understandable.
+		//
+		// leader or candidate rejects vote-requests from another server.
+
 		leaderID := msg.From
-		if msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
+		if msg.Type == raftpb.MESSAGE_TYPE_PRE_CANDIDATE_REQUEST_VOTE || msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
 			// if the vote was requested for leadership transfer,
 			// current node should not ignore this vote-request,
 			// so that it can revert back to follower
@@ -92,15 +79,42 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 			ignoreHigherTermVoteRequest := notLeaderTransfer && leaderExist && lastQuorumChecked
 
 			if ignoreHigherTermVoteRequest {
-				raftLogger.Infof("%s ignores vote-request from %s with higher term %d", rnd.describe(), types.ID(msg.From), msg.SenderCurrentTerm)
+				raftLogger.Infof("%s ignores vote-request %s from %s with higher term %d", rnd.describe(), msg.Type, types.ID(msg.From), msg.SenderCurrentTerm)
 				return nil
 			}
 			leaderID = NoNodeID // leader should revert back to follower
 		}
-		raftLogger.Infof("%s received vote-request from %s with higher term %d", rnd.describe(), types.ID(msg.From), msg.SenderCurrentTerm)
-		rnd.becomeFollower(msg.SenderCurrentTerm, leaderID)
+
+		switch {
+		case msg.Type == raftpb.MESSAGE_TYPE_PRE_CANDIDATE_REQUEST_VOTE:
+			// Never change our term in response to a PreVote
+
+		case msg.Type == raftpb.MESSAGE_TYPE_RESPONSE_TO_PRE_CANDIDATE_REQUEST_VOTE && !msg.Reject:
+			// We send pre-vote requests with a term in our future.
+			// If the pre-vote is granted, we will increment our term when we get a quorum.
+			// If it is not, the term comes from the node that rejected our vote
+			// so we should become a follower at the new term.
+
+		default:
+			raftLogger.Infof("%s received vote-request %s from %s with higher term %d", rnd.describe(), msg.Type, types.ID(msg.From), msg.SenderCurrentTerm)
+			rnd.becomeFollower(msg.SenderCurrentTerm, leaderID)
+		}
 
 	case msg.SenderCurrentTerm < rnd.currentTerm: // message with lower term
+		// We have received messages from a leader at a lower term. It is possible
+		// that these messages were simply delayed in the network, but this could
+		// also mean that this node has advanced its term number during a network
+		// partition, and it is now unable to either win an election or to rejoin
+		// the majority on the old term. If checkQuorum is false, this will be
+		// handled by incrementing term numbers in response to MsgVote with a
+		// higher term, but if checkQuorum is true we may not advance the term on
+		// MsgVote and must generate other messages to advance the term. The net
+		// result of these two features is to minimize the disruption caused by
+		// nodes that have been removed from the cluster's configuration: a
+		// removed node will send MsgVotes (or MsgPreVotes) which will be ignored,
+		// but it will not receive MsgApp or MsgHeartbeat, so it will not create
+		// disruptive term increases
+		//
 		// checkQuorum is true, and message from leader with lower term
 		if rnd.checkQuorum &&
 			(msg.Type == raftpb.MESSAGE_TYPE_LEADER_HEARTBEAT ||
@@ -125,6 +139,66 @@ func (rnd *raftNode) Step(msg raftpb.Message) error {
 		return nil
 	}
 
-	rnd.stepFunc(rnd, msg)
+	switch msg.Type {
+	case raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN: // pb.MsgHup
+		if rnd.state == raftpb.NODE_STATE_LEADER {
+			raftLogger.Infof("%s is already leader, so ignores %q from %x", rnd.describe(), msg.Type, msg.From)
+			return nil
+		}
+
+		idx1 := rnd.storageRaftLog.appliedIndex + 1
+		idx2 := rnd.storageRaftLog.committedIndex + 1
+		ents, err := rnd.storageRaftLog.slice(idx1, idx2, math.MaxUint64)
+		if err != nil {
+			raftLogger.Panicf("unexpected error getting uncommitted entries (%v)", err)
+		}
+
+		if nconf := countPendingConfigChange(ents); nconf > 0 &&
+			rnd.storageRaftLog.committedIndex > rnd.storageRaftLog.appliedIndex {
+			raftLogger.Warningf("%s cannot campaign since there are still %d pending config changes", rnd.describe(), nconf)
+			return nil
+		}
+
+		raftLogger.Infof("%s starts a new election", rnd.describe())
+		if rnd.preVote {
+			rnd.doCampaign(raftpb.CAMPAIGN_TYPE_PRE_LEADER_ELECTION)
+		} else {
+			rnd.doCampaign(raftpb.CAMPAIGN_TYPE_LEADER_ELECTION)
+		}
+
+	case raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE, raftpb.MESSAGE_TYPE_PRE_CANDIDATE_REQUEST_VOTE:
+		// The msg.SenderCurrentTerm > rnd.currentTerm clause is for PRE_CANDIDATE_REQUEST_VOTE.
+		// For CANDIDATE_REQUEST_VOTE, msg.SenderCurrentTerm should always equal rnd.currentTerm.
+		ok := msg.SenderCurrentTerm > rnd.currentTerm || rnd.votedFor == NoNodeID || rnd.votedFor == msg.From
+
+		// isUpToDate returns true if the given (index, term) log is more up-to-date
+		// than the last entry in the existing logs. It returns true, first if the
+		// term is greater than the last term. Second if the index is greater than
+		// the last index.
+		moreUpToDate := rnd.storageRaftLog.isUpToDate(msg.LogIndex, msg.LogTerm)
+
+		if ok && moreUpToDate {
+			raftLogger.Infof("%s received vote-request %s, votes for %s", rnd.describe(), msg.Type, types.ID(msg.From))
+			rnd.sendToMailbox(raftpb.Message{
+				Type: raftpb.VoteResponseType(msg.Type),
+				To:   msg.From,
+			})
+
+			if msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
+				rnd.electionTimeoutElapsedTickNum = 0
+				rnd.votedFor = msg.From
+			}
+		} else {
+			raftLogger.Infof("%s received vote-request %s, rejects %s", rnd.describe(), msg.Type, types.ID(msg.From))
+			rnd.sendToMailbox(raftpb.Message{
+				Type:   raftpb.VoteResponseType(msg.Type),
+				To:     msg.From,
+				Reject: true,
+			})
+		}
+
+	default:
+		rnd.stepFunc(rnd, msg)
+	}
 	return nil
 }

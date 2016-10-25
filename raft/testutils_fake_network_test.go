@@ -35,15 +35,20 @@ type connection struct {
 //
 // (etcd raft.network)
 type fakeNetwork struct {
-	allStateMachines         map[uint64]stateMachine
-	allStableStorageInMemory map[uint64]*StorageStableInMemory
+	allStateMachines         map[uint64]stateMachine           // (etcd network.peers)
+	allStableStorageInMemory map[uint64]*StorageStableInMemory // (etcd network.storage)
 
-	allDroppedConnections  map[connection]float64
-	allIgnoredMessageTypes map[raftpb.MESSAGE_TYPE]bool
+	allDroppedConnections  map[connection]float64       // (etcd network.dropm)
+	allIgnoredMessageTypes map[raftpb.MESSAGE_TYPE]bool // (etcd network.ignorem)
 }
 
 // (etcd raft.newNetwork)
 func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
+	return newFakeNetworkWithConfig(nil, machines...)
+}
+
+// (etcd raft.newNetworkWithConfig)
+func newFakeNetworkWithConfig(configFunc func(*Config), machines ...stateMachine) *fakeNetwork {
 	peerIDs := generateIDs(len(machines))
 
 	allStateMachines := make(map[uint64]stateMachine, len(peerIDs))
@@ -54,7 +59,11 @@ func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 		switch v := machines[i].(type) {
 		case nil:
 			allStableStorageInMemory[id] = NewStorageStableInMemory()
-			allStateMachines[id] = newTestRaftNode(id, peerIDs, 10, 1, allStableStorageInMemory[id])
+			cfg := newTestConfig(id, peerIDs, 10, 1, allStableStorageInMemory[id])
+			if configFunc != nil {
+				configFunc(cfg)
+			}
+			allStateMachines[id] = newRaftNode(cfg)
 
 		case *raftNode:
 			v.id = id
@@ -62,7 +71,7 @@ func newFakeNetwork(machines ...stateMachine) *fakeNetwork {
 			for _, pid := range peerIDs {
 				v.allProgresses[pid] = &Progress{}
 			}
-			v.resetWithTerm(0)
+			v.resetWithTerm(v.currentTerm)
 			allStateMachines[id] = v
 
 		case *blackHole:
@@ -151,4 +160,9 @@ func (fn *fakeNetwork) isolate(id uint64) {
 // (etcd raft.network.ignore)
 func (fn *fakeNetwork) ignoreMessageType(tp raftpb.MESSAGE_TYPE) {
 	fn.allIgnoredMessageTypes[tp] = true
+}
+
+// (etcd raft.preVoteConfig)
+func preVoteConfig(c *Config) {
+	c.PreVote = true
 }

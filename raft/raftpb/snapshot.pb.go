@@ -44,7 +44,7 @@ func (SNAPSHOT_STATUS) EnumDescriptor() ([]byte, []int) { return fileDescriptorS
 //
 // (etcd raftpb.ConfState)
 type ConfigState struct {
-	IDs []uint64 `protobuf:"varint,1,rep,name=IDs,json=iDs" json:"IDs,omitempty"`
+	IDs []uint64 `protobuf:"varint,1,rep,packed,name=IDs,json=iDs" json:"IDs,omitempty"`
 }
 
 func (m *ConfigState) Reset()                    { *m = ConfigState{} }
@@ -84,133 +84,145 @@ func init() {
 	proto.RegisterType((*Snapshot)(nil), "raftpb.Snapshot")
 	proto.RegisterEnum("raftpb.SNAPSHOT_STATUS", SNAPSHOT_STATUS_name, SNAPSHOT_STATUS_value)
 }
-func (m *ConfigState) Marshal() (data []byte, err error) {
+func (m *ConfigState) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ConfigState) MarshalTo(data []byte) (int, error) {
+func (m *ConfigState) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.IDs) > 0 {
+		dAtA2 := make([]byte, len(m.IDs)*10)
+		var j1 int
 		for _, num := range m.IDs {
-			data[i] = 0x8
-			i++
-			i = encodeVarintSnapshot(data, i, uint64(num))
+			for num >= 1<<7 {
+				dAtA2[j1] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j1++
+			}
+			dAtA2[j1] = uint8(num)
+			j1++
 		}
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintSnapshot(dAtA, i, uint64(j1))
+		i += copy(dAtA[i:], dAtA2[:j1])
 	}
 	return i, nil
 }
 
-func (m *SnapshotMetadata) Marshal() (data []byte, err error) {
+func (m *SnapshotMetadata) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *SnapshotMetadata) MarshalTo(data []byte) (int, error) {
+func (m *SnapshotMetadata) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintSnapshot(data, i, uint64(m.ConfigState.Size()))
-	n1, err := m.ConfigState.MarshalTo(data[i:])
+	i = encodeVarintSnapshot(dAtA, i, uint64(m.ConfigState.Size()))
+	n3, err := m.ConfigState.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n1
+	i += n3
 	if m.Index != 0 {
-		data[i] = 0x10
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintSnapshot(data, i, uint64(m.Index))
+		i = encodeVarintSnapshot(dAtA, i, uint64(m.Index))
 	}
 	if m.Term != 0 {
-		data[i] = 0x18
+		dAtA[i] = 0x18
 		i++
-		i = encodeVarintSnapshot(data, i, uint64(m.Term))
+		i = encodeVarintSnapshot(dAtA, i, uint64(m.Term))
 	}
 	return i, nil
 }
 
-func (m *Snapshot) Marshal() (data []byte, err error) {
+func (m *Snapshot) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Snapshot) MarshalTo(data []byte) (int, error) {
+func (m *Snapshot) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintSnapshot(data, i, uint64(m.Metadata.Size()))
-	n2, err := m.Metadata.MarshalTo(data[i:])
+	i = encodeVarintSnapshot(dAtA, i, uint64(m.Metadata.Size()))
+	n4, err := m.Metadata.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n4
 	if len(m.Data) > 0 {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintSnapshot(data, i, uint64(len(m.Data)))
-		i += copy(data[i:], m.Data)
+		i = encodeVarintSnapshot(dAtA, i, uint64(len(m.Data)))
+		i += copy(dAtA[i:], m.Data)
 	}
 	return i, nil
 }
 
-func encodeFixed64Snapshot(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Snapshot(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Snapshot(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Snapshot(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintSnapshot(data []byte, offset int, v uint64) int {
+func encodeVarintSnapshot(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *ConfigState) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.IDs) > 0 {
+		l = 0
 		for _, e := range m.IDs {
-			n += 1 + sovSnapshot(uint64(e))
+			l += sovSnapshot(uint64(e))
 		}
+		n += 1 + sovSnapshot(uint64(l)) + l
 	}
 	return n
 }
@@ -254,8 +266,8 @@ func sovSnapshot(x uint64) (n int) {
 func sozSnapshot(x uint64) (n int) {
 	return sovSnapshot(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *ConfigState) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ConfigState) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -267,7 +279,7 @@ func (m *ConfigState) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -284,28 +296,70 @@ func (m *ConfigState) Unmarshal(data []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field IDs", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowSnapshot
+			if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowSnapshot
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= (int(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
 				}
-				if iNdEx >= l {
+				if packedLen < 0 {
+					return ErrInvalidLengthSnapshot
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex > l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
-				iNdEx++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
+				for iNdEx < postIndex {
+					var v uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowSnapshot
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= (uint64(b) & 0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.IDs = append(m.IDs, v)
 				}
+			} else if wireType == 0 {
+				var v uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowSnapshot
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.IDs = append(m.IDs, v)
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field IDs", wireType)
 			}
-			m.IDs = append(m.IDs, v)
 		default:
 			iNdEx = preIndex
-			skippy, err := skipSnapshot(data[iNdEx:])
+			skippy, err := skipSnapshot(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -324,8 +378,8 @@ func (m *ConfigState) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *SnapshotMetadata) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *SnapshotMetadata) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -337,7 +391,7 @@ func (m *SnapshotMetadata) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -365,7 +419,7 @@ func (m *SnapshotMetadata) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -379,7 +433,7 @@ func (m *SnapshotMetadata) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ConfigState.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ConfigState.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -395,7 +449,7 @@ func (m *SnapshotMetadata) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Index |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -414,7 +468,7 @@ func (m *SnapshotMetadata) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Term |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -423,7 +477,7 @@ func (m *SnapshotMetadata) Unmarshal(data []byte) error {
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipSnapshot(data[iNdEx:])
+			skippy, err := skipSnapshot(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -442,8 +496,8 @@ func (m *SnapshotMetadata) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Snapshot) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Snapshot) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -455,7 +509,7 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -483,7 +537,7 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -497,7 +551,7 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Metadata.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Metadata.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -513,7 +567,7 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				byteLen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -527,14 +581,14 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Data = append(m.Data[:0], data[iNdEx:postIndex]...)
+			m.Data = append(m.Data[:0], dAtA[iNdEx:postIndex]...)
 			if m.Data == nil {
 				m.Data = []byte{}
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipSnapshot(data[iNdEx:])
+			skippy, err := skipSnapshot(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -553,8 +607,8 @@ func (m *Snapshot) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipSnapshot(data []byte) (n int, err error) {
-	l := len(data)
+func skipSnapshot(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -565,7 +619,7 @@ func skipSnapshot(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -583,7 +637,7 @@ func skipSnapshot(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -600,7 +654,7 @@ func skipSnapshot(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -623,7 +677,7 @@ func skipSnapshot(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -634,7 +688,7 @@ func skipSnapshot(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipSnapshot(data[start:])
+				next, err := skipSnapshot(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}

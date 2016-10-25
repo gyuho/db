@@ -282,7 +282,7 @@ func Test_raft_leader_transfer_after_snapshot(t *testing.T) {
 		To:      1,
 		Entries: []raftpb.Entry{{}},
 	})
-	persistALlUnstableAndApplyNextEntries(rnd1, fn.allStableStorageInMemory[1])
+	persistAllUnstableAndApplyNextEntries(rnd1, fn.allStableStorageInMemory[1])
 
 	fn.allStableStorageInMemory[1].CreateSnapshot(
 		rnd1.storageRaftLog.appliedIndex,

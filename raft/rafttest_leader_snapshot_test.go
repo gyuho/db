@@ -446,7 +446,7 @@ func Test_raft_snapshot_restore_slow_node(t *testing.T) {
 
 	// to trigger snapshot
 	rndLeader := fn.allStateMachines[1].(*raftNode)
-	persistALlUnstableAndApplyNextEntries(rndLeader, fn.allStableStorageInMemory[1])
+	persistAllUnstableAndApplyNextEntries(rndLeader, fn.allStableStorageInMemory[1])
 	fn.allStableStorageInMemory[1].CreateSnapshot(rndLeader.storageRaftLog.appliedIndex, &raftpb.ConfigState{IDs: rndLeader.allNodeIDs()}, nil)
 	fn.allStableStorageInMemory[1].Compact(rndLeader.storageRaftLog.appliedIndex)
 

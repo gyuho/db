@@ -16,9 +16,9 @@ const (
 	defaultTestMaxInflightMsgNum       = 15
 )
 
-// (etcd raft.newTestRaft)
-func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *raftNode {
-	return newRaftNode(&Config{
+// (etcd raft.newTestConfig)
+func newTestConfig(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *Config {
+	return &Config{
 		allPeerIDs:              allPeerIDs,
 		ID:                      id,
 		ElectionTickNum:         electionTick,
@@ -28,7 +28,12 @@ func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick
 		MaxEntryNumPerMsg:       defaultTestMaxEntryNumPerMsg,
 		MaxInflightMsgNum:       defaultTestMaxInflightMsgNum,
 		LastAppliedIndex:        0,
-	})
+	}
+}
+
+// (etcd raft.newTestRaft)
+func newTestRaftNode(id uint64, allPeerIDs []uint64, electionTick, heartbeatTick int, stableStorage StorageStable) *raftNode {
+	return newRaftNode(newTestConfig(id, allPeerIDs, electionTick, heartbeatTick, stableStorage))
 }
 
 // (etcd raft.ents)
@@ -49,13 +54,13 @@ func newTestRaftNodeWithTerms(terms ...uint64) *raftNode {
 		MaxInflightMsgNum:       defaultTestMaxInflightMsgNum,
 		LastAppliedIndex:        0,
 	})
-	rnd.resetWithTerm(0)
+	rnd.resetWithTerm(terms[len(terms)-1])
 
 	return rnd
 }
 
 // (etcd raft.nextEnts)
-func persistALlUnstableAndApplyNextEntries(rnd *raftNode, st *StorageStableInMemory) []raftpb.Entry {
+func persistAllUnstableAndApplyNextEntries(rnd *raftNode, st *StorageStableInMemory) []raftpb.Entry {
 	// append all unstable entries to stable
 	st.Append(rnd.storageRaftLog.unstableEntries()...)
 
