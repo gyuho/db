@@ -456,7 +456,51 @@ func Test_raft_single_node_pre_candidate(t *testing.T) {
 
 // (etcd raft.TestCandidateConcede)
 func Test_raft_candidate_concede(t *testing.T) {
+	tt := newFakeNetwork(nil, nil, nil)
+	tt.isolate(1)
 
+	tt.stepFirstMessage(raftpb.Message{From: 1, To: 1, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+	tt.stepFirstMessage(raftpb.Message{From: 3, To: 3, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+
+	// heal the partition
+	tt.recoverAll()
+
+	// send heartbeat; reset wait
+	tt.stepFirstMessage(raftpb.Message{From: 3, To: 3, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT})
+
+	data := []byte("force follower")
+
+	// send a proposal to 3 to flush out a MsgApp to 1
+	tt.stepFirstMessage(raftpb.Message{From: 3, To: 3, Type: raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER, Entries: []raftpb.Entry{{Data: data}}})
+
+	// send heartbeat; flush out commit
+	tt.stepFirstMessage(raftpb.Message{From: 3, To: 3, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_LEADER_HEARTBEAT})
+
+	a := tt.allStateMachines[1].(*raftNode)
+	if g := a.state; g != raftpb.NODE_STATE_FOLLOWER {
+		t.Fatalf("state = %s, want %s", g, raftpb.NODE_STATE_FOLLOWER)
+	}
+	if g := a.currentTerm; g != 1 {
+		t.Fatalf("term = %d, want %d", g, 1)
+	}
+	wantLog := ltoa(&storageRaftLog{
+		storageStable: &StorageStableInMemory{
+			snapshotEntries: []raftpb.Entry{{}, {Data: nil, Term: 1, Index: 1}, {Term: 1, Index: 2, Data: data}},
+		},
+		storageUnstable: storageUnstable{indexOffset: 3},
+		committedIndex:  2,
+	})
+
+	for i, p := range tt.allStateMachines {
+		if sm, ok := p.(*raftNode); ok {
+			l := ltoa(sm.storageRaftLog)
+			if g := diffu(wantLog, l); g != "" {
+				t.Fatalf("#%d: diff:\n%s", i, g)
+			}
+		} else {
+			t.Logf("#%d: empty log", i)
+		}
+	}
 }
 
 // (etcd raft.TestDuelingPreCandidates)
