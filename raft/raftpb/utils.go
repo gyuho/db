@@ -39,6 +39,7 @@ func IsEmptyHardState(st HardState) bool {
 // (etcd raft.IsResponseMsg)
 func IsResponseMessage(tp MESSAGE_TYPE) bool {
 	return tp == MESSAGE_TYPE_RESPONSE_TO_LEADER_APPEND ||
+		tp == MESSAGE_TYPE_RESPONSE_TO_PRE_CANDIDATE_REQUEST_VOTE ||
 		tp == MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE ||
 		tp == MESSAGE_TYPE_RESPONSE_TO_LEADER_HEARTBEAT ||
 		tp == MESSAGE_TYPE_INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER
@@ -111,4 +112,18 @@ func DescribeMessageLongLong(msg Message) string {
 // (etcd raft.DescribeEntry)
 func DescribeEntry(e Entry) string {
 	return fmt.Sprintf("[index=%d | term=%d | type=%q | data=%q]", e.Index, e.Term, e.Type, e.Data)
+}
+
+// VoteResponseType maps vote and prevote message types to their corresponding responses.
+//
+// (etcd raft.voteRespMsgType)
+func VoteResponseType(msgt MESSAGE_TYPE) MESSAGE_TYPE {
+	switch msgt {
+	case MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE:
+		return MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE
+	case MESSAGE_TYPE_PRE_CANDIDATE_REQUEST_VOTE:
+		return MESSAGE_TYPE_RESPONSE_TO_PRE_CANDIDATE_REQUEST_VOTE
+	default:
+		panic(fmt.Sprintf("not a vote message: %s", msgt))
+	}
 }
