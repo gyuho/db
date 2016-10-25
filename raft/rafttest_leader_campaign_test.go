@@ -262,7 +262,68 @@ func Test_raft_receive_msg_vote(t *testing.T) {
 }
 
 // (etcd raft.TestStateTransition)
-// TODO:
+func Test_raft_node_state_transition(t *testing.T) {
+	tests := []struct {
+		from   raftpb.NODE_STATE
+		to     raftpb.NODE_STATE
+		wallow bool
+		wterm  uint64
+		wlead  uint64
+	}{
+		{raftpb.NODE_STATE_FOLLOWER, raftpb.NODE_STATE_FOLLOWER, true, 1, NoNodeID},
+		{raftpb.NODE_STATE_FOLLOWER, raftpb.NODE_STATE_PRE_CANDIDATE, true, 0, NoNodeID},
+		{raftpb.NODE_STATE_FOLLOWER, raftpb.NODE_STATE_CANDIDATE, true, 1, NoNodeID},
+		{raftpb.NODE_STATE_FOLLOWER, raftpb.NODE_STATE_LEADER, false, 0, NoNodeID},
+
+		{raftpb.NODE_STATE_PRE_CANDIDATE, raftpb.NODE_STATE_FOLLOWER, true, 0, NoNodeID},
+		{raftpb.NODE_STATE_PRE_CANDIDATE, raftpb.NODE_STATE_PRE_CANDIDATE, true, 0, NoNodeID},
+		{raftpb.NODE_STATE_PRE_CANDIDATE, raftpb.NODE_STATE_CANDIDATE, true, 1, NoNodeID},
+		{raftpb.NODE_STATE_PRE_CANDIDATE, raftpb.NODE_STATE_LEADER, true, 0, 1},
+
+		{raftpb.NODE_STATE_CANDIDATE, raftpb.NODE_STATE_FOLLOWER, true, 0, NoNodeID},
+		{raftpb.NODE_STATE_CANDIDATE, raftpb.NODE_STATE_PRE_CANDIDATE, true, 0, NoNodeID},
+		{raftpb.NODE_STATE_CANDIDATE, raftpb.NODE_STATE_CANDIDATE, true, 1, NoNodeID},
+		{raftpb.NODE_STATE_CANDIDATE, raftpb.NODE_STATE_LEADER, true, 0, 1},
+
+		{raftpb.NODE_STATE_LEADER, raftpb.NODE_STATE_FOLLOWER, true, 1, NoNodeID},
+		{raftpb.NODE_STATE_LEADER, raftpb.NODE_STATE_PRE_CANDIDATE, false, 0, NoNodeID},
+		{raftpb.NODE_STATE_LEADER, raftpb.NODE_STATE_CANDIDATE, false, 1, NoNodeID},
+		{raftpb.NODE_STATE_LEADER, raftpb.NODE_STATE_LEADER, true, 0, 1},
+	}
+
+	for i, tt := range tests {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					if tt.wallow {
+						t.Fatalf("%d: allow = %v, want %v", i, false, true)
+					}
+				}
+			}()
+
+			sm := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+			sm.state = tt.from
+
+			switch tt.to {
+			case raftpb.NODE_STATE_FOLLOWER:
+				sm.becomeFollower(tt.wterm, tt.wlead)
+			case raftpb.NODE_STATE_PRE_CANDIDATE:
+				sm.becomePreCandidate()
+			case raftpb.NODE_STATE_CANDIDATE:
+				sm.becomeCandidate()
+			case raftpb.NODE_STATE_LEADER:
+				sm.becomeLeader()
+			}
+
+			if sm.currentTerm != tt.wterm {
+				t.Fatalf("%d: term = %d, want %d", i, sm.currentTerm, tt.wterm)
+			}
+			if sm.leaderID != tt.wlead {
+				t.Fatalf("%d: leaderID = %d, want %d", i, sm.leaderID, tt.wlead)
+			}
+		}()
+	}
+}
 
 // (etcd raft.TestLeaderCycle)
 // TODO:
