@@ -42,11 +42,12 @@ func Test_encode_decode_header(t *testing.T) {
 	}
 }
 
+// (etcd wal.TestWriteRecord)
 func TestRecordEncode(t *testing.T) {
 	var (
 		data = []byte("Hello World!")
 		buf  = new(bytes.Buffer)
-		enc  = newEncoder(buf, 0)
+		enc  = newEncoder(buf, 0, 0)
 
 		tp = int64(0xABCDE)
 	)

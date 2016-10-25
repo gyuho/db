@@ -6,6 +6,7 @@ import (
 	"hash"
 	"hash/crc32"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/gyuho/db/pkg/crcutil"
@@ -133,7 +134,7 @@ type encoder struct {
 
 var crcTable = crc32.MakeTable(crc32.Castagnoli)
 
-func newEncoder(w io.Writer, prevCRC uint32) *encoder {
+func newEncoder(w io.Writer, prevCRC uint32, pageOffset int) *encoder {
 	return &encoder{
 		crc: crcutil.New(prevCRC, crcTable),
 
@@ -141,8 +142,17 @@ func newEncoder(w io.Writer, prevCRC uint32) *encoder {
 		wordBuf:   make([]byte, byteBitN),
 
 		// bw: bufio.NewWriter(w),
-		bw: ioutil.NewPageWriter(w, walPageBytes),
+		bw: ioutil.NewPageWriter(w, walPageBytes, pageOffset),
 	}
+}
+
+// newFileEncoder creates a new encoder with current file offset for the page writer.
+func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
+	offset, err := f.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+	return newEncoder(f, prevCrc, int(offset)), nil
 }
 
 func (e *encoder) encode(rec *raftwalpb.Record) error {

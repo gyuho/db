@@ -312,11 +312,14 @@ func Create(dir string, metadata []byte) (*WAL, error) {
 
 	var prevCRC uint32
 	w := &WAL{
-		dir:         dir,
-		lockedFiles: []*fileutil.LockedFile{f},
-		enc:         newEncoder(f, prevCRC),
-		metadata:    metadata,
+		dir:      dir,
+		metadata: metadata,
 	}
+	w.enc, err = newFileEncoder(f.File, 0)
+	if err != nil {
+		return nil, err
+	}
+	w.lockedFiles = append(w.lockedFiles, f)
 
 	// 1. encode CRC
 	if err = w.unsafeEncodeCRC(prevCRC); err != nil {
@@ -484,7 +487,10 @@ func (w *WAL) unsafeCutCurrent() error {
 
 	// update encoder with the newly-appended last file
 	prevCRC := w.enc.crc.Sum32()
-	w.enc = newEncoder(w.unsafeLastFile(), prevCRC)
+	w.enc, err = newFileEncoder(w.unsafeLastFile().File, prevCRC)
+	if err != nil {
+		return err
+	}
 
 	// 1. update CRC
 	if err = w.unsafeEncodeCRC(prevCRC); err != nil {
@@ -543,7 +549,10 @@ func (w *WAL) unsafeCutCurrent() error {
 	prevCRC = w.enc.crc.Sum32()
 
 	// update the encoder with newly-locked file
-	w.enc = newEncoder(w.unsafeLastFile(), prevCRC)
+	w.enc, err = newFileEncoder(w.unsafeLastFile().File, prevCRC)
+	if err != nil {
+		return err
+	}
 
 	logger.Infof("created %q", walPath)
 	return nil

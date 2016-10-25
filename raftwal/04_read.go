@@ -149,7 +149,10 @@ func (w *WAL) ReadAll() (metadata []byte, hardstate raftpb.HardState, entries []
 
 	if w.unsafeLastFile() != nil { // write mode
 		// create encoder to enable appends
-		w.enc = newEncoder(w.unsafeLastFile(), w.dec.crc.Sum32())
+		w.enc, err = newFileEncoder(w.unsafeLastFile().File, w.dec.crc.Sum32())
+		if err != nil {
+			return
+		}
 	}
 
 	// done with reading
