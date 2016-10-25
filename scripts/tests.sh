@@ -11,6 +11,11 @@ result=$(go tool vet -shadow $TESTS 2>&1 >/dev/null)
 echo $result
 COMMENT
 
+if ! [[ "$0" =~ "scripts/tests.sh" ]]; then
+	echo "must be run from repository root"
+	exit 255
+fi
+
 IGNORE_PKGS="(vendor|rafttest)"
 TESTS=`find . -name \*_test.go | while read a; do dirname $a; done | sort | uniq | egrep -v "$IGNORE_PKGS"`
 

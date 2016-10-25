@@ -11,6 +11,11 @@ printf "generating proto in raftwal/raftwalpb\n"
 protoc --go_out=. raftwal/raftwalpb/*.proto
 COMMENT
 
+if ! [[ "$0" =~ "scripts/genproto.sh" ]]; then
+	echo "must be run from repository root"
+	exit 255
+fi
+
 # for now, be conservative about what version of protoc we expect
 if ! [[ $(protoc --version) =~ "3.0.0" ]]; then
 	echo "could not find protoc 3.0.0, is it installed + in PATH?"
