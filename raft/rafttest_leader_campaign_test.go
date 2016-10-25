@@ -444,16 +444,30 @@ func Test_raft_leader_election_single_node(t *testing.T) {
 }
 
 // (etcd raft.TestSingleNodePreCandidate)
-// TODO:
+func Test_raft_single_node_pre_candidate(t *testing.T) {
+	tt := newFakeNetworkWithConfig(preVoteConfig, nil)
+	tt.stepFirstMessage(raftpb.Message{From: 1, To: 1, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+
+	rnd := tt.allStateMachines[1].(*raftNode)
+	if rnd.state != raftpb.NODE_STATE_LEADER {
+		t.Errorf("state = %d, want %d", rnd.state, raftpb.NODE_STATE_LEADER)
+	}
+}
 
 // (etcd raft.TestCandidateConcede)
-// TODO:
+func Test_raft_candidate_concede(t *testing.T) {
+
+}
 
 // (etcd raft.TestDuelingPreCandidates)
-// TODO:
+func Test_raft_dueling_pre_candidate(t *testing.T) {
+
+}
 
 // (etcd raft.TestAllServerStepdown)
-// TODO:
+func Test_raft_all_server_step_down(t *testing.T) {
+
+}
 
 // (etcd raft.TestLeaderStepdownWhenQuorumActive)
 func Test_raft_leader_step_down_checkQuorum_active(t *testing.T) {
