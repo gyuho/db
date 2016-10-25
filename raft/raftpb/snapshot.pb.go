@@ -44,7 +44,7 @@ func (SNAPSHOT_STATUS) EnumDescriptor() ([]byte, []int) { return fileDescriptorS
 //
 // (etcd raftpb.ConfState)
 type ConfigState struct {
-	IDs []uint64 `protobuf:"varint,1,rep,name=IDs,json=iDs" json:"IDs,omitempty"`
+	IDs []uint64 `protobuf:"varint,1,rep,packed,name=IDs,json=iDs" json:"IDs,omitempty"`
 }
 
 func (m *ConfigState) Reset()                    { *m = ConfigState{} }
@@ -100,11 +100,21 @@ func (m *ConfigState) MarshalTo(data []byte) (int, error) {
 	var l int
 	_ = l
 	if len(m.IDs) > 0 {
+		data2 := make([]byte, len(m.IDs)*10)
+		var j1 int
 		for _, num := range m.IDs {
-			data[i] = 0x8
-			i++
-			i = encodeVarintSnapshot(data, i, uint64(num))
+			for num >= 1<<7 {
+				data2[j1] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j1++
+			}
+			data2[j1] = uint8(num)
+			j1++
 		}
+		data[i] = 0xa
+		i++
+		i = encodeVarintSnapshot(data, i, uint64(j1))
+		i += copy(data[i:], data2[:j1])
 	}
 	return i, nil
 }
@@ -127,11 +137,11 @@ func (m *SnapshotMetadata) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintSnapshot(data, i, uint64(m.ConfigState.Size()))
-	n1, err := m.ConfigState.MarshalTo(data[i:])
+	n3, err := m.ConfigState.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n1
+	i += n3
 	if m.Index != 0 {
 		data[i] = 0x10
 		i++
@@ -163,11 +173,11 @@ func (m *Snapshot) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintSnapshot(data, i, uint64(m.Metadata.Size()))
-	n2, err := m.Metadata.MarshalTo(data[i:])
+	n4, err := m.Metadata.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n4
 	if len(m.Data) > 0 {
 		data[i] = 0x12
 		i++
@@ -208,9 +218,11 @@ func (m *ConfigState) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.IDs) > 0 {
+		l = 0
 		for _, e := range m.IDs {
-			n += 1 + sovSnapshot(uint64(e))
+			l += sovSnapshot(uint64(e))
 		}
+		n += 1 + sovSnapshot(uint64(l)) + l
 	}
 	return n
 }
@@ -284,25 +296,67 @@ func (m *ConfigState) Unmarshal(data []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field IDs", wireType)
-			}
-			var v uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowSnapshot
+			if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowSnapshot
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := data[iNdEx]
+					iNdEx++
+					packedLen |= (int(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
 				}
-				if iNdEx >= l {
+				if packedLen < 0 {
+					return ErrInvalidLengthSnapshot
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex > l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
-				iNdEx++
-				v |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
+				for iNdEx < postIndex {
+					var v uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowSnapshot
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := data[iNdEx]
+						iNdEx++
+						v |= (uint64(b) & 0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.IDs = append(m.IDs, v)
 				}
+			} else if wireType == 0 {
+				var v uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowSnapshot
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := data[iNdEx]
+					iNdEx++
+					v |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.IDs = append(m.IDs, v)
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field IDs", wireType)
 			}
-			m.IDs = append(m.IDs, v)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipSnapshot(data[iNdEx:])
