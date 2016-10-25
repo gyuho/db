@@ -49,6 +49,26 @@ type Config struct {
 	// (etcd raft.Config.CheckQuorum)
 	CheckQuorum bool
 
+	// PreVote enables the Pre-Vote algorithm described in raft thesis section
+	// 9.6. This prevents disruption when a node that has been partitioned away
+	// rejoins the cluster.
+	//
+	//
+	// (Raft §9.6 Preventing disruptions when a server rejoins the cluster, p.136)
+	//
+	// In the Pre-Vote algorithm, a candidate only increments its term
+	// if it first learns from a majority of the cluster that they would be willing
+	// to grant the candidate their votes (if the candidate’s log is sufficiently
+	// up-to-date, and the voters have not received heartbeats from a valid leader
+	// for at least a baseline election timeout).
+	//
+	// No node increases its term number unless the pre-election indicates that the
+	// campaigining node would win.	This minimizes disruption when a partitioned node
+	// rejoins the cluster.
+	//
+	// (etcd raft.Config.PreVote)
+	PreVote bool
+
 	// StorageStable implements storage for Raft logs, where a node stores its
 	// entries and states, reads the persisted data when needed.
 	// Raft node needs to read the previous state and configuration
@@ -174,6 +194,7 @@ type raftNode struct {
 	//
 	// (etcd raft.raft.checkQuorum)
 	checkQuorum bool
+	preVote     bool
 
 	// (etcd raft.raft.Term)
 	currentTerm uint64
@@ -234,6 +255,7 @@ func newRaftNode(c *Config) *raftNode {
 		maxInflightMsgNum: c.MaxInflightMsgNum,
 
 		checkQuorum: c.CheckQuorum,
+		preVote:     c.PreVote,
 
 		readOnly: newReadOnly(c.ReadOnlyOption),
 	}
@@ -284,13 +306,25 @@ func newRaftNode(c *Config) *raftNode {
 func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 	msg.From = rnd.id
 
-	// proposal must go through consensus, which means proposal is to be
-	// forwarded to the leader, and replicated back to followers.
-	// So it should be treated as local message by setting msg.LogTerm as 0
-	if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
-		// (X)
-		// msg.LogTerm = rnd.currentTerm
-		msg.SenderCurrentTerm = rnd.currentTerm
+	if msg.Type == raftpb.MESSAGE_TYPE_PRE_CANDIDATE_REQUEST_VOTE || msg.Type == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
+		if msg.SenderCurrentTerm == 0 {
+			// PreVote RPCs are sent at a term other than our actual term, so the code
+			// that sends these messages is responsible for setting the term.
+			panic(fmt.Sprintf("term should be set when sending %s", msg.Type))
+		}
+	} else {
+		if msg.SenderCurrentTerm != 0 {
+			panic(fmt.Sprintf("term should not be set when sending %s (was %d)", msg.Type, msg.SenderCurrentTerm))
+		}
+
+		// proposal must go through consensus, which means proposal is to be
+		// forwarded to the leader, and replicated back to followers.
+		// So it should be treated as local message by setting msg.LogTerm as 0
+		if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
+			// (X)
+			// msg.LogTerm = rnd.currentTerm
+			msg.SenderCurrentTerm = rnd.currentTerm
+		}
 	}
 
 	rnd.mailbox = append(rnd.mailbox, msg)
