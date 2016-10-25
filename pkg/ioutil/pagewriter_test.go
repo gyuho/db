@@ -29,7 +29,7 @@ func Test_PageWriter_random(t *testing.T) {
 	defaultWatermarkN = 8 * 1024
 	pageChunkN := 128
 	cw := &checkPageWriter{t: t, pageChunkN: pageChunkN}
-	pw := NewPageWriter(cw, pageChunkN)
+	pw := NewPageWriter(cw, pageChunkN, 0)
 
 	// randomly write empty bytes
 	data := make([]byte, 4*defaultWatermarkN)
@@ -60,7 +60,7 @@ func Test_PageWriter_partial(t *testing.T) {
 	pageChunkN := 128
 
 	cw := &checkPageWriter{t: t, pageChunkN: 64}
-	pw := NewPageWriter(cw, pageChunkN)
+	pw := NewPageWriter(cw, pageChunkN, 0)
 
 	// randomly write empty bytes
 	data := make([]byte, defaultWatermarkN)
