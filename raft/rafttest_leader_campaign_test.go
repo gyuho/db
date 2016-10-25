@@ -97,18 +97,24 @@ func Test_raft_Step_trigger_leader_heartbeat(t *testing.T) {
 
 // (etcd raft.TestCampaignWhileLeader)
 func Test_raft_Step_trigger_campaign_while_leader(t *testing.T) {
-	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
-	rnd.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
+	for i, preVote := range []bool{false, true} {
+		cfg := newTestConfig(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+		cfg.PreVote = preVote
+		rnd := newRaftNode(cfg)
+		rnd.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 
-	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
+		// We don't call campaign() directly because it comes after the check
+		// for our current state.
+		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+		rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
 
-	oldTerm := rnd.currentTerm
+		oldTerm := rnd.currentTerm
 
-	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
-	rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
-	if rnd.currentTerm != oldTerm {
-		t.Fatalf("term should not be increased (expected %d, got %d)", oldTerm, rnd.currentTerm)
+		rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+		rnd.assertNodeState(raftpb.NODE_STATE_LEADER)
+		if rnd.currentTerm != oldTerm {
+			t.Fatalf("#%d: term should not be increased (expected %d, got %d)", i, oldTerm, rnd.currentTerm)
+		}
 	}
 }
 
@@ -184,6 +190,86 @@ func Test_raft_leader_election(t *testing.T) {
 	}
 }
 
+// (etcd raft.TestRecvMsgVote)
+func Test_raft_receive_msg_vote(t *testing.T) {
+	for i, msgType := range []raftpb.MESSAGE_TYPE{raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE, raftpb.MESSAGE_TYPE_PRE_CANDIDATE_REQUEST_VOTE} {
+		tests := []struct {
+			state   raftpb.NODE_STATE
+			i, term uint64
+			voteFor uint64
+			wreject bool
+		}{
+			{raftpb.NODE_STATE_FOLLOWER, 0, 0, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 0, 1, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 0, 2, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 0, 3, NoNodeID, false},
+
+			{raftpb.NODE_STATE_FOLLOWER, 1, 0, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 1, 1, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 1, 2, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 1, 3, NoNodeID, false},
+
+			{raftpb.NODE_STATE_FOLLOWER, 2, 0, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 2, 1, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 2, 2, NoNodeID, false},
+			{raftpb.NODE_STATE_FOLLOWER, 2, 3, NoNodeID, false},
+
+			{raftpb.NODE_STATE_FOLLOWER, 3, 0, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 3, 1, NoNodeID, true},
+			{raftpb.NODE_STATE_FOLLOWER, 3, 2, NoNodeID, false},
+			{raftpb.NODE_STATE_FOLLOWER, 3, 3, NoNodeID, false},
+
+			{raftpb.NODE_STATE_FOLLOWER, 3, 2, 2, false},
+			{raftpb.NODE_STATE_FOLLOWER, 3, 2, 1, true},
+
+			{raftpb.NODE_STATE_LEADER, 3, 3, 1, true},
+			{raftpb.NODE_STATE_PRE_CANDIDATE, 3, 3, 1, true},
+			{raftpb.NODE_STATE_CANDIDATE, 3, 3, 1, true},
+		}
+
+		for j, tt := range tests {
+			sm := newTestRaftNode(1, []uint64{1}, 10, 1, NewStorageStableInMemory())
+			sm.state = tt.state
+			switch tt.state {
+			case raftpb.NODE_STATE_FOLLOWER:
+				sm.stepFunc = stepFollower
+			case raftpb.NODE_STATE_CANDIDATE, raftpb.NODE_STATE_PRE_CANDIDATE:
+				sm.stepFunc = stepCandidate
+			case raftpb.NODE_STATE_LEADER:
+				sm.stepFunc = stepLeader
+			}
+			sm.votedFor = tt.voteFor
+			sm.storageRaftLog = &storageRaftLog{
+				storageStable:   &StorageStableInMemory{snapshotEntries: []raftpb.Entry{{}, {Index: 1, Term: 2}, {Index: 2, Term: 2}}},
+				storageUnstable: storageUnstable{indexOffset: 3},
+			}
+
+			sm.Step(raftpb.Message{Type: msgType, From: 2, LogIndex: tt.i, LogTerm: tt.term})
+
+			msgs := sm.readAndClearMailbox()
+			if g := len(msgs); g != 1 {
+				t.Fatalf("#%d-%d: len(msgs) = %d, want 1", i, j, g)
+				continue
+			}
+			if g := msgs[0].Type; g != raftpb.VoteResponseType(msgType) {
+				t.Fatalf("#%d-%d: m.Type = %v, want %v", i, j, g, raftpb.VoteResponseType(msgType))
+			}
+			if g := msgs[0].Reject; g != tt.wreject {
+				t.Fatalf("#%d-%d: m.Reject = %v, want %v", i, j, g, tt.wreject)
+			}
+		}
+	}
+}
+
+// (etcd raft.TestStateTransition)
+// TODO:
+
+// (etcd raft.TestLeaderCycle)
+// TODO:
+
+// (etcd raft.TestVoteFromAnyState)
+// TODO:
+
 // (etcd raft.TestSingleNodeCandidate)
 func Test_raft_leader_election_single_node(t *testing.T) {
 	fn := newFakeNetwork(nil)
@@ -195,6 +281,24 @@ func Test_raft_leader_election_single_node(t *testing.T) {
 		t.Fatalf("rnd1 state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd1.state)
 	}
 }
+
+// (etcd raft.TestSingleNodePreCandidate)
+// TODO:
+
+// (etcd raft.TestCandidateConcede)
+// TODO:
+
+// (etcd raft.TestDuelingPreCandidates)
+// TODO:
+
+// (etcd raft.TestAllServerStepdown)
+// TODO:
+
+// (etcd raft.TestLeaderStepdownWhenQuorumActive)
+// TODO:
+
+// (etcd raft.TestLeaderStepdownWhenQuorumLost)
+// TODO:
 
 func Test_raft_leader_election_checkQuorum_candidate(t *testing.T) {
 	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
