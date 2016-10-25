@@ -421,8 +421,8 @@ func Test_raft_vote_from_any_node_state(t *testing.T) {
 				if r.currentTerm != origTerm {
 					t.Fatalf("%s,%s: term %d, want %d", vt, st, r.currentTerm, origTerm)
 				}
-				// if st == raftpb.NODE_STATE_FOLLOWER  or StatePreCandidate, r hasn't voted yet.
-				// In StateCandidate or StateLeader, it's voted for itself.
+				// if st == raftpb.NODE_STATE_FOLLOWER  or raftpb.NODE_STATE_PRE_CANDIDATE, r hasn't voted yet.
+				// In raftpb.NODE_STATE_CANDIDATE or raftpb.NODE_STATE_LEADER, it's voted for itself.
 				if r.votedFor != NoNodeID && r.votedFor != 1 {
 					t.Fatalf("%s,%s: votedFor %d, want %d or 1", vt, st, r.votedFor, NoNodeID)
 				}
@@ -505,12 +505,131 @@ func Test_raft_candidate_concede(t *testing.T) {
 
 // (etcd raft.TestDuelingPreCandidates)
 func Test_raft_dueling_pre_candidate(t *testing.T) {
+	cfgA := newTestConfig(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	cfgB := newTestConfig(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	cfgC := newTestConfig(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
 
+	cfgA.PreVote = true
+	cfgB.PreVote = true
+	cfgC.PreVote = true
+
+	a := newRaftNode(cfgA)
+	b := newRaftNode(cfgB)
+	c := newRaftNode(cfgC)
+
+	nt := newFakeNetwork(a, b, c)
+	nt.cutConnection(1, 3)
+
+	nt.stepFirstMessage(raftpb.Message{From: 1, To: 1, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+	nt.stepFirstMessage(raftpb.Message{From: 3, To: 3, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+
+	// 1 becomes leader since it receives votes from 1 and 2
+	sm := nt.allStateMachines[1].(*raftNode)
+	if sm.state != raftpb.NODE_STATE_LEADER {
+		t.Fatalf("state = %s, want %s", sm.state, raftpb.NODE_STATE_LEADER)
+	}
+
+	// 3 campaigns then reverts to follower when its PreVote is rejected
+	sm = nt.allStateMachines[3].(*raftNode)
+	if sm.state != raftpb.NODE_STATE_FOLLOWER {
+		t.Fatalf("state = %s, want %s", sm.state, raftpb.NODE_STATE_FOLLOWER)
+	}
+
+	nt.recoverAll()
+
+	// Candidate 3 now increases its term and tries to vote again.
+	// With PreVote, it does not disrupt the leader.
+	nt.stepFirstMessage(raftpb.Message{From: 3, To: 3, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+
+	wlog := &storageRaftLog{
+		storageUnstable: storageUnstable{indexOffset: 2},
+		storageStable:   &StorageStableInMemory{snapshotEntries: []raftpb.Entry{{}, {Data: nil, Term: 1, Index: 1}}},
+		committedIndex:  1,
+	}
+	tests := []struct {
+		sm             *raftNode
+		state          raftpb.NODE_STATE
+		term           uint64
+		storageRaftLog *storageRaftLog
+	}{
+		{a, raftpb.NODE_STATE_LEADER, 1, wlog},
+		{b, raftpb.NODE_STATE_FOLLOWER, 1, wlog},
+		{c, raftpb.NODE_STATE_FOLLOWER, 1, newStorageRaftLog(NewStorageStableInMemory())},
+	}
+
+	for i, tt := range tests {
+		if g := tt.sm.state; g != tt.state {
+			t.Fatalf("#%d: state = %s, want %s", i, g, tt.state)
+		}
+		if g := tt.sm.currentTerm; g != tt.term {
+			t.Fatalf("#%d: term = %d, want %d", i, g, tt.term)
+		}
+		base := ltoa(tt.storageRaftLog)
+		if sm, ok := nt.allStateMachines[1+uint64(i)].(*raftNode); ok {
+			l := ltoa(sm.storageRaftLog)
+			if g := diffu(base, l); g != "" {
+				t.Fatalf("#%d: diff:\n%s", i, g)
+			}
+		} else {
+			t.Logf("#%d: empty log", i)
+		}
+	}
 }
 
 // (etcd raft.TestAllServerStepdown)
 func Test_raft_all_server_step_down(t *testing.T) {
+	tests := []struct {
+		state raftpb.NODE_STATE
 
+		wstate raftpb.NODE_STATE
+		wterm  uint64
+		windex uint64
+	}{
+		{raftpb.NODE_STATE_FOLLOWER, raftpb.NODE_STATE_FOLLOWER, 3, 0},
+		{raftpb.NODE_STATE_PRE_CANDIDATE, raftpb.NODE_STATE_FOLLOWER, 3, 0},
+		{raftpb.NODE_STATE_CANDIDATE, raftpb.NODE_STATE_FOLLOWER, 3, 0},
+		{raftpb.NODE_STATE_LEADER, raftpb.NODE_STATE_FOLLOWER, 3, 1},
+	}
+
+	tmsgTypes := [...]raftpb.MESSAGE_TYPE{raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE, raftpb.MESSAGE_TYPE_LEADER_APPEND}
+	tterm := uint64(3)
+
+	for i, tt := range tests {
+		sm := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+		switch tt.state {
+		case raftpb.NODE_STATE_FOLLOWER:
+			sm.becomeFollower(1, NoNodeID)
+		case raftpb.NODE_STATE_CANDIDATE:
+			sm.becomeCandidate()
+		case raftpb.NODE_STATE_LEADER:
+			sm.becomeCandidate()
+			sm.becomeLeader()
+		}
+
+		for j, msgType := range tmsgTypes {
+			sm.Step(raftpb.Message{From: 2, Type: msgType, SenderCurrentTerm: tterm, LogTerm: tterm})
+
+			if sm.state != tt.wstate {
+				t.Fatalf("#%d.%d state = %v , want %v", i, j, sm.state, tt.wstate)
+			}
+			if sm.currentTerm != tt.wterm {
+				t.Fatalf("#%d.%d term = %v , want %v", i, j, sm.currentTerm, tt.wterm)
+			}
+			if uint64(sm.storageRaftLog.lastIndex()) != tt.windex {
+				t.Fatalf("#%d.%d index = %v , want %v", i, j, sm.storageRaftLog.lastIndex(), tt.windex)
+			}
+			if uint64(len(sm.storageRaftLog.allEntries())) != tt.windex {
+				t.Fatalf("#%d.%d len(ents) = %v , want %v", i, j, len(sm.storageRaftLog.allEntries()), tt.windex)
+			}
+			wlead := uint64(2)
+			if msgType == raftpb.MESSAGE_TYPE_CANDIDATE_REQUEST_VOTE {
+				wlead = NoNodeID
+			}
+			if sm.leaderID != wlead {
+				t.Fatalf("#%d, sm.leaderID = %d, want %d", i, sm.leaderID, NoNodeID)
+			}
+		}
+	}
 }
 
 // (etcd raft.TestLeaderStepdownWhenQuorumActive)
