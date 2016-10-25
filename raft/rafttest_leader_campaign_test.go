@@ -450,7 +450,7 @@ func Test_raft_single_node_pre_candidate(t *testing.T) {
 
 	rnd := tt.allStateMachines[1].(*raftNode)
 	if rnd.state != raftpb.NODE_STATE_LEADER {
-		t.Errorf("state = %d, want %d", rnd.state, raftpb.NODE_STATE_LEADER)
+		t.Fatalf("rnd state expected %q, got %q", raftpb.NODE_STATE_LEADER, rnd.state)
 	}
 }
 
