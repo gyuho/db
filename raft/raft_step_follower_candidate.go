@@ -324,8 +324,6 @@ func (rnd *raftNode) becomeCandidate() {
 
 // (etcd raft.raft.stepCandidate)
 func stepCandidate(rnd *raftNode, msg raftpb.Message) {
-	rnd.assertNodeState(raftpb.NODE_STATE_CANDIDATE)
-
 	// Only handle vote responses corresponding to our candidacy (while in
 	// StateCandidate, we may get stale MsgPreVoteResp messages in this term from
 	// our pre-candidate state).

@@ -188,7 +188,7 @@ func Test_raft_commit_after_delete_node(t *testing.T) {
 		Entries: []raftpb.Entry{{Type: raftpb.ENTRY_TYPE_CONFIG_CHANGE, Data: configChangeData}},
 	})
 
-	nextEnts := persistALlUnstableAndApplyNextEntries(rnd, st)
+	nextEnts := persistAllUnstableAndApplyNextEntries(rnd, st)
 	if len(nextEnts) > 0 {
 		t.Fatalf("unexpected committed entries %+v", nextEnts)
 	}
@@ -207,7 +207,7 @@ func Test_raft_commit_after_delete_node(t *testing.T) {
 		LogIndex: lastIndex,
 	})
 
-	nextEnts = persistALlUnstableAndApplyNextEntries(rnd, st)
+	nextEnts = persistAllUnstableAndApplyNextEntries(rnd, st)
 	if len(nextEnts) != 2 {
 		t.Fatalf("len(nextEnts) expected 2, got %v", len(nextEnts))
 	}

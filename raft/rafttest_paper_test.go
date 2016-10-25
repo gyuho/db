@@ -908,12 +908,15 @@ func Test_raft_paper_leader_sync_follower_log(t *testing.T) {
 			From: 1,
 			To:   1,
 		})
+
+		// The election occurs in the term after the one we loaded with lead.loadHardState above.
 		fn.stepFirstMessage(raftpb.Message{
 			Type:              raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE,
 			From:              3,
 			To:                1,
-			SenderCurrentTerm: 1,
+			SenderCurrentTerm: term + 1,
 		})
+
 		fn.stepFirstMessage(raftpb.Message{
 			Type:    raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER,
 			From:    1,
@@ -1045,5 +1048,5 @@ func Test_raft_paper_voter(t *testing.T) {
 
 // (etcd raft.TestLeaderOnlyCommitsLogFromCurrentTerm)
 func Test_raft_paper_leader_commits_from_current_term(t *testing.T) {
-
+	// TODO
 }

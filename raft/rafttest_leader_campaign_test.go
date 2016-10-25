@@ -114,41 +114,72 @@ func Test_raft_Step_trigger_campaign_while_leader(t *testing.T) {
 
 // (etcd raft.TestLeaderElection)
 func Test_raft_leader_election(t *testing.T) {
-	tests := []struct {
-		fakeNetwork *fakeNetwork
-		wNodeState  raftpb.NODE_STATE
-	}{
-		{newFakeNetwork(nil, nil, nil), raftpb.NODE_STATE_LEADER},
-		{newFakeNetwork(nil, nil, noOpBlackHole), raftpb.NODE_STATE_LEADER},
-		{newFakeNetwork(nil, noOpBlackHole, noOpBlackHole), raftpb.NODE_STATE_CANDIDATE},
-
-		// quorum is 3
-		{newFakeNetwork(nil, noOpBlackHole, noOpBlackHole, nil), raftpb.NODE_STATE_CANDIDATE},
-		{newFakeNetwork(nil, noOpBlackHole, noOpBlackHole, nil, nil), raftpb.NODE_STATE_LEADER},
-
-		// with higher terms than first node
-		{newFakeNetwork(nil, newTestRaftNodeWithTerms(1), newTestRaftNodeWithTerms(2), newTestRaftNodeWithTerms(1, 3), nil), raftpb.NODE_STATE_FOLLOWER},
-
-		// with higher terms including quorum, higest term in <quorum() nodes
-		// out-of-range index from leader
-		{newFakeNetwork(newTestRaftNodeWithTerms(1), nil, newTestRaftNodeWithTerms(2), newTestRaftNodeWithTerms(1), nil), raftpb.NODE_STATE_LEADER},
-	}
-
-	for i, tt := range tests {
-		stepNode := tt.fakeNetwork.allStateMachines[1].(*raftNode)
-		if stepNode.currentTerm != 0 {
-			t.Fatalf("#%d: term expected 0, got %d", i, stepNode.currentTerm)
+	for i, preVote := range []bool{false, true} {
+		var cfg func(*Config)
+		if preVote {
+			cfg = preVoteConfig
 		}
 
-		// to trigger election to 1
-		tt.fakeNetwork.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+		tests := []struct {
+			fakeNetwork *fakeNetwork
+			wNodeState  raftpb.NODE_STATE
+			expTerm     uint64
+		}{
+			{newFakeNetworkWithConfig(cfg, nil, nil, nil), raftpb.NODE_STATE_LEADER, 1},
+			{newFakeNetworkWithConfig(cfg, nil, nil, noOpBlackHole), raftpb.NODE_STATE_LEADER, 1},
+			{newFakeNetworkWithConfig(cfg, nil, noOpBlackHole, noOpBlackHole), raftpb.NODE_STATE_CANDIDATE, 1},
 
-		if stepNode.state != tt.wNodeState {
-			t.Fatalf("#%d: node state expected %q, got %q", i, tt.wNodeState, stepNode.state)
+			{ // quorum is 3
+				newFakeNetworkWithConfig(cfg, nil, noOpBlackHole, noOpBlackHole, nil),
+				raftpb.NODE_STATE_CANDIDATE,
+				1,
+			},
+			{
+				newFakeNetworkWithConfig(cfg, nil, noOpBlackHole, noOpBlackHole, nil, nil),
+				raftpb.NODE_STATE_LEADER,
+				1,
+			},
+
+			// three logs further along than 0, but in the same term so rejections
+			// are returned instead of the votes being ignored.
+			{
+				newFakeNetworkWithConfig(cfg, nil, newTestRaftNodeWithTerms(1), newTestRaftNodeWithTerms(1), newTestRaftNodeWithTerms(1, 1), nil), raftpb.NODE_STATE_FOLLOWER,
+				1,
+			},
+
+			// logs converge
+			{
+				newFakeNetworkWithConfig(cfg, newTestRaftNodeWithTerms(1), nil, newTestRaftNodeWithTerms(2), newTestRaftNodeWithTerms(1), nil),
+				raftpb.NODE_STATE_LEADER,
+				2,
+			},
 		}
 
-		if stepNode.currentTerm != 1 { // should have increased
-			t.Fatalf("#%d: term expected 1, got %d", i, stepNode.currentTerm)
+		for j, tt := range tests {
+			// to trigger election to 1
+			tt.fakeNetwork.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+
+			stepNode := tt.fakeNetwork.allStateMachines[1].(*raftNode)
+
+			var expState raftpb.NODE_STATE
+			var expTerm uint64
+
+			if tt.wNodeState == raftpb.NODE_STATE_CANDIDATE && preVote {
+				// In pre-vote mode, an election that fails to complete
+				// leaves the node in pre-candidate state without advancing the term.
+				expState = raftpb.NODE_STATE_PRE_CANDIDATE
+				expTerm = 0
+			} else {
+				expState = tt.wNodeState
+				expTerm = tt.expTerm
+			}
+
+			if stepNode.state != expState {
+				t.Fatalf("#%d-%d: node state expected %q, got %q", i, j, expState, stepNode.state)
+			}
+			if stepNode.currentTerm != expTerm {
+				t.Fatalf("#%d-%d: term expected %d, got %d", i, j, expTerm, stepNode.currentTerm)
+			}
 		}
 	}
 }
