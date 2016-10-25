@@ -374,7 +374,21 @@ func Test_raft_leader_step_down_checkQuorum_active(t *testing.T) {
 }
 
 // (etcd raft.TestLeaderStepdownWhenQuorumLost)
-// TODO:
+func Test_raft_leader_step_down_checkQuorum_lost(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{1, 2, 3}, 5, 1, NewStorageStableInMemory())
+	rnd.checkQuorum = true
+
+	rnd.becomeCandidate()
+	rnd.becomeLeader()
+
+	for i := 0; i < rnd.electionTimeoutTickNum+1; i++ {
+		rnd.tickFunc()
+	}
+
+	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
+		t.Fatalf("state = %v, want %v", rnd.state, raftpb.NODE_STATE_FOLLOWER)
+	}
+}
 
 func Test_raft_leader_election_checkQuorum_candidate(t *testing.T) {
 	rnd1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
