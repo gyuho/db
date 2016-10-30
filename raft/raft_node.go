@@ -320,7 +320,9 @@ func (rnd *raftNode) sendToMailbox(msg raftpb.Message) {
 		// proposal must go through consensus, which means proposal is to be
 		// forwarded to the leader, and replicated back to followers.
 		// So it should be treated as local message by setting msg.LogTerm as 0
-		if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER {
+		//
+		// readIndex request is also forwarded to leader
+		if msg.Type != raftpb.MESSAGE_TYPE_PROPOSAL_TO_LEADER && msg.Type != raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX {
 			// (X)
 			// msg.LogTerm = rnd.currentTerm
 			msg.SenderCurrentTerm = rnd.currentTerm

@@ -229,3 +229,60 @@ func Test_raft_node_read_index(t *testing.T) {
 		t.Fatalf("data expected %s, got %s", wRequestCtx, msgs[0].Entries[0].Data)
 	}
 }
+
+// (etcd raft.TestNodeReadIndexToOldLeader)
+func Test_raft_node_read_index_old_leader(t *testing.T) {
+	r1 := newTestRaftNode(1, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	r2 := newTestRaftNode(2, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+	r3 := newTestRaftNode(3, []uint64{1, 2, 3}, 10, 1, NewStorageStableInMemory())
+
+	nt := newFakeNetwork(r1, r2, r3)
+
+	// elect r1 as leader
+	nt.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
+
+	var testEntries = []raftpb.Entry{{Data: []byte("testdata")}}
+
+	// send readindex request to r2(follower)
+	r2.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX, From: 2, To: 2, Entries: testEntries})
+
+	// verify r2(follower) forwards this message to r1(leader) with term not set
+	if len(r2.mailbox) != 1 {
+		t.Fatalf("len(r2.mailbox) expected 1, got %d", len(r2.mailbox))
+	}
+	readIndxMsg1 := raftpb.Message{Type: raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX, From: 2, To: 1, Entries: testEntries}
+	if !reflect.DeepEqual(r2.mailbox[0], readIndxMsg1) {
+		t.Fatalf("r2.mailbox[0] expected %+v, got %+v", readIndxMsg1, r2.mailbox[0])
+	}
+
+	// send readindex request to r3(follower)
+	r3.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX, From: 3, To: 3, Entries: testEntries})
+
+	// verify r3(follower) forwards this message to r1(leader) with term not set as well.
+	if len(r3.mailbox) != 1 {
+		t.Fatalf("len(r3.mailbox) expected 1, got %d", len(r3.mailbox))
+	}
+	readIndxMsg2 := raftpb.Message{Type: raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX, From: 3, To: 1, Entries: testEntries}
+	if !reflect.DeepEqual(r3.mailbox[0], readIndxMsg2) {
+		t.Fatalf("r3.mailbox[0] expected %+v, got %+v", readIndxMsg2, r3.mailbox[0])
+	}
+
+	// now elect r3 as leader
+	nt.stepFirstMessage(raftpb.Message{From: 3, To: 3, Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN})
+
+	// let r1 steps the two messages previously we got from r2, r3
+	r1.Step(readIndxMsg1)
+	r1.Step(readIndxMsg2)
+
+	// verify r1(follower) forwards these messages again to r3(new leader)
+	if len(r1.mailbox) != 2 {
+		t.Fatalf("len(r1.mailbox) expected 1, got %d", len(r1.mailbox))
+	}
+	readIndxMsg3 := raftpb.Message{Type: raftpb.MESSAGE_TYPE_TRIGGER_READ_INDEX, From: 1, To: 3, Entries: testEntries}
+	if !reflect.DeepEqual(r1.mailbox[0], readIndxMsg3) {
+		t.Fatalf("r1.mailbox[0] expected %+v, got %+v", readIndxMsg3, r1.mailbox[0])
+	}
+	if !reflect.DeepEqual(r1.mailbox[1], readIndxMsg3) {
+		t.Fatalf("r1.mailbox[1] expected %+v, got %+v", readIndxMsg3, r1.mailbox[1])
+	}
+}
