@@ -11,30 +11,49 @@ option (gogoproto.goproto_getters_all) = false;
 
 // (etcd raft.raftpb.MessageType)
 enum MESSAGE_TYPE {
-	INTERNAL_TRIGGER_CAMPAIGN                  = 0; // (etcd raft.raftpb.MsgHup)
-	INTERNAL_TRIGGER_LEADER_HEARTBEAT          = 1; // (etcd raft.raftpb.MsgBeat)
-	INTERNAL_TRIGGER_CHECK_QUORUM              = 2; // (etcd raft.raftpb.MsgCheckQuorum)
-	INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER = 3; // (etcd raft.raftpb.MsgUnreachable)
+	// (etcd raft.raftpb.MsgHup)
+	INTERNAL_TRIGGER_CAMPAIGN = 0;
+	// (etcd raft.raftpb.MsgBeat)
+	INTERNAL_TRIGGER_LEADER_HEARTBEAT = 1;
+	// (etcd raft.raftpb.MsgCheckQuorum)
+	INTERNAL_TRIGGER_CHECK_QUORUM = 2;
+	// (etcd raft.raftpb.MsgUnreachable)
+	INTERNAL_LEADER_CANNOT_CONNECT_TO_FOLLOWER = 3;
 
-	LEADER_HEARTBEAT             = 4; // (etcd raft.raftpb.MsgHeartbeat)
-	RESPONSE_TO_LEADER_HEARTBEAT = 5; // (etcd raft.raftpb.MsgHeartbeatResp)
+	// (etcd raft.raftpb.MsgHeartbeat)
+	LEADER_HEARTBEAT = 4;
+	// (etcd raft.raftpb.MsgHeartbeatResp)
+	RESPONSE_TO_LEADER_HEARTBEAT = 5;
 
-	PRE_CANDIDATE_REQUEST_VOTE             = 6; // (etcd raft.raftpb.MsgPreVote)
-	RESPONSE_TO_PRE_CANDIDATE_REQUEST_VOTE = 7; // (etcd raft.raftpb.MsgPreVoteResp)
+	// (etcd raft.raftpb.MsgPreVote)
+	PRE_CANDIDATE_REQUEST_VOTE = 6; 
+	// (etcd raft.raftpb.MsgPreVoteResp)
+	RESPONSE_TO_PRE_CANDIDATE_REQUEST_VOTE = 7;
 
-	CANDIDATE_REQUEST_VOTE             = 8; // (etcd raft.raftpb.MsgVote)
-	RESPONSE_TO_CANDIDATE_REQUEST_VOTE = 9; // (etcd raft.raftpb.MsgVoteResp)
+	// (etcd raft.raftpb.MsgVote)
+	CANDIDATE_REQUEST_VOTE = 8;
+	// (etcd raft.raftpb.MsgVoteResp)
+	RESPONSE_TO_CANDIDATE_REQUEST_VOTE = 9;
 
-	PROPOSAL_TO_LEADER        = 10;   // (etcd raft.raftpb.MsgProp)
-	LEADER_APPEND             = 11;   // (etcd raft.raftpb.MsgApp)
-	RESPONSE_TO_LEADER_APPEND = 12;  // (etcd raft.raftpb.MsgAppResp)
+	// (etcd raft.raftpb.MsgProp)
+	PROPOSAL_TO_LEADER = 10;   
+	// (etcd raft.raftpb.MsgApp)
+	LEADER_APPEND = 11;
+	// (etcd raft.raftpb.MsgAppResp)
+	RESPONSE_TO_LEADER_APPEND = 12;
 
-	LEADER_SNAPSHOT                      = 13; // (etcd raft.raftpb.MsgSnap)
-	INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT = 14; // (etcd raft.raftpb.MsgSnapStatus)
+	// (etcd raft.raftpb.MsgSnap)
+	LEADER_SNAPSHOT = 13; 
+	// (etcd raft.raftpb.MsgSnapStatus)
+	INTERNAL_RESPONSE_TO_LEADER_SNAPSHOT = 14;
 
-	TRANSFER_LEADER        = 15; // (etcd raft.raftpb.MsgTransferLeader)
-	FORCE_ELECTION_TIMEOUT = 16; // (etcd raft.raftpb.MsgTimeoutNow)
+	// (etcd raft.raftpb.MsgTransferLeader)
+	TRANSFER_LEADER = 15;
+	// (etcd raft.raftpb.MsgTimeoutNow)
+	FORCE_ELECTION_TIMEOUT = 16;
 
-	TRIGGER_READ_INDEX = 17; // (etcd raft.raftpb.MsgReadIndex)
-	READ_INDEX_DATA    = 18; // (etcd raft.raftpb.MsgReadIndexResp)
+	// (etcd raft.raftpb.MsgReadIndex)
+	TRIGGER_READ_INDEX = 17;
+	// (etcd raft.raftpb.MsgReadIndexResp)
+	READ_INDEX_DATA = 18;
 }
