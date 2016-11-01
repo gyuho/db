@@ -99,6 +99,9 @@ func (ln *listenerStoppable) Accept() (net.Conn, error) {
 
 	select {
 	case <-ln.stopc:
+		if cerr := ln.Close(); cerr != nil {
+			return nil, cerr
+		}
 		return nil, ErrListenerStopped
 	case err := <-errc:
 		return nil, err
