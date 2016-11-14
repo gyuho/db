@@ -670,3 +670,15 @@ func Test_raft_leader_transfer_second_transfer_to_same_node(t *testing.T) {
 	// if rnd.electionTimeoutElapsedTickNum >= rnd.electionTimeoutTickNum {
 	// then stop leader transfer
 }
+
+// (etcd raft.TestLeaderTransferToUpToDateNode)
+func Test_raft_follower_leader_transfer_up_to_date_node(t *testing.T) {
+	rnd := newTestRaftNode(1, []uint64{2, 3, 4}, 5, 1, NewStorageStableInMemory())
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT, From: 2, To: 1})
+
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE, From: 2, To: 1})
+	rnd.Step(raftpb.Message{Type: raftpb.MESSAGE_TYPE_RESPONSE_TO_CANDIDATE_REQUEST_VOTE, From: 3, To: 1})
+	if rnd.state != raftpb.NODE_STATE_FOLLOWER {
+		t.Fatalf("state expected follower, got %q", rnd.state)
+	}
+}

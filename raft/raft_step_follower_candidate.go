@@ -249,11 +249,15 @@ func stepFollower(rnd *raftNode, msg raftpb.Message) {
 		rnd.followerHandleLeaderSnapshot(msg)
 
 	case raftpb.MESSAGE_TYPE_FORCE_ELECTION_TIMEOUT:
-		// Leadership transfers never use pre-vote even if r.preVote is true; we
-		// know we are not recovering from a partition so there is no need for the
-		// extra round trip.
-		raftLogger.Infof("%s received %q; start campaign", rnd.describe(), msg.Type)
-		rnd.doCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
+		if rnd.promotableToLeader() {
+			// Leadership transfers never use pre-vote even if r.preVote is true; we
+			// know we are not recovering from a partition so there is no need for the
+			// extra round trip.
+			raftLogger.Infof("%s received %q; start campaign", rnd.describe(), msg.Type)
+			rnd.doCampaign(raftpb.CAMPAIGN_TYPE_LEADER_TRANSFER)
+		} else {
+			raftLogger.Infof("%s received %q but is not promotable", rnd.describe(), msg.Type)
+		}
 
 	case raftpb.MESSAGE_TYPE_TRANSFER_LEADER:
 		if rnd.leaderID == NoNodeID {
