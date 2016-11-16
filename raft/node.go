@@ -160,8 +160,12 @@ func newNode() node {
 // (etcd raft.node.Status)
 func (nd *node) NodeStatus() NodeStatus {
 	ch := make(chan NodeStatus)
-	nd.nodeStatuscc <- ch
-	return <-ch
+	select {
+	case nd.nodeStatuscc <- ch:
+		return <-ch
+	case <-nd.donec:
+		return NodeStatus{}
+	}
 }
 
 // (etcd raft.node.Tick)
