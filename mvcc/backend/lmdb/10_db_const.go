@@ -10,20 +10,6 @@ import (
 // (bolt.version)
 const version = 2
 
-// marker to indicate that the file is lmdb.
-//
-// (bolt.magic)
-const magic uint32 = 0XED0CDAED
-
-// maxMmapStepBytesN is the largest step that can be taken
-// when remapping the mmap (1 GB).
-//
-// (bolt.maxMmapStep)
-const maxMmapStepBytesN = 1 << 30
-
-// (bolt_amd64.go maxMapSize)
-const maxMmapSize = 0xFFFFFFFFFFFF // 256 TB
-
 const (
 	// DefaultMaxBatchSize is the maximum batch size for DB operations.
 	//
