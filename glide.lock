@@ -1,14 +1,14 @@
-hash: e1f3bab51c471d9c0725f905b90aad91495a014fb51485ad947cdfbf205da1ef
-updated: 2016-08-29T02:42:17.028972469-07:00
+hash: a03bd8902aad58f9392e2fa33bdb6954e5554588da2573995191bd8306cc803b
+updated: 2016-11-19T21:51:44.835023554-08:00
 imports:
 - name: github.com/gogo/protobuf
-  version: 966a6f4b3274f2692aa2f30df2ea5c7172c832ca
+  version: 8d70fb3182befc465c4a1eac8ad4d38ff49778e2
   subpackages:
   - gogoproto
   - proto
   - protoc-gen-gogo/descriptor
 - name: github.com/golang/protobuf
-  version: f592bd283e9ef86337a432eb50e592278c3d534d
+  version: 8ee79997227bf9b34611aee7946ae64735e6fd93
   subpackages:
   - proto
 testImports: []
