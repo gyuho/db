@@ -91,8 +91,8 @@ func encodeLen(dataN, padBytesN int) (headerN uint64) {
 
 func decodeLen(headerN int64) (dataN int64, padBytesN int64) {
 	// revert left-shift from encoding
-	// 0xff is 11111111 in binary
-	shift := uint64(0xff) << lowerBitN
+	// 0xFF is 11111111 in binary
+	shift := uint64(0xFF) << lowerBitN
 	dataN = int64(uint64(headerN) &^ shift)
 
 	if headerN < 0 { // padding was encoded in lower 3-bit of length MSB
@@ -134,11 +134,13 @@ type encoder struct {
 
 var crcTable = crc32.MakeTable(crc32.Castagnoli)
 
+const recordBufN = 1024 * 1024 // 1 MB buffer
+
 func newEncoder(w io.Writer, prevCRC uint32, pageOffset int) *encoder {
 	return &encoder{
 		crc: crcutil.New(prevCRC, crcTable),
 
-		recordBuf: make([]byte, 1024*1024), // 1MB buffer
+		recordBuf: make([]byte, recordBufN),
 		wordBuf:   make([]byte, byteBitN),
 
 		// bw: bufio.NewWriter(w),
