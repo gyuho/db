@@ -7,10 +7,10 @@ import (
 	"github.com/gyuho/db/raft/raftpb"
 )
 
-// NodeStatus represents the status of raft node.
+// Status represents the status of raft node.
 //
 // (etcd raft.Status)
-type NodeStatus struct {
+type Status struct {
 	ID uint64
 
 	SoftState raftpb.SoftState
@@ -22,8 +22,8 @@ type NodeStatus struct {
 }
 
 // (etcd raft.getStatus)
-func getNodeStatus(rnd *raftNode) NodeStatus {
-	ns := NodeStatus{
+func getStatus(rnd *raftNode) Status {
+	ns := Status{
 		ID: rnd.id,
 
 		SoftState: *rnd.softState(),
@@ -43,10 +43,10 @@ func getNodeStatus(rnd *raftNode) NodeStatus {
 	return ns
 }
 
-// MarshalJSON marshals NodeStatus to bytes.
+// MarshalJSON marshals Status to bytes.
 //
 // (etcd raft.Status.MarshalJSON)
-func (ns NodeStatus) MarshalJSON() ([]byte, error) {
+func (ns Status) MarshalJSON() ([]byte, error) {
 	txt := fmt.Sprintf(`{"id":"%x","voted_for":"%x","committed_index":%d,"term":%d,"leader_id":"%x","node_state":%q,"progress":{`,
 		ns.ID, ns.HardState.VotedFor, ns.HardState.CommittedIndex, ns.HardState.Term, ns.SoftState.LeaderID, ns.SoftState.NodeState)
 	if len(ns.AllProgresses) > 0 {
@@ -60,7 +60,7 @@ func (ns NodeStatus) MarshalJSON() ([]byte, error) {
 	return []byte(txt), nil
 }
 
-func (ns NodeStatus) String() string {
+func (ns Status) String() string {
 	b, err := ns.MarshalJSON()
 	if err != nil {
 		raftLogger.Panicf("unexpected error %v", err)

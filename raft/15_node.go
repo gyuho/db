@@ -10,10 +10,10 @@ import (
 //
 // (etcd raft.Node)
 type Node interface {
-	// NodeStatus returns the current status of the Raft state machine.
+	// Status returns the current status of the Raft state machine.
 	//
 	// (etcd raft.Node.Status)
-	NodeStatus() NodeStatus
+	Status() Status
 
 	// Tick increments the internal logical clock in the Node, by a single tick.
 	// Election timeouts and heartbeat timeouts are in units of ticks.
@@ -128,7 +128,7 @@ type node struct {
 	stopc chan struct{}
 	donec chan struct{}
 
-	nodeStatuscc chan chan NodeStatus
+	statuscc chan chan Status
 }
 
 // tickcBufferSize buffers node.tickc, so Raft node can buffer some ticks
@@ -153,18 +153,18 @@ func newNode() node {
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),
 
-		nodeStatuscc: make(chan chan NodeStatus),
+		statuscc: make(chan chan Status),
 	}
 }
 
 // (etcd raft.node.Status)
-func (nd *node) NodeStatus() NodeStatus {
-	ch := make(chan NodeStatus)
+func (nd *node) Status() Status {
+	ch := make(chan Status)
 	select {
-	case nd.nodeStatuscc <- ch:
+	case nd.statuscc <- ch:
 		return <-ch
 	case <-nd.donec:
-		return NodeStatus{}
+		return Status{}
 	}
 }
 
@@ -420,8 +420,8 @@ func (nd *node) runWithRaftNode(rnd *raftNode) {
 			rnd.storageRaftLog.persistedSnapshotAt(prevSnapshotIndex)
 			advancec = nil // reset, waits for next ready
 
-		case nodeStatusCh := <-nd.nodeStatuscc: // case c := <-n.status:
-			nodeStatusCh <- getNodeStatus(rnd)
+		case statusch := <-nd.statuscc: // case c := <-n.status:
+			statusch <- getStatus(rnd)
 
 		case <-nd.stopc: // case <-n.stop:
 			close(nd.donec)
