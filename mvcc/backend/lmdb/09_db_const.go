@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-// data file format version
-//
-// (bolt.version)
-const version = 2
-
 const (
 	// DefaultMaxBatchSize is the maximum batch size for DB operations.
 	//
