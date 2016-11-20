@@ -1,5 +1,7 @@
 package lmdb
 
+import "fmt"
+
 // marker to indicate that the file is lmdb.
 //
 // (bolt.magic)
@@ -21,15 +23,6 @@ const maxAllocSize = 0x7FFFFFFF // 2 GB
 
 // maxBranchLeafSize is the maximum size of pointer arrays of leaf, branch page element.
 const maxBranchLeafSize = 0x7FFFFFF // 134 MB
-
-const (
-	branchPageFlag   = 0x01
-	leafPageFlag     = 0x02
-	metaPageFlag     = 0x04
-	freelistPageFlag = 0x10
-
-	bucketLeafFlag = 0x01
-)
 
 // pgid is the page ID.
 //
@@ -78,3 +71,26 @@ Let f be ∨
 	2. f(a, a) = a
 	3. f(a, b) ≥ max(a, b)
 */
+const (
+	branchPageFlag   = 0x01
+	leafPageFlag     = 0x02
+	metaPageFlag     = 0x04
+	freelistPageFlag = 0x10
+
+	bucketLeafFlag = 0x01
+)
+
+// (bolt.page.typ)
+func (p *page) String() string {
+	switch {
+	case (p.flags & branchPageFlag) != 0:
+		return "branch"
+	case (p.flags & leafPageFlag) != 0:
+		return "leaf"
+	case (p.flags & metaPageFlag) != 0:
+		return "meta"
+	case (p.flags & freelistPageFlag) != 0:
+		return "freelist"
+	}
+	return fmt.Sprintf("unknown<0x%02x>", p.flags)
+}
