@@ -1,8 +1,6 @@
-hash: b5eaae04f3482b14de1aad8633a7952f8b3136678c266fb3effdf728117ee7cd
-updated: 2016-11-21T01:33:28.272532167-08:00
+hash: a03bd8902aad58f9392e2fa33bdb6954e5554588da2573995191bd8306cc803b
+updated: 2016-11-21T02:16:13.883785416-08:00
 imports:
-- name: github.com/boltdb/bolt
-  version: 315c65d4cf4f5278c73477a35fb1f9b08365d340
 - name: github.com/gogo/protobuf
   version: 8d70fb3182befc465c4a1eac8ad4d38ff49778e2
   subpackages:
@@ -13,10 +11,4 @@ imports:
   version: 8ee79997227bf9b34611aee7946ae64735e6fd93
   subpackages:
   - proto
-- name: github.com/google/btree
-  version: 925471ac9e2131377a91e1595defec898166fe49
-- name: golang.org/x/sys
-  version: 9c60d1c508f5134d1ca726b4641db998f2523357
-  subpackages:
-  - unix
 testImports: []
