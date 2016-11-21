@@ -47,7 +47,3 @@ protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
 	raftsnap/raftsnappb/*.proto;
 
-printf "Generating mvcc/mvccpb\n"
-protoc --gofast_out=plugins=grpc:. \
-	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
-	mvcc/mvccpb/*.proto;
