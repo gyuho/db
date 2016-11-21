@@ -40,23 +40,23 @@ if [ -n "${result}" ]; then
 	exit 255
 fi
 
-echo "Checking gosimple..."
-for path in $TESTS; do
-	result=`gosimple ${path} || true`
-	if [ -n "${result}" ]; then
-		echo -e "gosimple checking ${path} failed:\n${result}"
-		exit 255
-	fi
-done
+# echo "Checking gosimple..."
+# for path in $TESTS; do
+# 	result=`gosimple ${path} || true`
+# 	if [ -n "${result}" ]; then
+# 		echo -e "gosimple checking ${path} failed:\n${result}"
+# 		exit 255
+# 	fi
+# done
 
-echo "Checking unused..."
-for path in $TESTS; do
-	result=`unused ${path} || true`
-	if [ -n "${result}" ]; then
-		echo -e "unused checking ${path} failed:\n${result}"
-		exit 255
-	fi
-done
+# echo "Checking unused..."
+# for path in $TESTS; do
+# 	result=`unused ${path} || true`
+# 	if [ -n "${result}" ]; then
+# 		echo -e "unused checking ${path} failed:\n${result}"
+# 		exit 255
+# 	fi
+# done
 
 echo "Running tests...";
 go test -v -cover -cpu 1,2,4 $TESTS;
