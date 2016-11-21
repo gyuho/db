@@ -17,8 +17,8 @@ if ! [[ "$0" =~ "scripts/genproto.sh" ]]; then
 fi
 
 # for now, be conservative about what version of protoc we expect
-if ! [[ $(protoc --version) =~ "3.0.0" ]]; then
-	echo "could not find protoc 3.0.0, is it installed + in PATH?"
+if ! [[ $(protoc --version) =~ "3.1.0" ]]; then
+	echo "could not find protoc 3.1.0, is it installed + in PATH?"
 	exit 255
 fi
 
@@ -46,3 +46,4 @@ printf "Generating raftsnap/raftsnappb\n"
 protoc --gofast_out=plugins=grpc:. \
 	--proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. \
 	raftsnap/raftsnappb/*.proto;
+

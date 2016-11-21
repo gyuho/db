@@ -445,6 +445,8 @@ func (rnd *raftNode) allNodeIDs() []uint64 {
 
 // (etcd raft.raft.addNode)
 func (rnd *raftNode) addNode(id uint64) {
+	rnd.pendingConfigExist = false
+
 	if _, ok := rnd.allProgresses[id]; ok {
 		raftLogger.Infof("%s ignores redundant 'addNode' call to %s (can happen when initial boostrapping entries are applied twice)", rnd.describe(), types.ID(id))
 		return
@@ -452,8 +454,6 @@ func (rnd *raftNode) addNode(id uint64) {
 
 	matchIndex := uint64(0)
 	rnd.updateProgress(id, matchIndex, rnd.storageRaftLog.lastIndex()+1)
-
-	rnd.pendingConfigExist = false
 }
 
 // (etcd raft.raft.removeNode)

@@ -512,3 +512,71 @@ func Test_node_RestartNode_from_snapshot(t *testing.T) {
 	case <-time.After(time.Millisecond):
 	}
 }
+
+// (etcd raft.TestNodeProposeAddDuplicateNode)
+func Test_node_propose_addNode_twice(t *testing.T) {
+	nd := newNode()
+	st := NewStorageStableInMemory()
+	rnd := newTestRaftNode(1, []uint64{1}, 10, 1, st)
+	go nd.runWithRaftNode(rnd)
+	nd.Campaign(context.TODO())
+
+	var rdyEntries []raftpb.Entry
+	ticker := time.NewTicker(100 * time.Millisecond)
+
+	donec, stopc := make(chan struct{}), make(chan struct{})
+	applyConfChan := make(chan struct{})
+
+	go func() {
+		defer close(donec)
+		for {
+			select {
+			case <-stopc:
+				return
+			case <-ticker.C:
+				nd.Tick()
+			case rd := <-nd.Ready():
+				st.Append(rd.EntriesToAppend...)
+				for _, e := range rd.EntriesToAppend {
+					rdyEntries = append(rdyEntries, e)
+					switch e.Type {
+					case raftpb.ENTRY_TYPE_NORMAL:
+					case raftpb.ENTRY_TYPE_CONFIG_CHANGE:
+						var cc raftpb.ConfigChange
+						cc.Unmarshal(e.Data)
+						nd.ApplyConfigChange(cc)
+						applyConfChan <- struct{}{}
+					}
+				}
+				nd.Advance()
+			}
+		}
+	}()
+
+	cc1 := raftpb.ConfigChange{Type: raftpb.CONFIG_CHANGE_TYPE_ADD_NODE, NodeID: 1}
+	ccdata1, _ := cc1.Marshal()
+	nd.ProposeConfigChange(context.TODO(), cc1)
+	<-applyConfChan
+
+	// duplicate request
+	nd.ProposeConfigChange(context.TODO(), cc1)
+	<-applyConfChan
+
+	cc2 := raftpb.ConfigChange{Type: raftpb.CONFIG_CHANGE_TYPE_ADD_NODE, NodeID: 2}
+	ccdata2, _ := cc2.Marshal()
+	nd.ProposeConfigChange(context.TODO(), cc2)
+	<-applyConfChan
+
+	close(stopc)
+	<-donec
+
+	if len(rdyEntries) != 4 {
+		t.Fatalf("len(rdyEntries) expected 4, got %d", len(rdyEntries))
+	}
+	if !bytes.Equal(rdyEntries[1].Data, ccdata1) {
+		t.Fatalf("data expected %q, got %q", ccdata1, rdyEntries[1].Data)
+	}
+	if !bytes.Equal(rdyEntries[3].Data, ccdata2) {
+		t.Fatalf("data expected %q, got %q", ccdata2, rdyEntries[3].Data)
+	}
+}

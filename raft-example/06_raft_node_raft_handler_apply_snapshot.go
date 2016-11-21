@@ -90,7 +90,7 @@ func (rnd *raftNode) applyEntries(ap *apply) {
 		case raftpb.ENTRY_TYPE_CONFIG_CHANGE:
 			var cc raftpb.ConfigChange
 			cc.Unmarshal(ap.entriesToApply[i].Data)
-			rnd.node.ApplyConfigChange(cc)
+			rnd.configState = *rnd.node.ApplyConfigChange(cc)
 			switch cc.Type {
 			case raftpb.CONFIG_CHANGE_TYPE_ADD_NODE:
 				if len(cc.Context) > 0 {

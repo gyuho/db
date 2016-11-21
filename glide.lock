@@ -1,14 +1,16 @@
-hash: e1f3bab51c471d9c0725f905b90aad91495a014fb51485ad947cdfbf205da1ef
-updated: 2016-08-29T02:42:17.028972469-07:00
+hash: e03aec5c289cd1aafa1e364e383be91bdbd34cb46b58ed12ec75163589dc6817
+updated: 2016-11-20T23:18:03.1471397-08:00
 imports:
+- name: github.com/boltdb/bolt
+  version: 315c65d4cf4f5278c73477a35fb1f9b08365d340
 - name: github.com/gogo/protobuf
-  version: 966a6f4b3274f2692aa2f30df2ea5c7172c832ca
+  version: 8d70fb3182befc465c4a1eac8ad4d38ff49778e2
   subpackages:
   - gogoproto
   - proto
   - protoc-gen-gogo/descriptor
 - name: github.com/golang/protobuf
-  version: f592bd283e9ef86337a432eb50e592278c3d534d
+  version: 8ee79997227bf9b34611aee7946ae64735e6fd93
   subpackages:
   - proto
 testImports: []

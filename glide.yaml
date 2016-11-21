@@ -1,12 +1,14 @@
 package: github.com/gyuho/db
 import:
 - package: github.com/gogo/protobuf
-  version: 966a6f4b3274f2692aa2f30df2ea5c7172c832ca
+  version: 8d70fb3182befc465c4a1eac8ad4d38ff49778e2
   subpackages:
   - gogoproto
   - proto
   - protoc-gen-gogo/descriptor
 - package: github.com/golang/protobuf
-  version: f592bd283e9ef86337a432eb50e592278c3d534d
+  version: 8ee79997227bf9b34611aee7946ae64735e6fd93
   subpackages:
   - proto
+- package: github.com/boltdb/bolt
+  version: 315c65d4cf4f5278c73477a35fb1f9b08365d340
