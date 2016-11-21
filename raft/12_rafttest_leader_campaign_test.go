@@ -741,7 +741,6 @@ func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	// rnd1 will start campaign and become the leader
 	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 1, To: 1})
 	rnd1.assertNodeState(raftpb.NODE_STATE_LEADER)
-	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 
 	// rnd1 check quorum is true, and passed election timeout
@@ -759,7 +758,6 @@ func Test_raft_leader_election_checkQuorum_leader(t *testing.T) {
 	// rnd3 will start campaign and become the leader
 	fn.stepFirstMessage(raftpb.Message{Type: raftpb.MESSAGE_TYPE_INTERNAL_TRIGGER_CAMPAIGN, From: 3, To: 3})
 	rnd1.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
-	rnd2.assertNodeState(raftpb.NODE_STATE_FOLLOWER)
 	rnd3.assertNodeState(raftpb.NODE_STATE_LEADER)
 }
 
