@@ -363,6 +363,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 		for i := range msg.Entries {
 			if msg.Entries[i].Type == raftpb.ENTRY_TYPE_CONFIG_CHANGE {
 				if rnd.pendingConfigExist {
+					raftLogger.Infof("proposal %q is ignored since there's pending unapplied configuration", msg.Entries[i].Type.String())
 					msg.Entries[i] = raftpb.Entry{Type: raftpb.ENTRY_TYPE_NORMAL}
 				}
 				rnd.pendingConfigExist = true
