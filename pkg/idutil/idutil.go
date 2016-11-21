@@ -1,3 +1,4 @@
+// Package idutil implements ID utilities.
 package idutil
 
 import (
