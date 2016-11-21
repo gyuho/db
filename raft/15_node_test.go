@@ -525,7 +525,7 @@ func Test_node_propose_addNode_twice(t *testing.T) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 
 	donec, stopc := make(chan struct{}), make(chan struct{})
-	applyc := make(chan struct{})
+	applyConfChan := make(chan struct{})
 
 	go func() {
 		defer close(donec)
@@ -545,10 +545,10 @@ func Test_node_propose_addNode_twice(t *testing.T) {
 						var cc raftpb.ConfigChange
 						cc.Unmarshal(e.Data)
 						nd.ApplyConfigChange(cc)
+						applyConfChan <- struct{}{}
 					}
 				}
 				nd.Advance()
-				applyc <- struct{}{}
 			}
 		}
 	}()
@@ -556,16 +556,16 @@ func Test_node_propose_addNode_twice(t *testing.T) {
 	cc1 := raftpb.ConfigChange{Type: raftpb.CONFIG_CHANGE_TYPE_ADD_NODE, NodeID: 1}
 	ccdata1, _ := cc1.Marshal()
 	nd.ProposeConfigChange(context.TODO(), cc1)
-	<-applyc
+	<-applyConfChan
 
 	// duplicate request
 	nd.ProposeConfigChange(context.TODO(), cc1)
-	<-applyc
+	<-applyConfChan
 
 	cc2 := raftpb.ConfigChange{Type: raftpb.CONFIG_CHANGE_TYPE_ADD_NODE, NodeID: 2}
 	ccdata2, _ := cc2.Marshal()
 	nd.ProposeConfigChange(context.TODO(), cc2)
-	<-applyc
+	<-applyConfChan
 
 	close(stopc)
 	<-donec
