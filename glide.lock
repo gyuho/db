@@ -1,6 +1,8 @@
-hash: a03bd8902aad58f9392e2fa33bdb6954e5554588da2573995191bd8306cc803b
-updated: 2016-11-19T21:51:44.835023554-08:00
+hash: e03aec5c289cd1aafa1e364e383be91bdbd34cb46b58ed12ec75163589dc6817
+updated: 2016-11-20T23:18:03.1471397-08:00
 imports:
+- name: github.com/boltdb/bolt
+  version: 315c65d4cf4f5278c73477a35fb1f9b08365d340
 - name: github.com/gogo/protobuf
   version: 8d70fb3182befc465c4a1eac8ad4d38ff49778e2
   subpackages:

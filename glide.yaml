@@ -10,3 +10,5 @@ import:
   version: 8ee79997227bf9b34611aee7946ae64735e6fd93
   subpackages:
   - proto
+- package: github.com/boltdb/bolt
+  version: 315c65d4cf4f5278c73477a35fb1f9b08365d340
