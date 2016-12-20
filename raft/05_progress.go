@@ -92,8 +92,13 @@ func (pr *Progress) resume() {
 	pr.Paused = false
 }
 
-// (etcd raft.Progress.isPaused)
-func (pr *Progress) isPaused() bool {
+// IsPaused returns whether sending log entries to this node has been
+// paused. A node may be paused because it has rejected recent
+// MsgApps, is currently waiting for a snapshot, or has reached the
+// MaxInflightMsgs limit.
+//
+// (etcd raft.Progress.IsPaused)
+func (pr *Progress) IsPaused() bool {
 	switch pr.State {
 	case raftpb.PROGRESS_STATE_PROBE:
 		return pr.Paused
@@ -183,7 +188,7 @@ func (pr *Progress) String() string {
 		pr.State,
 		pr.MatchIndex,
 		pr.NextIndex,
-		pr.isPaused(),
+		pr.IsPaused(),
 		pr.PendingSnapshotIndex,
 	)
 }

@@ -310,7 +310,9 @@ func (ms *StorageStableInMemory) ApplySnapshot(snapshot raftpb.Snapshot) error {
 //
 // (etcd raft.MemoryStorage.SetHardState)
 func (ms *StorageStableInMemory) SetHardState(state raftpb.HardState) error {
+	ms.mu.Lock()
 	ms.hardState = state
+	ms.mu.Unlock()
 	return nil
 }
 

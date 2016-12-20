@@ -250,8 +250,8 @@ func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
 			t.Fatalf("#%d: msgs[0].LogIndex expected 0, got %d", i, msgs[0].LogIndex)
 		}
 
-		if !rnd.allProgresses[2].isPaused() {
-			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected true, got %v", i, rnd.allProgresses[2].isPaused())
+		if !rnd.allProgresses[2].IsPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].IsPaused() expected true, got %v", i, rnd.allProgresses[2].IsPaused())
 		}
 
 		for j := 0; j < 10; j++ {
@@ -268,8 +268,8 @@ func Test_raft_leader_progress_append_to_progress_probe(t *testing.T) {
 		}
 		// rnd.leaderSendHeartbeats() // resume all progresses
 
-		if rnd.allProgresses[2].isPaused() {
-			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected false, got %v", i, rnd.allProgresses[2].isPaused())
+		if rnd.allProgresses[2].IsPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].IsPaused() expected false, got %v", i, rnd.allProgresses[2].IsPaused())
 		}
 		msgs = rnd.readAndClearMailbox()
 		if len(msgs) != 1 {
@@ -295,8 +295,8 @@ func Test_raft_leader_progress_append_to_progress_replicate(t *testing.T) {
 		rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: []byte("testdata")})
 		rnd.leaderSendAppendOrSnapshot(2)
 
-		if rnd.allProgresses[2].isPaused() {
-			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected false, got %v", i, rnd.allProgresses[2].isPaused())
+		if rnd.allProgresses[2].IsPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].IsPaused() expected false, got %v", i, rnd.allProgresses[2].IsPaused())
 		}
 		msgs := rnd.readAndClearMailbox()
 		if len(msgs) != 1 {
@@ -315,7 +315,7 @@ func Test_raft_leader_progress_append_to_progress_snapshot(t *testing.T) {
 
 	rnd.allProgresses[2].becomeSnapshot(10)
 	/*
-	   isPaused returns true
+	   IsPaused returns true
 
 	   case raftpb.PROGRESS_STATE_SNAPSHOT:
 	   	return true
@@ -325,8 +325,8 @@ func Test_raft_leader_progress_append_to_progress_snapshot(t *testing.T) {
 		rnd.leaderAppendEntriesToLeader(raftpb.Entry{Data: []byte("testdata")})
 		rnd.leaderSendAppendOrSnapshot(2)
 
-		if !rnd.allProgresses[2].isPaused() {
-			t.Fatalf("#%d: rnd.allProgresses[2].isPaused() expected true, got %v", i, rnd.allProgresses[2].isPaused())
+		if !rnd.allProgresses[2].IsPaused() {
+			t.Fatalf("#%d: rnd.allProgresses[2].IsPaused() expected true, got %v", i, rnd.allProgresses[2].IsPaused())
 		}
 		msgs := rnd.readAndClearMailbox()
 		if len(msgs) != 0 {

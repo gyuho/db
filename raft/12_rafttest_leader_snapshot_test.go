@@ -137,7 +137,7 @@ func Test_raft_snapshot_pause_replication(t *testing.T) {
 	}
 	/*
 	   followerProgress := rnd.allProgresses[targetID]
-	   if followerProgress.isPaused() { // snapshot returns true
+	   if followerProgress.IsPaused() { // snapshot returns true
 	   	raftLogger.Debugf("%s skips append/snapshot to paused follower %x", rnd.describe(), targetID)
 	   	return
 	   }
@@ -177,8 +177,8 @@ func Test_raft_snapshot_failure(t *testing.T) {
 	if rnd.allProgresses[2].NextIndex != 1 {
 		t.Fatalf("rnd.allProgresses[2].NextIndex expected 1, got %d", rnd.allProgresses[2].NextIndex)
 	}
-	if !rnd.allProgresses[2].isPaused() {
-		t.Fatalf("rnd.allProgresses[2].isPaused() expected true, got %v", rnd.allProgresses[2].isPaused())
+	if !rnd.allProgresses[2].IsPaused() {
+		t.Fatalf("rnd.allProgresses[2].IsPaused() expected true, got %v", rnd.allProgresses[2].IsPaused())
 	}
 }
 
@@ -222,8 +222,8 @@ func Test_raft_snapshot_succeed(t *testing.T) {
 	if rnd.allProgresses[2].NextIndex != 12 {
 		t.Fatalf("rnd.allProgresses[2].NextIndex expected 12, got %d", rnd.allProgresses[2].NextIndex)
 	}
-	if !rnd.allProgresses[2].isPaused() {
-		t.Fatalf("rnd.allProgresses[2].isPaused() expected true, got %v", rnd.allProgresses[2].isPaused())
+	if !rnd.allProgresses[2].IsPaused() {
+		t.Fatalf("rnd.allProgresses[2].IsPaused() expected true, got %v", rnd.allProgresses[2].IsPaused())
 	}
 }
 
@@ -263,8 +263,8 @@ func Test_raft_snapshot_abort(t *testing.T) {
 	if rnd.allProgresses[2].NextIndex != 12 {
 		t.Fatalf("rnd.allProgresses[2].NextIndex expected 12, got %d", rnd.allProgresses[2].NextIndex)
 	}
-	if !rnd.allProgresses[2].isPaused() {
-		t.Fatalf("rnd.allProgresses[2].isPaused() expected true, got %v", rnd.allProgresses[2].isPaused())
+	if !rnd.allProgresses[2].IsPaused() {
+		t.Fatalf("rnd.allProgresses[2].IsPaused() expected true, got %v", rnd.allProgresses[2].IsPaused())
 	}
 }
 

@@ -135,8 +135,8 @@ func Test_Progress_maybeUpdateAndResume(t *testing.T) {
 		if tt.pr.NextIndex != tt.wNextIndex {
 			t.Fatalf("#%d: progress next index expected %d, got %d", i, tt.wNextIndex, tt.pr.NextIndex)
 		}
-		if tt.pr.isPaused() != tt.wPaused {
-			t.Fatalf("#%d: paused expected %v, got %v", i, tt.wPaused, tt.pr.isPaused())
+		if tt.pr.IsPaused() != tt.wPaused {
+			t.Fatalf("#%d: paused expected %v, got %v", i, tt.wPaused, tt.pr.IsPaused())
 		}
 	}
 }
@@ -261,7 +261,7 @@ func Test_Progress_maybeDecreaseAndResume(t *testing.T) {
 }
 
 // (etcd raft.TestProgressIsPaused)
-func Test_Progress_isPaused(t *testing.T) {
+func Test_Progress_IsPaused(t *testing.T) {
 	tests := []struct {
 		pr      *Progress
 		wPaused bool
@@ -298,7 +298,7 @@ func Test_Progress_isPaused(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		if paused := tt.pr.isPaused(); paused != tt.wPaused {
+		if paused := tt.pr.IsPaused(); paused != tt.wPaused {
 			t.Fatalf("#%d: paused expected %v, got %v", i, tt.wPaused, paused)
 		}
 	}

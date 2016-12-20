@@ -144,7 +144,7 @@ func (rnd *raftNode) leaderMaybeCommitWithQuorumMatchIndex() bool {
 // (etcd raft.raft.sendAppend)
 func (rnd *raftNode) leaderSendAppendOrSnapshot(targetID uint64) {
 	followerProgress := rnd.allProgresses[targetID]
-	if followerProgress.isPaused() {
+	if followerProgress.IsPaused() {
 		raftLogger.Infof("%s skips append/snapshot to paused follower %s", rnd.describe(), types.ID(targetID))
 		return
 	}
@@ -470,7 +470,7 @@ func stepLeader(rnd *raftNode, msg raftpb.Message) {
 			}
 
 		case false:
-			wasPausedOrFull := followerProgress.isPaused()
+			wasPausedOrFull := followerProgress.IsPaused()
 			if followerProgress.maybeUpdateAndResume(msg.LogIndex) {
 				switch followerProgress.State {
 				case raftpb.PROGRESS_STATE_PROBE:
