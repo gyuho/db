@@ -64,12 +64,12 @@ func HardStateContainUpdates(prevHardState, hardState HardState, entryNum int) b
 	return entryNum != 0 || prevHardState.VotedFor != hardState.VotedFor || prevHardState.Term != hardState.Term
 }
 
-// DescribeMessage decribes message.
+// DescribeMessage describes message.
 func DescribeMessage(msg Message) string {
 	return fmt.Sprintf(`%q [from=%x | message sender current term=%d]`, msg.Type, msg.From, msg.SenderCurrentTerm)
 }
 
-// DescribeMessageLong decribes message.
+// DescribeMessageLong describes message.
 func DescribeMessageLong(msg Message) string {
 	return fmt.Sprintf(`%q
 	[from=%x ➝ to=%x | sender current committed index=%d | sender current term=%d]
