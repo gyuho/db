@@ -28,7 +28,7 @@ func Test_MessageBinaryEncoderDecoder(t *testing.T) {
 				{Data: []byte("testdata")},
 			},
 		},
-		Message{Type: MESSAGE_TYPE_LEADER_HEARTBEAT},
+		{Type: MESSAGE_TYPE_LEADER_HEARTBEAT},
 	}
 
 	for i, tt := range tests {
