@@ -22,7 +22,7 @@ type storageRaftLog struct {
 	// (etcd raft.raftLog.storage)
 	storageStable StorageStable
 
-	// committedIndex is the higest log position that is known to be stored in
+	// committedIndex is the highest log position that is known to be stored in
 	// the stable storage "on a quorum of nodes".
 	//
 	// (etcd raft.raftLog.committed)
