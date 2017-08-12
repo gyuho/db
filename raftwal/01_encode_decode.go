@@ -38,7 +38,7 @@ const (
 	//
 	// Computer reads from or writes to a memory address in word-sized chunks
 	// or larger. Data alignment is to put this data to a memory address with
-	// the size of "multiple" word-sized chunks. This increases the sytem
+	// the size of "multiple" word-sized chunks. This increases the system
 	// performance because that's how CPU handles the memory.
 	//
 	// To align the data this way, it needs to insert some meaningless bytes between
