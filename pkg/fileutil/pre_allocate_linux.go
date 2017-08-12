@@ -47,7 +47,7 @@ func Preallocate(f *os.File, sizeInBytes int64, extendFile bool) error {
 			switch extendFile {
 			case true:
 				// fallocate not supported
-				// fallocate EINTRs frequently in some enviroments; fallback
+				// fallocate EINTRs frequently in some environments; fallback
 				if errno == syscall.ENOTSUP || errno == syscall.EINTR {
 					return preallocExtendTrunc(f, sizeInBytes)
 				}
