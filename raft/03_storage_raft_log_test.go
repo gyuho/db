@@ -488,7 +488,7 @@ func Test_storageRaftLog_NextEntries(t *testing.T) { // (etcd raft TestHasNextEn
 			0,
 
 			4, true, // maxStart := maxUint64(rg.appliedIndex+1, rg.firstIndex())
-			[]raftpb.Entry{{Index: 4, Term: 1}, {Index: 5, Term: 1}}, // because Index: 6 is not comitted yet
+			[]raftpb.Entry{{Index: 4, Term: 1}, {Index: 5, Term: 1}}, // because Index: 6 is not committed yet
 		},
 
 		{
@@ -500,7 +500,7 @@ func Test_storageRaftLog_NextEntries(t *testing.T) { // (etcd raft TestHasNextEn
 			3, // 2, then panic because applied index is already 3
 
 			4, true, // maxStart := maxUint64(rg.appliedIndex+1, rg.firstIndex())
-			[]raftpb.Entry{{Index: 4, Term: 1}, {Index: 5, Term: 1}}, // because Index: 6 is not comitted yet
+			[]raftpb.Entry{{Index: 4, Term: 1}, {Index: 5, Term: 1}}, // because Index: 6 is not committed yet
 		},
 
 		{
@@ -512,7 +512,7 @@ func Test_storageRaftLog_NextEntries(t *testing.T) { // (etcd raft TestHasNextEn
 			4,
 
 			5, true, // maxStart := maxUint64(rg.appliedIndex+1, rg.firstIndex())
-			[]raftpb.Entry{{Index: 5, Term: 1}}, // because Index: 6 is not comitted yet
+			[]raftpb.Entry{{Index: 5, Term: 1}}, // because Index: 6 is not committed yet
 		},
 
 		{
@@ -524,7 +524,7 @@ func Test_storageRaftLog_NextEntries(t *testing.T) { // (etcd raft TestHasNextEn
 			5,
 
 			6, false, // maxStart := maxUint64(rg.appliedIndex+1, rg.firstIndex())
-			nil, // because Index: 6 is not comitted yet
+			nil, // because Index: 6 is not committed yet
 		},
 	}
 	for i, tt := range tests {
