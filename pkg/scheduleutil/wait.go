@@ -45,7 +45,7 @@ func (w *waitList) Register(id uint64) <-chan interface{} {
 		ch = make(chan interface{}, 1)
 		w.list[id] = ch
 	} else {
-		panic(fmt.Errorf("dupicate id %x", id))
+		panic(fmt.Errorf("duplicate id %x", id))
 	}
 	return ch
 }
